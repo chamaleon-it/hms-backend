@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { JWTUserInterface } from 'src/interface/jwt-user.interface';
 
 @Injectable()
 export class UsersService {
@@ -14,10 +15,21 @@ export class UsersService {
       email: createUserDto.email,
     });
     if (isUserExist) {
-      throw new BadRequestException('User already exist.');
+      throw new BadRequestException(
+        'This email address is already registered with us.',
+      );
     }
     createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     const user = await this.userModel.create(createUserDto);
     return user;
+  }
+
+  async getProfile(user: JWTUserInterface) {
+    const data = await this.userModel.findById(user.id).lean();
+
+    if (!data) {
+      throw new BadRequestException('User profile not found.');
+    }
+    return data;
   }
 }

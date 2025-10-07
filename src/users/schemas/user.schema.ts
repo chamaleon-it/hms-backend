@@ -58,6 +58,11 @@ export class User {
   })
   status: string;
 
+  @Prop({
+    default: null,
+  })
+  refreshToken?: string;
+
   @Prop({ trim: true, default: null })
   phoneNumber?: string;
 

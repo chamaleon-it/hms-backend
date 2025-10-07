@@ -12,11 +12,11 @@ import {
 @ValidatorConstraint({ name: 'MatchPassword', async: false })
 export class MatchPasswordConstraint implements ValidatorConstraintInterface {
   validate(confirmPassword: string, args: ValidationArguments) {
-    const object = args.object as any;
+    const object = args.object as { password: string };
     return object.password === confirmPassword;
   }
 
-  defaultMessage(args: ValidationArguments) {
+  defaultMessage() {
     return 'Passwords do not match.';
   }
 }
@@ -25,6 +25,10 @@ export class CreateUserDto {
   @IsString({ message: 'Name must be a string.' })
   @Transform(({ value }: { value: string }) => value.trim())
   name: string;
+
+  @IsString({ message: 'Role must be a string.' })
+  @Transform(({ value }: { value: string }) => value.trim())
+  role: string;
 
   @IsEmail({}, { message: 'Email must be a valid email address.' })
   @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
