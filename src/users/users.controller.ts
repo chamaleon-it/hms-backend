@@ -32,13 +32,24 @@ export class UsersController {
     };
   }
 
-  @Post("forgot_password")
-  async forgotPassword(@Body() forgotPasswordDto:ForgotPasswordDto){
-    const data = await this.usersService.forgotPassword(forgotPasswordDto)
+  @Post('forgot_password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    const data = await this.usersService.forgotPassword(forgotPasswordDto);
     return {
       data,
-      message:"The password reset link has been successfully sent to your email address."
-    }
+      message:
+        'The password reset link has been successfully sent to your email address.',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('doctors')
+  async getAllDoctors() {
+    const data = await this.usersService.getAllDoctors();
+    return {
+      data,
+      message: 'All doctors data retrived successfully',
+    };
   }
 
   //get all users

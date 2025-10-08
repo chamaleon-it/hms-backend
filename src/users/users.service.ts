@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/createUser.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from './schemas/user.schema';
+import { User, UserRole } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -53,8 +53,16 @@ export class UsersService {
         expiresIn: '7d',
       },
     );
-console.log(`${forgotPasswordDto.email} is requaest for reset link.` );
+    console.log(`${forgotPasswordDto.email} is requaest for reset link.`);
     console.log(`https://hms.com/reset-passsword?token=${token}`);
-    return token
+    return token;
+  }
+
+  async getAllDoctors() {
+    const data = await this.userModel
+      .find({ role: UserRole.DOCTOR })
+      .select('name email phoneNumber address profilePic')
+      .lean();
+    return data;
   }
 }
