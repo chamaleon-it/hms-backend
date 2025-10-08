@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -29,6 +30,15 @@ export class UsersController {
       data,
       message: 'user profile retrived',
     };
+  }
+
+  @Post("forgot_password")
+  async forgotPassword(@Body() forgotPasswordDto:ForgotPasswordDto){
+    const data = await this.usersService.forgotPassword(forgotPasswordDto)
+    return {
+      data,
+      message:"The password reset link has been successfully sent to your email address."
+    }
   }
 
   //get all users

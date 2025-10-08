@@ -5,10 +5,16 @@ import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { JwtService } from '@nestjs/jwt';
+import configuration from 'src/config/configuration';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    private jwtService: JwtService,
+  ) {}
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
@@ -31,5 +37,24 @@ export class UsersService {
       throw new BadRequestException('User profile not found.');
     }
     return data;
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const user = await this.userModel.findOne({
+      email: forgotPasswordDto.email,
+    });
+    if (!user) {
+      throw new BadRequestException('Sorry, User not exist.');
+    }
+    const token = await this.jwtService.signAsync(
+      { id: user._id },
+      {
+        secret: configuration().secret.forgotPassword,
+        expiresIn: '7d',
+      },
+    );
+console.log(`${forgotPasswordDto.email} is requaest for reset link.` );
+    console.log(`https://hms.com/reset-passsword?token=${token}`);
+    return token
   }
 }
