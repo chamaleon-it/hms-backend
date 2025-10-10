@@ -75,7 +75,7 @@ export class Appointment {
   @Prop({
     default: false,
   })
-  isPaid: Boolean;
+  isPaid: boolean;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

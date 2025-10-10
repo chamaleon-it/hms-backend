@@ -60,7 +60,7 @@ export class User {
 
   @Prop({
     default: null,
-    select:false
+    select: false,
   })
   refreshToken?: string;
 

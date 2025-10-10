@@ -29,7 +29,12 @@ export class AppointmentsController {
   @UseGuards(JwtAuthGuard)
   @Get('list')
   async getAppointments(@Query() getListDto: GetListDto) {
-    const data = await this.appointmentsService.getAppointments({query:getListDto.query,status:getListDto.status ? JSON.parse(getListDto.status as string) : []});
+    const data = await this.appointmentsService.getAppointments({
+      query: getListDto.query,
+      status: getListDto.status
+        ? (JSON.parse(getListDto.status) as string[])
+        : [],
+    });
     return {
       data,
       message: 'Appointment retrived successfully',
@@ -46,12 +51,13 @@ export class AppointmentsController {
     };
   }
 
-  @Get("calender-monthly")
-  async calenderMonthly(){
-    const data = await this.appointmentsService.calenderMonthly()
+  @UseGuards(JwtAuthGuard)
+  @Get('calender-monthly')
+  async calenderMonthly() {
+    const data = await this.appointmentsService.calenderMonthly();
     return {
       data,
-      message:"Monthly calender fetched successfully"
-    }
+      message: 'Monthly calender fetched successfully',
+    };
   }
 }

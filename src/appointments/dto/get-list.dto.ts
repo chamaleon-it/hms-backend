@@ -1,7 +1,7 @@
-import { Transform } from "class-transformer"
+import { Transform } from 'class-transformer';
 
-export class GetListDto{
-    query?:string
-    @Transform(({value})=>JSON.parse(value))
-    status?:string
+export class GetListDto {
+  query?: string;
+  @Transform(({ value }: { value: string }) => JSON.parse(value))
+  status?: string;
 }

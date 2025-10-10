@@ -3,7 +3,6 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
-import { GetListDto } from './dto/get-list.dto';
 
 @Injectable()
 export class AppointmentsService {
@@ -36,7 +35,7 @@ export class AppointmentsService {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    let filter: { patientName?: RegExp; date: {}; status?: {} } = {
+    const filter: { patientName?: RegExp; date: {}; status?: {} } = {
       date: { $gte: startOfDay, $lte: endOfDay },
     };
 

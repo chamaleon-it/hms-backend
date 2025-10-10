@@ -3,6 +3,6 @@ export default () => ({
   secret: {
     accessToken: 'accessTokenaccessToken',
     refreshToken: 'refreshTokenrefreshToken',
-    forgotPassword:"forgotPasswordforgotPassword"
+    forgotPassword: 'forgotPasswordforgotPassword',
   },
 });
