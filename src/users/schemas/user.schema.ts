@@ -71,6 +71,15 @@ export class User {
   address?: string;
 
   @Prop({ trim: true, default: null })
+  hospital?: string;
+
+  @Prop({ trim: true, default: null })
+  specialization?: string;
+
+  @Prop({ trim: true, default: null })
+  signature?: string;
+
+  @Prop({ trim: true, default: null })
   profilePic?: string;
 
   @Prop({ type: Boolean, default: false })
