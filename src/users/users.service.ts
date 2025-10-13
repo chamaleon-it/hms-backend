@@ -1,13 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/createUser.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserRole } from './schemas/user.schema';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { JwtService } from '@nestjs/jwt';
 import configuration from 'src/config/configuration';
+import { UpdateUserDto } from './dto/updateUser.dto';
+import { UpdatePasswordDto } from './dto/updatePassword';
 
 @Injectable()
 export class UsersService {
@@ -64,5 +70,40 @@ export class UsersService {
       .select('name email phoneNumber address profilePic')
       .lean();
     return data;
+  }
+
+  async updateUser(id: mongoose.Types.ObjectId, updateUserDto: UpdateUserDto) {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      updateUserDto,
+      { new: true, runValidators: true }, // ✅ Return updated doc & validate
+    );
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    return user;
+  }
+
+  async updatePassword(
+    id: mongoose.Types.ObjectId,
+    updatePasswordDto: UpdatePasswordDto,
+  ) {
+    const user = await this.userModel.findById(id).select('password');
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+    const isPasswordMatch = await bcrypt.compare(
+      updatePasswordDto.currentPassword,
+      user.password,
+    );
+    if (!isPasswordMatch) {
+      throw new BadRequestException(
+        'Incorrect current password. Please try again.',
+      );
+    }
+    user.password = await bcrypt.hash(updatePasswordDto.password, 10);
+    await user.save();
   }
 }

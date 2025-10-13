@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { UpdateUserDto } from './dto/updateUser.dto';
+import { UpdatePasswordDto } from './dto/updatePassword';
 
 @Controller('users')
 export class UsersController {
@@ -52,15 +54,30 @@ export class UsersController {
     };
   }
 
-  //get all users
+  @UseGuards(JwtAuthGuard)
+  @Patch()
+  async updateUser(
+    @GetUser() user: JWTUserInterface,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const data = await this.usersService.updateUser(user.id, updateUserDto);
+    return {
+      message: data
+        ? 'User profile updated successfully.'
+        : 'Failed to update user profile. Please try again later.',
+      data,
+    };
+  }
 
-  //get single users
-
-  //delete users
-
-  //update users
-
-  //update status
-
-  //assign role
+  @UseGuards(JwtAuthGuard)
+  @Patch('update_password')
+  async updatePassword(
+    @GetUser() user: JWTUserInterface,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    await this.usersService.updatePassword(user.id, updatePasswordDto);
+    return {
+      message: 'User password is updated.',
+    };
+  }
 }
