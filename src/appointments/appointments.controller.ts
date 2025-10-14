@@ -1,10 +1,21 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { GetListDto } from './dto/get-list.dto';
+import mongoose from 'mongoose';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -42,6 +53,16 @@ export class AppointmentsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('single/:id')
+  async getSingleAppointment(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentsService.getSingleAppointment(id);
+    return {
+      data,
+      message: 'Single appointment is retrived.',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('statistics')
   async getStatistics() {
     const data = await this.appointmentsService.getStatistics();
@@ -58,6 +79,22 @@ export class AppointmentsController {
     return {
       data,
       message: 'Monthly calender fetched successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('update_status/:id')
+  async updateStatus(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateStatusDto: UpdateStatusDto,
+  ) {
+    const data = await this.appointmentsService.updateStatus(
+      id,
+      updateStatusDto,
+    );
+    return {
+      data,
+      message: 'Appointment status is updated',
     };
   }
 }

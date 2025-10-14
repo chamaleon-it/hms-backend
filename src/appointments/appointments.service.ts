@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Injectable()
 export class AppointmentsService {
@@ -52,6 +57,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel
       .find(filter)
       .populate('doctor', 'name email phoneNumber address profilePic')
+      .populate('patient')
       .sort({ date: 1 });
     return data;
   }
@@ -130,6 +136,7 @@ export class AppointmentsService {
       })
       .select('date patientName type status')
       .sort({ date: 1 })
+      .populate('patient')
       .lean(); // returns plain JS objects (faster + easier to format)
 
     // Format date to "YYYY-MM-DD"
@@ -138,6 +145,39 @@ export class AppointmentsService {
       date: a.date.toISOString().split('T')[0],
     }));
 
+    return data;
+  }
+
+  async updateStatus(
+    id: mongoose.Types.ObjectId,
+    updateStatusDto: UpdateStatusDto,
+  ) {
+    if (!mongoose.isValidObjectId(id))
+      throw new BadRequestException('id not valid');
+
+    const data = await this.appointmentModel.findByIdAndUpdate(
+      id,
+      { status: updateStatusDto.status },
+      { new: true, runValidators: true },
+    );
+
+    if (!data) {
+      throw new NotFoundException('Appointment not found');
+    }
+    return data;
+  }
+
+  async getSingleAppointment(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id))
+      throw new BadRequestException('id not valid');
+
+    const data = await this.appointmentModel
+      .findById(id)
+      .lean()
+      .populate('patient');
+    if (!data) {
+      throw new NotFoundException('Appointment is not found.');
+    }
     return data;
   }
 }

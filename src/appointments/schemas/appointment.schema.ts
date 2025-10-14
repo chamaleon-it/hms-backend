@@ -27,14 +27,8 @@ export enum AppointmentStatus {
   timestamps: true,
 })
 export class Appointment {
-  @Prop({ required: true, trim: true })
-  patientName: string;
-
-  @Prop({ required: true, trim: true })
-  phoneNumber: string;
-
-  @Prop({ required: true, trim: true, lowercase: true })
-  email: string;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' })
+  patient: mongoose.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   doctor: mongoose.Types.ObjectId;
