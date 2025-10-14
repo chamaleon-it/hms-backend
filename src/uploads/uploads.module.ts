@@ -8,7 +8,7 @@ import { ensureUploadsDir, multerOptions } from './multer.config';
   imports: [
     // Register Multer globally for this module
     MulterModule.registerAsync({
-      useFactory: async () => {
+      useFactory: () => {
         ensureUploadsDir();
         return multerOptions;
       },
