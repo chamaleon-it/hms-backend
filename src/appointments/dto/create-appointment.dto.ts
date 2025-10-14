@@ -6,8 +6,6 @@ import {
 } from '../schemas/appointment.schema';
 import {
   IsString,
-  IsNotEmpty,
-  IsEmail,
   IsMongoId,
   IsOptional,
   IsEnum,
@@ -16,17 +14,8 @@ import {
 } from 'class-validator';
 
 export class CreateAppointmentDto {
-  @IsString({ message: 'Patient name must be a string.' })
-  @IsNotEmpty({ message: 'Patient name is required.' })
-  patientName: string;
-
-  @IsString({ message: 'Phone number must be a string.' })
-  @IsNotEmpty({ message: 'Phone number is required.' })
-  phoneNumber: string;
-
-  @IsEmail({}, { message: 'Email must be a valid email address.' })
-  @IsNotEmpty({ message: 'Email is required.' })
-  email: string;
+  @IsMongoId({ message: 'Patient must be a valid MongoDB ObjectId.' })
+  patient: mongoose.Types.ObjectId;
 
   @IsMongoId({ message: 'Doctor must be a valid MongoDB ObjectId.' })
   doctor: mongoose.Types.ObjectId;
