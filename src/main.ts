@@ -9,7 +9,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000', // Next.js local
       'http://localhost:3001', // Optional local admin or test client
-      'https://your-production-domain.com', // Production frontend
+      'https://synapsehms.com', // Production frontend
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
