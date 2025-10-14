@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { GetPatientsDto } from './dto/get-patients.dto';
 
 @Controller('patients')
 export class PatientsController {
@@ -26,8 +27,8 @@ export class PatientsController {
   }
 
   @Get()
-  async getPatient() {
-    const data = await this.patientsService.getPatient();
+  async getPatient(@Query() getPatientsDto: GetPatientsDto) {
+    const data = await this.patientsService.getPatient(getPatientsDto);
     return {
       data,
       message: 'All Patient data are retrived successfully',
