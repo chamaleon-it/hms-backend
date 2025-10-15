@@ -82,6 +82,17 @@ export class AppointmentsController {
     };
   }
 
+
+@Get("/calender/weekly")
+async calenderWeekly(){
+    const data = await this.appointmentsService.calenderWeekly()
+     return {
+      message:"Weekly calander fetched",
+      data
+    }
+}
+
+
   @UseGuards(JwtAuthGuard)
   @Patch('update_status/:id')
   async updateStatus(
