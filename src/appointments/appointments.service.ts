@@ -30,14 +30,16 @@ export class AppointmentsService {
   async getAppointments({
     query,
     status,
+    date
   }: {
     query?: string;
     status?: string[];
+    date:string
   }) {
-    const startOfDay = new Date();
+    const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date();
+    const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
     const filter: { patientName?: RegExp; date: {}; status?: {} } = {
@@ -120,8 +122,8 @@ export class AppointmentsService {
     return stats;
   }
 
-  async calenderMonthly() {
-    const now = new Date();
+  async calenderMonthly(date:string) {
+    const now = new Date(date);
     const year = now.getFullYear();
     const month = now.getMonth(); // 0 = Jan
 
@@ -181,9 +183,9 @@ export class AppointmentsService {
     return data;
   }
 
-  async calenderWeekly(){
+  async calenderWeekly(date:string){
   // Get start (Sunday) and end (Saturday) of current week
-  const now = new Date();
+  const now = new Date(date);
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
