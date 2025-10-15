@@ -23,8 +23,8 @@ export class ConsultingsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('/patient/:id')
-  async getPatientConsultings(@Param('id') patientId: string) {
+  @Get('/patient/:patientId')
+  async getPatientConsultings(@Param('patientId') patientId: string) {
     const data = await this.consultingsService.getPatientConsultings(patientId);
     return {
       message: 'Patient consultation record retrived',
