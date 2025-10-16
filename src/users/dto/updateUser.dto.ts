@@ -1,10 +1,50 @@
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsOptional,
   MinLength,
   MaxLength,
   IsEmail,
+  IsDateString,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+
+class AvailabilityDto {
+  @IsDateString()
+  startDate: string;
+
+  @IsDateString()
+  endDate: string;
+
+  @IsString()
+  @IsOptional()
+  startTime: string;
+
+  @IsString()
+  @IsOptional()
+  endTime: string;
+
+  @IsArray({ message: 'days must be an array' })
+  @IsOptional()
+  days: string[];
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => RoundsDto)
+  rounds?: RoundsDto[];
+}
+
+class RoundsDto {
+  @IsString()
+  label: string;
+
+  @IsString()
+  start: string;
+
+  @IsString()
+  end: string;
+}
 
 export class UpdateUserDto {
   @IsString({ message: 'Name must be a string' })
@@ -36,4 +76,9 @@ export class UpdateUserDto {
   @IsString({ message: 'Signature must be a string' })
   @IsOptional()
   signature?: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AvailabilityDto)
+  availability?: AvailabilityDto;
 }

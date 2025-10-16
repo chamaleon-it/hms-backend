@@ -20,6 +20,39 @@ export enum UserStatus {
   BLOCKED = 'Blocked',
 }
 
+@Schema({ _id: false })
+export class Round {
+  @Prop({ type: String, trim: true })
+  label?: string;
+
+  @Prop({ type: String, trim: true })
+  start?: string;
+
+  @Prop({ type: String, trim: true })
+  end?: string;
+}
+
+@Schema({ _id: false })
+export class Availability {
+  @Prop({ type: Date, default: null })
+  startDate?: Date | null;
+
+  @Prop({ type: Date, default: null })
+  endDate?: Date | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  startTime?: string | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  endTime?: string | null;
+
+  @Prop({ type: [String], default: [] })
+  days?: string[];
+
+  @Prop({ type: [SchemaFactory.createForClass(Round)], default: [] })
+  rounds?: Round[];
+}
+
 @Schema({
   versionKey: false,
   timestamps: true,
@@ -84,6 +117,9 @@ export class User {
 
   @Prop({ type: Boolean, default: false })
   emailVerified: boolean;
+
+  @Prop({ type: SchemaFactory.createForClass(Availability), default: null })
+  availability?: Availability | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
