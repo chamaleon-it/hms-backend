@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
@@ -36,21 +44,21 @@ export class PatientsController {
     };
   }
 
-  @Get("single/:id")
-  async getSinglePatient(@Param("id") id:mongoose.Types.ObjectId){
-    const data = await this.patientsService.getSinglePatient(id)
+  @Get('single/:id')
+  async getSinglePatient(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.patientsService.getSinglePatient(id);
     return {
       data,
-      message:"Patient data retrived successfully"
-    }
+      message: 'Patient data retrived successfully',
+    };
   }
 
-  @Get("statistics")
-  async statistics(){
-    const data = await this.patientsService.statistics()
+  @Get('statistics')
+  async statistics() {
+    const data = await this.patientsService.statistics();
     return {
       data,
-      message:"Patient statistics retrived successfully"
-    }
+      message: 'Patient statistics retrived successfully',
+    };
   }
 }

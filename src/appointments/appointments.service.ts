@@ -30,11 +30,11 @@ export class AppointmentsService {
   async getAppointments({
     query,
     status,
-    date
+    date,
   }: {
     query?: string;
     status?: string[];
-    date:string
+    date: string;
   }) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -122,7 +122,7 @@ export class AppointmentsService {
     return stats;
   }
 
-  async calenderMonthly(date:string) {
+  async calenderMonthly(date: string) {
     const now = new Date(date);
     const year = now.getFullYear();
     const month = now.getMonth(); // 0 = Jan
@@ -183,32 +183,29 @@ export class AppointmentsService {
     return data;
   }
 
-  async calenderWeekly(date:string){
-  // Get start (Sunday) and end (Saturday) of current week
-  const now = new Date(date);
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
+  async calenderWeekly(date: string) {
+    // Get start (Sunday) and end (Saturday) of current week
+    const now = new Date(date);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
 
-  const endOfWeek = new Date(now);
-  endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
-  endOfWeek.setHours(23, 59, 59, 999);
+    const endOfWeek = new Date(now);
+    endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
+    endOfWeek.setHours(23, 59, 59, 999);
 
-  // Fetch only required fields & filter in DB (not in JS)
-  const data = await this.appointmentModel
-    .find({
-      date: { $gte: startOfWeek, $lte: endOfWeek },
-    })
-    .select('date status')
-    .populate('patient', 'name')
-    .lean();
+    // Fetch only required fields & filter in DB (not in JS)
+    const data = await this.appointmentModel
+      .find({
+        date: { $gte: startOfWeek, $lte: endOfWeek },
+      })
+      .select('date status')
+      .populate('patient', 'name')
+      .lean();
 
-  // Map formatted response
-  return data;
-}
-
-
-
+    // Map formatted response
+    return data;
+  }
 }
 
 export function safeRegex(input: string) {

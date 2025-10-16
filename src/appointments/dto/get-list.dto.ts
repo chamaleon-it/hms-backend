@@ -5,5 +5,5 @@ export class GetListDto {
   @Transform(({ value }: { value: string }) => JSON.parse(value))
   status?: string;
 
-  date?:string
+  date?: string;
 }
