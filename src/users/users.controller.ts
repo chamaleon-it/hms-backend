@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
@@ -7,6 +15,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
+import mongoose from 'mongoose';
 
 @Controller('users')
 export class UsersController {
@@ -78,6 +87,15 @@ export class UsersController {
     await this.usersService.updatePassword(user.id, updatePasswordDto);
     return {
       message: 'User password is updated.',
+    };
+  }
+
+  @Get('doctor_availability/:id')
+  async getDoctorAvailability(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.usersService.getDoctorAvailability(id);
+    return {
+      message: 'Doctor availability retrived successfully',
+      data,
     };
   }
 }

@@ -106,4 +106,23 @@ export class UsersService {
     user.password = await bcrypt.hash(updatePasswordDto.password, 10);
     await user.save();
   }
+
+  async getDoctorAvailability(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Please provide a valid doctor id');
+    }
+    const user = await this.userModel
+      .findById(id)
+      .select('availability')
+      .lean();
+    if (!user) {
+      throw new NotFoundException('Doctor not found.');
+    }
+
+    if(!user.availability){
+      throw new BadRequestException("Doctor is not available")
+    }
+
+    return user.availability
+  }
 }
