@@ -43,6 +43,9 @@ export class Patient {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
+
+  @Prop({ required: true, unique: true })
+  mrn: string;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

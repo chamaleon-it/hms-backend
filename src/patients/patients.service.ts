@@ -11,13 +11,32 @@ export class PatientsService {
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
   ) {}
 
+  private async generateUniqueMRN(): Promise<string> {
+    let mrn: string;
+    let exists = true;
+
+    do {
+      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
+      mrn = `P-${randomNum}`;
+
+      // Check if MRN already exists
+      const existing = await this.patientModel.exists({ mrn });
+      exists = !!existing;
+    } while (exists);
+
+    return mrn;
+  }
+
   async register(
     patientRegisterDto: PatientRegisterDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
+    const mrn = await this.generateUniqueMRN();
+
     const patient = await this.patientModel.create({
       ...patientRegisterDto,
       createdBy,
+      mrn,
     });
     return patient;
   }
@@ -68,7 +87,6 @@ export class PatientsService {
         filter.condition = { $in: JSON.parse(conditions) };
       }
     }
-
 
     const data = await this.patientModel
       .find(filter)
