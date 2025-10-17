@@ -23,10 +23,19 @@ export class PatientsService {
   }
 
   async getPatient(getPatientsDto: GetPatientsDto) {
-    const { limit = 100, page = 1, query = '' } = getPatientsDto;
+    const {
+      limit = 100,
+      page = 1,
+      query = '',
+      gender,
+      conditions,
+      minAge = 0,
+      maxAge = 100,
+    } = getPatientsDto;
+
     const skip = (page - 1) * limit;
 
-    let filter = {};
+    let filter: any = {};
 
     if (query && query.trim() !== '') {
       const searchRegex = { $regex: query, $options: 'i' };
@@ -38,6 +47,28 @@ export class PatientsService {
         ],
       };
     }
+
+    if (gender) {
+      filter.gender = gender;
+    }
+
+    const ageFilter: any = {};
+    if (typeof Number(minAge) === 'number' && Number.isFinite(Number(minAge))) {
+      ageFilter.$gte = Number(minAge);
+    }
+    if (typeof Number(maxAge) === 'number' && Number.isFinite(Number(maxAge))) {
+      ageFilter.$lte = Number(maxAge);
+    }
+    if (Object.keys(ageFilter).length) {
+      filter.age = ageFilter;
+    }
+
+    if (conditions) {
+      if (JSON.parse(conditions).length > 0) {
+        filter.condition = { $in: JSON.parse(conditions) };
+      }
+    }
+
 
     const data = await this.patientModel
       .find(filter)
