@@ -38,6 +38,7 @@ export class Consulting {
       cvs: { type: String, default: null },
       pa: { type: String, default: null },
       cns: { type: String, default: null },
+      le: { type: String, default: null },
       otherNotes: { type: String, default: null },
     },
     required: true,

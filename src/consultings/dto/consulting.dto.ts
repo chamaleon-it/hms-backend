@@ -50,12 +50,16 @@ class ExaminationNoteDto {
   cvs: null | string;
 
   @IsOptional()
-  @IsString({ message: 'PA must be a string or null.' })
+  @IsString({ message: 'P/A must be a string or null.' })
   pa: null | string;
 
   @IsOptional()
   @IsString({ message: 'CNS must be a string or null.' })
   cns: null | string;
+
+    @IsOptional()
+  @IsString({ message: 'L/E must be a string or null.' })
+  le: null | string;
 
   @IsOptional()
   @IsString({ message: 'Other notes must be a string or null.' })
