@@ -20,6 +20,8 @@ export enum AppointmentStatus {
   OBSERVATION = 'Observation',
   COMPLETED = 'Completed',
   NOT_SHOW = 'Not show',
+  ADMIT = 'Admit',
+  TEST = 'Test',
 }
 
 @Schema({
