@@ -38,30 +38,68 @@ export class AppointmentsService {
   }) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
-
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const filter: { patientName?: RegExp; date: {}; status?: {} } = {
+    const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
     };
+    if (query && query.trim())
+      $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
+    if (status?.length) $match.status = { $in: status };
 
-    if (query && query.trim()) {
-      // case-insensitive, prefix/contains match (safe from regex DOS)
-      const rx = new RegExp(safeRegex(query.trim()), 'i');
-      filter.patientName = rx;
-    }
-
-    if (status?.length) {
-      filter.status = { $in: status };
-    }
-
-    const data = await this.appointmentModel
-      .find(filter)
-      .populate('doctor', 'name email phoneNumber address profilePic')
-      .populate('patient')
-      .sort({ date: 1 });
-    return data;
+    return this.appointmentModel
+      .aggregate([
+        { $match },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'doctor',
+            foreignField: '_id',
+            pipeline: [
+              {
+                $project: {
+                  name: 1,
+                  email: 1,
+                  phoneNumber: 1,
+                  address: 1,
+                  profilePic: 1,
+                },
+              },
+            ],
+            as: 'doctor',
+          },
+        },
+        { $unwind: { path: '$doctor', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patient',
+            foreignField: '_id',
+            as: 'patient',
+          },
+        },
+        { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: 'appointments',
+            let: { pid: '$patient._id' },
+            pipeline: [
+              { $match: { $expr: { $eq: ['$patient', '$$pid'] } } },
+              { $count: 'cnt' },
+            ],
+            as: 'visitCountArr',
+          },
+        },
+        {
+          $addFields: {
+            visitCount: { $ifNull: [{ $first: '$visitCountArr.cnt' }, 0] },
+          },
+        },
+        { $project: { visitCountArr: 0 } },
+        { $sort: { date: 1 } },
+      ])
+      .option({ allowDiskUse: true });
   }
 
   async getStatistics() {
@@ -93,6 +131,8 @@ export class AppointmentsService {
       observation: 0,
       completed: 0,
       notShow: 0,
+      test: 0,
+      admit: 0,
     };
 
     // Total count for today
@@ -115,6 +155,14 @@ export class AppointmentsService {
           break;
         case AppointmentStatus.NOT_SHOW:
           stats.notShow = r.count;
+          break;
+
+        case AppointmentStatus.TEST:
+          stats.test = r.count;
+          break;
+
+        case AppointmentStatus.ADMIT:
+          stats.admit = r.count;
           break;
       }
     }
