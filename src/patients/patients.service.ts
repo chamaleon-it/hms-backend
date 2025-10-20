@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Gender, Patient } from './schemas/patient.schema';
+import { Gender, Patient, PatientStatus } from './schemas/patient.schema';
 import mongoose, { Model } from 'mongoose';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { GetPatientsDto } from './dto/get-patients.dto';
@@ -106,20 +106,16 @@ export class PatientsService {
 
   async statistics() {
     const now = new Date();
-
-    // start of today (local time)
     const startOfToday = new Date(
       now.getFullYear(),
       now.getMonth(),
       now.getDate(),
     );
 
-    // start of week (Monday). If you want Sunday, use: const dayIndex = now.getDay();
-    const dayIndex = (now.getDay() + 6) % 7; // 0 = Monday, 6 = Sunday
+    const dayIndex = (now.getDay() + 6) % 7;
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - dayIndex);
 
-    // start of month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const facets = await this.patientModel
@@ -127,6 +123,25 @@ export class PatientsService {
         {
           $facet: {
             total: [{ $count: 'count' }],
+            active: [
+              { $match: { status: PatientStatus.ACTIVE } },
+              { $count: 'count' },
+            ],
+            inactive: [
+              { $match: { status: PatientStatus.INACTIVE } },
+              { $count: 'count' },
+            ],
+
+            critical: [
+              { $match: { status: PatientStatus.CRITICAL } },
+              { $count: 'count' },
+            ],
+
+            discharged: [
+              { $match: { status: PatientStatus.DISCHARGED } },
+              { $count: 'count' },
+            ],
+
             today: [
               { $match: { createdAt: { $gte: startOfToday } } },
               { $count: 'count' },
@@ -150,12 +165,15 @@ export class PatientsService {
       .exec();
 
     const r = facets[0] || {};
-
     const toNum = (arr: { count: number }[] | undefined) =>
       arr && arr[0] ? arr[0].count : 0;
 
     return {
       total: toNum(r.total),
+      active: toNum(r.active),
+      inactive: toNum(r.inactive),
+      critical: toNum(r.critical),
+      discharged: toNum(r.discharged),
       today: toNum(r.today),
       thisWeek: toNum(r.thisWeek),
       thisMonth: toNum(r.thisMonth),

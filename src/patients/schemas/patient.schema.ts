@@ -9,6 +9,13 @@ export enum Gender {
   OTHER = 'Other',
 }
 
+export enum PatientStatus {
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  CRITICAL = 'Critical',
+  DISCHARGED = 'Discharged',
+}
+
 @Schema({ versionKey: false, timestamps: true })
 export class Patient {
   @Prop({ required: true, trim: true })
@@ -43,6 +50,9 @@ export class Patient {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
+
+  @Prop({ enum: Object.values(PatientStatus), default: PatientStatus.ACTIVE })
+  status: PatientStatus;
 
   @Prop({ required: true, unique: true })
   mrn: string;
