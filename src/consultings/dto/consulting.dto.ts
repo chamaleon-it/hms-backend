@@ -57,7 +57,7 @@ class ExaminationNoteDto {
   @IsString({ message: 'CNS must be a string or null.' })
   cns: null | string;
 
-    @IsOptional()
+  @IsOptional()
   @IsString({ message: 'L/E must be a string or null.' })
   le: null | string;
 

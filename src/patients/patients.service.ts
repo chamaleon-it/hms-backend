@@ -169,16 +169,56 @@ export class PatientsService {
       arr && arr[0] ? arr[0].count : 0;
 
     return {
-      total: toNum(r.total),
-      active: toNum(r.active),
-      inactive: toNum(r.inactive),
-      critical: toNum(r.critical),
-      discharged: toNum(r.discharged),
-      today: toNum(r.today),
-      thisWeek: toNum(r.thisWeek),
-      thisMonth: toNum(r.thisMonth),
-      male: toNum(r.male),
-      female: toNum(r.female),
+      total: toNum(
+        r.total as {
+          count: number;
+        }[],
+      ),
+      active: toNum(
+        r.active as {
+          count: number;
+        }[],
+      ),
+      inactive: toNum(
+        r.inactive as {
+          count: number;
+        }[],
+      ),
+      critical: toNum(
+        r.critical as {
+          count: number;
+        }[],
+      ),
+      discharged: toNum(
+        r.discharged as {
+          count: number;
+        }[],
+      ),
+      today: toNum(
+        r.today as {
+          count: number;
+        }[],
+      ),
+      thisWeek: toNum(
+        r.thisWeek as {
+          count: number;
+        }[],
+      ),
+      thisMonth: toNum(
+        r.thisMonth as {
+          count: number;
+        }[],
+      ),
+      male: toNum(
+        r.male as {
+          count: number;
+        }[],
+      ),
+      female: toNum(
+        r.female as {
+          count: number;
+        }[],
+      ),
     };
   }
 }

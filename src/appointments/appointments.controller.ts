@@ -111,4 +111,30 @@ export class AppointmentsController {
       message: 'Appointment status is updated',
     };
   }
+
+  @Get('booked_slot')
+  async getBookedSlot(
+    @Query('date') date?: string,
+    @Query('doctor') doctor?: mongoose.Types.ObjectId,
+  ) {
+    const selectedDate = date ? new Date(date) : new Date();
+    const data = await this.appointmentsService.getBookedSlot(
+      selectedDate,
+      doctor,
+    );
+    return {
+      data,
+      message: 'Booked slot all retrived successfully',
+    };
+  }
+
+
+  @Get("patient/:id")
+  async getPatientAppointment(@Param("id")  patient:mongoose.Types.ObjectId){
+    const data = await this.appointmentsService.getPatientAppointment(patient)
+    return {
+      data,
+      message:"patient appointment are retrived successfully",
+    }
+  }
 }

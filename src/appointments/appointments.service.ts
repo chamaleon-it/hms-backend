@@ -254,6 +254,38 @@ export class AppointmentsService {
     // Map formatted response
     return data;
   }
+
+  async getBookedSlot(date: Date, doctor?: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(doctor))
+      throw new BadRequestException(
+        'Doctor id is not valid, Please selected valid doctor id',
+      );
+
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const $match: Record<string, any> = {
+      date: { $gte: startOfDay, $lte: endOfDay },
+      doctor,
+    };
+
+    const data = await this.appointmentModel
+      .find($match)
+      .distinct('date')
+      .lean();
+
+    return data;
+  }
+
+  async getPatientAppointment(patient: mongoose.Types.ObjectId) {
+    if(!mongoose.isValidObjectId(patient)){
+      throw new BadRequestException("Please provide a valid patient id")
+    }
+    const data = await this.appointmentModel.find({patient}).populate("patient").populate("doctor","name specialization").sort({date:-1}).lean()
+    return data
+  }
 }
 
 export function safeRegex(input: string) {

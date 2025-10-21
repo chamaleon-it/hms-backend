@@ -1,4 +1,5 @@
 import { Transform } from 'class-transformer';
+import { AppointmentStatus } from '../schemas/appointment.schema';
 
 export class GetListDto {
   query?: string;

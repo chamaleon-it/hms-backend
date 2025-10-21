@@ -28,15 +28,15 @@ export class AuthService {
         'No user record found. Kindly register to proceed.',
       );
     }
-    if (user.status === UserStatus.PENDING) {
+    if ((user.status as UserStatus) === UserStatus.PENDING) {
       throw new BadRequestException(
         'Your profile is under review. The verification process usually takes up to 24 hours.',
       );
-    } else if (user.status === UserStatus.INACTIVE) {
+    } else if ((user.status as UserStatus) === UserStatus.INACTIVE) {
       throw new BadRequestException(
         'This profile is inactive. Please contact the administrator for further assistance.',
       );
-    } else if (user.status === UserStatus.BLOCKED) {
+    } else if ((user.status as UserStatus) === UserStatus.BLOCKED) {
       throw new BadRequestException(
         'This profile is blocked. Please contact the administrator for further assistance.',
       );

@@ -119,10 +119,10 @@ export class UsersService {
       throw new NotFoundException('Doctor not found.');
     }
 
-    if(!user.availability){
-      throw new BadRequestException("Doctor is not available")
+    if (!user.availability) {
+      throw new BadRequestException('Doctor is not available');
     }
 
-    return user.availability
+    return user.availability;
   }
 }

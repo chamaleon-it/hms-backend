@@ -22,7 +22,7 @@ export class ConsultingsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('/patient/:patientId')
   async getPatientConsultings(@Param('patientId') patientId: string) {
     const data = await this.consultingsService.getPatientConsultings(patientId);
