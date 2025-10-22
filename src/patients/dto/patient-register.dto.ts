@@ -1,5 +1,12 @@
 import { Transform } from 'class-transformer';
-import { IsString, IsOptional, IsEmail, IsIn, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsIn,
+  MaxLength,
+  IsArray,
+} from 'class-validator';
 
 export class PatientRegisterDto {
   @IsString()
@@ -17,13 +24,29 @@ export class PatientRegisterDto {
   @IsIn(['Male', 'Female', 'Other'])
   gender: string;
 
-  @IsNumber()
-  age: number;
+  @IsString()
+  dateOfBirth: string;
 
   @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  condition?: string;
+  @Transform(({ value }) => {
+    if (value == null) return undefined;
+    // If already an array, normalize items to strings and trim
+    if (Array.isArray(value))
+      return value.map((v) => String(v).trim()).filter(Boolean);
+    // If a single string (possibly comma-separated), split into items
+    const str = String(value).trim();
+    if (!str) return undefined;
+    return str.includes(',')
+      ? str
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [str];
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(100, { each: true })
+  conditions?: string[];
 
   @IsOptional()
   @IsString()

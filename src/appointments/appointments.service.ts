@@ -280,11 +280,16 @@ export class AppointmentsService {
   }
 
   async getPatientAppointment(patient: mongoose.Types.ObjectId) {
-    if(!mongoose.isValidObjectId(patient)){
-      throw new BadRequestException("Please provide a valid patient id")
+    if (!mongoose.isValidObjectId(patient)) {
+      throw new BadRequestException('Please provide a valid patient id');
     }
-    const data = await this.appointmentModel.find({patient}).populate("patient").populate("doctor","name specialization").sort({date:-1}).lean()
-    return data
+    const data = await this.appointmentModel
+      .find({ patient })
+      .populate('patient')
+      .populate('doctor', 'name specialization')
+      .sort({ date: -1 })
+      .lean();
+    return data;
   }
 }
 

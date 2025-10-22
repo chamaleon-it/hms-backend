@@ -72,19 +72,36 @@ export class PatientsService {
     }
 
     const ageFilter: any = {};
-    if (typeof Number(minAge) === 'number' && Number.isFinite(Number(minAge))) {
-      ageFilter.$gte = Number(minAge);
+    const now = new Date();
+
+    if (minAge && Number.isFinite(Number(minAge))) {
+      const maxDOB = new Date(
+        now.getFullYear() - Number(minAge),
+        now.getMonth(),
+        now.getDate(),
+      );
+      ageFilter.$lte = maxDOB;
     }
-    if (typeof Number(maxAge) === 'number' && Number.isFinite(Number(maxAge))) {
-      ageFilter.$lte = Number(maxAge);
+
+    if (maxAge && Number.isFinite(Number(maxAge))) {
+      const minDOB = new Date(
+        now.getFullYear() - Number(maxAge) - 1,
+        now.getMonth(),
+        now.getDate() + 1,
+      );
+      ageFilter.$gte = minDOB;
     }
+
     if (Object.keys(ageFilter).length) {
-      filter.age = ageFilter;
+      filter.dateOfBirth = ageFilter;
     }
 
     if (conditions) {
-      if (JSON.parse(conditions).length > 0) {
-        filter.condition = { $in: JSON.parse(conditions) };
+      const parsed =
+        typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        filter.conditions = { $in: parsed };
       }
     }
 

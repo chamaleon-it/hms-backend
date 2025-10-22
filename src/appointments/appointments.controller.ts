@@ -128,13 +128,12 @@ export class AppointmentsController {
     };
   }
 
-
-  @Get("patient/:id")
-  async getPatientAppointment(@Param("id")  patient:mongoose.Types.ObjectId){
-    const data = await this.appointmentsService.getPatientAppointment(patient)
+  @Get('patient/:id')
+  async getPatientAppointment(@Param('id') patient: mongoose.Types.ObjectId) {
+    const data = await this.appointmentsService.getPatientAppointment(patient);
     return {
       data,
-      message:"patient appointment are retrived successfully",
-    }
+      message: 'patient appointment are retrived successfully',
+    };
   }
 }

@@ -31,10 +31,10 @@ export class Patient {
   gender: Gender;
 
   @Prop({ required: true })
-  age: number;
+  dateOfBirth: Date;
 
-  @Prop()
-  condition: string;
+  @Prop({ default: [], type: [String] })
+  conditions: string[];
 
   @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] })
   blood: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
