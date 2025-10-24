@@ -8,11 +8,13 @@ import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
+    private readonly usersService: UsersService,
   ) {}
 
   async createAppointment(
@@ -123,7 +125,6 @@ export class AppointmentsService {
       },
     ]);
 
-    // Create default counts with 0
     const stats = {
       today: 0,
       upcoming: 0,
@@ -135,10 +136,8 @@ export class AppointmentsService {
       admit: 0,
     };
 
-    // Total count for today
     stats.today = results.reduce((acc, r) => acc + r.count, 0);
 
-    // Fill individual statuses
     for (const r of results) {
       switch (r._id) {
         case AppointmentStatus.UPCOMING:
@@ -173,13 +172,11 @@ export class AppointmentsService {
   async calenderMonthly(date: string) {
     const now = new Date(date);
     const year = now.getFullYear();
-    const month = now.getMonth(); // 0 = Jan
+    const month = now.getMonth();
 
-    // Get start & end of current month
     const startDate = new Date(year, month, 1, 0, 0, 0, 0);
     const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
 
-    // Fetch filtered appointments
     const appointments = await this.appointmentModel
       .find({
         date: { $gte: startDate, $lte: endDate },
@@ -187,9 +184,8 @@ export class AppointmentsService {
       .select('date patientName type status')
       .sort({ date: 1 })
       .populate('patient')
-      .lean(); // returns plain JS objects (faster + easier to format)
+      .lean();
 
-    // Format date to "YYYY-MM-DD"
     const data = appointments.map((a) => ({
       ...a,
       date: a.date.toISOString().split('T')[0],
@@ -232,7 +228,6 @@ export class AppointmentsService {
   }
 
   async calenderWeekly(date: string) {
-    // Get start (Sunday) and end (Saturday) of current week
     const now = new Date(date);
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
@@ -242,7 +237,6 @@ export class AppointmentsService {
     endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
     endOfWeek.setHours(23, 59, 59, 999);
 
-    // Fetch only required fields & filter in DB (not in JS)
     const data = await this.appointmentModel
       .find({
         date: { $gte: startOfWeek, $lte: endOfWeek },
@@ -251,7 +245,6 @@ export class AppointmentsService {
       .populate('patient', 'name')
       .lean();
 
-    // Map formatted response
     return data;
   }
 
@@ -291,8 +284,87 @@ export class AppointmentsService {
       .lean();
     return data;
   }
+
+  async getWalkInAppointment(doctor: mongoose.Types.ObjectId, date: string) {
+    if (!mongoose.isValidObjectId(doctor))
+      throw new BadRequestException('Please provide a valid doctor id');
+    const today = date ? new Date(date) : new Date();
+
+    const availability: mongoose.FlattenMaps<{
+      startDate?: (Date | null) | undefined;
+      endDate?: (Date | null) | undefined;
+      startTime?: string | null | undefined;
+      endTime?: string | null | undefined;
+      days?: string[] | undefined;
+      rounds?:
+        | {
+            label?: string | undefined;
+            start?: string | undefined;
+            end?: string | undefined;
+          }[]
+        | undefined;
+    }> = await this.usersService.getDoctorAvailability(doctor);
+
+    const isAvailable = availability.days
+      ?.map((d) => dayNameToIndex[d])
+      ?.includes(today.getDay());
+
+    if (isAvailable) {
+      const alreadyBooked: Date[] = await this.getBookedSlot(
+        new Date(),
+        doctor,
+      );
+
+      return {
+        alreadyBooked,
+        nextAvailableDate: today,
+      };
+    } else {
+      const nextAvailableDate = getNextAvailableDate(
+        availability.days ?? [],
+        today,
+      );
+      const alreadyBooked: Date[] = await this.getBookedSlot(
+        nextAvailableDate,
+        doctor,
+      );
+      return {
+        alreadyBooked,
+        nextAvailableDate,
+      };
+    }
+  }
 }
 
 export function safeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const dayNameToIndex: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+function getNextAvailableDate(
+  availableDays: string[],
+  today: Date = new Date(),
+): Date {
+  const todayIndex = today.getDay();
+  const availableIndices = availableDays.map((d) => dayNameToIndex[d]);
+
+  const daysToAdd =
+    availableIndices
+      .map((day) => (day - todayIndex + 7) % 7)
+      .filter((diff) => diff > 0)
+      .sort((a, b) => a - b)[0] ?? 7;
+
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + daysToAdd);
+
+  return nextDate;
 }

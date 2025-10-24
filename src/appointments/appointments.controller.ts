@@ -136,4 +136,19 @@ export class AppointmentsController {
       message: 'patient appointment are retrived successfully',
     };
   }
+
+  @Get('walk-in/:doctor')
+  async getWalkInAppointment(
+    @Param('doctor') doctor: mongoose.Types.ObjectId,
+    @Query('date') date: string,
+  ) {
+    const data = await this.appointmentsService.getWalkInAppointment(
+      doctor,
+      date,
+    );
+    return {
+      data,
+      message: 'walk-in appointment',
+    };
+  }
 }

@@ -98,4 +98,27 @@ export class UsersController {
       data,
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('consultation_values')
+  async syncConsultationValues(
+    @GetUser() user: JWTUserInterface,
+    @Body() { value }: { value: string },
+  ) {
+    const data = await this.usersService.syncConsultationValues(user.id, value);
+    return {
+      message:"Consultation values sync completed",
+      data
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('consultation_values')
+  async getConsultationValues(@GetUser() user: JWTUserInterface) {
+    const data = await this.usersService.getConsultationValues(user.id)
+    return {
+      message:"Consultation value retrived successfully",
+      data
+    }
+  }
 }
