@@ -85,9 +85,18 @@ export class AppointmentsService {
         {
           $lookup: {
             from: 'appointments',
-            let: { pid: '$patient._id' },
+            let: { pid: '$patient._id', curDate: '$date' },
             pipeline: [
-              { $match: { $expr: { $eq: ['$patient', '$$pid'] } } },
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$patient', '$$pid'] },
+                      { $lte: ['$date', '$$curDate'] },
+                    ],
+                  },
+                },
+              },
               { $count: 'cnt' },
             ],
             as: 'visitCountArr',
