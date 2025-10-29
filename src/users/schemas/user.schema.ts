@@ -118,9 +118,8 @@ export class User {
   @Prop({ type: Boolean, default: false })
   emailVerified: boolean;
 
-  @Prop({type:String,default:null,select:false})
-  consultationValues:string;
-
+  @Prop({ type: String, default: null, select: false })
+  consultationValues: string;
 
   @Prop({ type: SchemaFactory.createForClass(Availability), default: null })
   availability?: Availability | null;

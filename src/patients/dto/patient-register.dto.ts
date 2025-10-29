@@ -2,7 +2,6 @@ import { Transform } from 'class-transformer';
 import {
   IsString,
   IsOptional,
-  IsEmail,
   IsIn,
   MaxLength,
   IsArray,
@@ -17,9 +16,13 @@ export class PatientRegisterDto {
   @Transform(({ value }: { value: string }) => value.trim())
   phoneNumber: string;
 
-  @IsEmail()
-  @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
-  email: string;
+  // @IsEmail({}, { message: 'Invalid email address' })
+  @IsOptional()
+  @Transform(({ value }) => value?.trim().toLowerCase())
+  email?: string;
+
+  @IsString()
+  doctor: string;
 
   @IsIn(['Male', 'Female', 'Other'])
   gender: string;
@@ -57,6 +60,26 @@ export class PatientRegisterDto {
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
   allergies?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  insurance?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  insuranceValidity?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  uhid?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  emergencyContactNumber?: string;
 
   @IsOptional()
   @IsString()

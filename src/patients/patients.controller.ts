@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -14,6 +15,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { GetPatientsDto } from './dto/get-patients.dto';
 import mongoose from 'mongoose';
+import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 
 @Controller('patients')
 export class PatientsController {
@@ -59,6 +61,25 @@ export class PatientsController {
     return {
       data,
       message: 'Patient statistics retrived successfully',
+    };
+  }
+
+  @Delete()
+  async deleteBulkPatient(@Body() deleteBulkPatientDto: DeleteBulkPatientDto) {
+    const data =
+      await this.patientsService.deleteBulkPatient(deleteBulkPatientDto);
+    return {
+      data,
+      message: 'Selected patients were deleted successfully',
+    };
+  }
+
+  @Delete(':id')
+  async deletePatient(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.patientsService.deletePatient(id);
+    return {
+      data,
+      message: 'Patient is deleted successfully',
     };
   }
 }

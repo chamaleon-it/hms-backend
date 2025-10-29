@@ -10,4 +10,8 @@ export class GetPatientsDto {
   maxAge?: string;
   lastVisit?: string;
   conditions?: string;
+
+  doctor?: string;
+
+  date?: string;
 }

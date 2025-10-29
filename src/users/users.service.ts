@@ -127,26 +127,24 @@ export class UsersService {
   }
 
   async syncConsultationValues(id: mongoose.Types.ObjectId, value: string) {
-    const user = await this.userModel
-      .findById(id)
-      .select('consultationValues');
+    const user = await this.userModel.findById(id).select('consultationValues');
     if (!user) {
       throw new NotFoundException('User not found.');
     }
     user.consultationValues = value;
-    user.save()
-    return null
+    user.save();
+    return null;
   }
 
-  async getConsultationValues(id:mongoose.Types.ObjectId){
-      const user = await this.userModel
+  async getConsultationValues(id: mongoose.Types.ObjectId) {
+    const user = await this.userModel
       .findById(id)
-      .select('consultationValues').lean();
-if (!user) {
+      .select('consultationValues')
+      .lean();
+    if (!user) {
       throw new NotFoundException('User not found.');
     }
 
-    return user.consultationValues
-
-    }
+    return user.consultationValues;
+  }
 }

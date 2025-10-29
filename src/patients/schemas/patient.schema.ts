@@ -14,6 +14,7 @@ export enum PatientStatus {
   INACTIVE = 'Inactive',
   CRITICAL = 'Critical',
   DISCHARGED = 'Discharged',
+  DELETED = 'Deleted',
 }
 
 @Schema({ versionKey: false, timestamps: true })
@@ -24,7 +25,7 @@ export class Patient {
   @Prop({ required: true, trim: true })
   phoneNumber: string;
 
-  @Prop({ required: true, trim: true, lowercase: true })
+  @Prop({ trim: true, lowercase: true })
   email: string;
 
   @Prop({ enum: Object.values(Gender) })
@@ -43,6 +44,18 @@ export class Patient {
   allergies: string;
 
   @Prop()
+  insurance: string;
+
+  @Prop()
+  insuranceValidity: Date;
+
+  @Prop()
+  uhid: string;
+
+  @Prop()
+  emergencyContactNumber: string;
+
+  @Prop()
   address: string;
 
   @Prop()
@@ -50,6 +63,9 @@ export class Patient {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  doctor: mongoose.Types.ObjectId;
 
   @Prop({ enum: Object.values(PatientStatus), default: PatientStatus.ACTIVE })
   status: PatientStatus;

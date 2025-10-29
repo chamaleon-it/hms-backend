@@ -1,9 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Gender, Patient, PatientStatus } from './schemas/patient.schema';
 import mongoose, { Model } from 'mongoose';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { GetPatientsDto } from './dto/get-patients.dto';
+import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 
 @Injectable()
 export class PatientsService {
@@ -50,6 +55,8 @@ export class PatientsService {
       conditions,
       minAge = 0,
       maxAge = 100,
+      doctor,
+      date,
     } = getPatientsDto;
 
     const skip = (page - 1) * limit;
@@ -62,7 +69,7 @@ export class PatientsService {
         $or: [
           { name: searchRegex },
           { phoneNumber: searchRegex },
-          { email: searchRegex },
+          { mrn: searchRegex },
         ],
       };
     }
@@ -96,6 +103,10 @@ export class PatientsService {
       filter.dateOfBirth = ageFilter;
     }
 
+    if (doctor) {
+      filter.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
     if (conditions) {
       const parsed =
         typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
@@ -105,11 +116,28 @@ export class PatientsService {
       }
     }
 
+    if (date) {
+      console.log(date);
+      const start = new Date(date);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 1);
+
+      const startUTC = new Date(start.getTime() - 5.5 * 60 * 60 * 1000);
+      const endUTC = new Date(end.getTime() - 5.5 * 60 * 60 * 1000);
+
+      filter.createdAt = {
+        $gte: startUTC,
+        $lt: endUTC,
+      };
+    }
+
+    filter.status = { $ne: PatientStatus.DELETED };
     const data = await this.patientModel
       .find(filter)
       .skip(skip)
       .limit(limit)
-      .populate('createdBy');
+      .populate('doctor')
+      .sort({ createdAt: -1 });
     return data;
   }
 
@@ -117,7 +145,9 @@ export class PatientsService {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Please provide a valid patient id');
     }
-    const patient = await this.patientModel.findById(id);
+    const patient = await this.patientModel
+      .findById(id)
+      .populate('doctor', 'name specialization');
     return patient;
   }
 
@@ -237,5 +267,38 @@ export class PatientsService {
         }[],
       ),
     };
+  }
+
+  async deleteBulkPatient(deleteBulkPatientDto: DeleteBulkPatientDto) {
+    const result = await this.patientModel.updateMany(
+      {
+        _id: { $in: deleteBulkPatientDto.ids },
+        status: { $ne: PatientStatus.DELETED },
+      },
+      { status: PatientStatus.DELETED },
+    );
+
+    if (result.matchedCount === 0)
+      throw new NotFoundException(
+        'No patients found or all patients already deleted.',
+      );
+  }
+
+  async deletePatient(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid patient ID provided.');
+    }
+
+    const patient = await this.patientModel.findOneAndUpdate(
+      { _id: id, status: { $ne: PatientStatus.DELETED } }, // Prevent re-deleting
+      { status: PatientStatus.DELETED },
+      { new: true },
+    );
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found or already deleted.');
+    }
+
+    return patient;
   }
 }
