@@ -22,7 +22,7 @@ export class PatientsService {
 
     do {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `P-${randomNum}`;
+      mrn = `P${randomNum}`;
 
       // Check if MRN already exists
       const existing = await this.patientModel.exists({ mrn });
@@ -57,6 +57,7 @@ export class PatientsService {
       maxAge = 100,
       doctor,
       date,
+      status,
     } = getPatientsDto;
 
     const skip = (page - 1) * limit;
@@ -131,7 +132,11 @@ export class PatientsService {
       };
     }
 
-    filter.status = { $ne: PatientStatus.DELETED };
+    if (status) {
+      filter.status = status;
+    } else {
+      filter.status = { $ne: PatientStatus.DELETED };
+    }
     const data = await this.patientModel
       .find(filter)
       .skip(skip)
