@@ -120,14 +120,19 @@ export class PatientsService {
     }
 
     if (from && to) {
-      const startUTC = new Date(from);
-      const endUTC = new Date(to);
+  const startUTC = new Date(from);
+  const endUTC = new Date(to);
 
-      filter.createdAt = {
-        $gte: startUTC,
-        $lt: endUTC,
-      };
-    }
+  // Convert to IST by adding 5 hours 30 minutes
+  const startIST = new Date(startUTC.getTime() + 5.5 * 60 * 60 * 1000);
+  const endIST = new Date(endUTC.getTime() + 5.5 * 60 * 60 * 1000);
+
+  filter.createdAt = {
+    $gte: startIST,
+    $lt: endIST,
+  };
+}
+
 
     if (status) {
       filter.status = status;
