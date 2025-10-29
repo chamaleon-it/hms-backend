@@ -58,6 +58,8 @@ export class PatientsService {
       doctor,
       date,
       status,
+      from,
+      to,
     } = getPatientsDto;
 
     const skip = (page - 1) * limit;
@@ -117,14 +119,9 @@ export class PatientsService {
       }
     }
 
-    if (date) {
-      console.log(date);
-      const start = new Date(date);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 1);
-
-      const startUTC = new Date(start.getTime() - 5.5 * 60 * 60 * 1000);
-      const endUTC = new Date(end.getTime() - 5.5 * 60 * 60 * 1000);
+    if (from && to) {
+      const startUTC = new Date(from);
+      const endUTC = new Date(to);
 
       filter.createdAt = {
         $gte: startUTC,
