@@ -42,6 +42,9 @@ class ExaminationNoteDto {
   temp: null | string;
 
   @IsOptional()
+  tempUnit:"°C" | "°F"
+
+  @IsOptional()
   @IsString({ message: 'RS must be a string or null.' })
   rs: null | string;
 

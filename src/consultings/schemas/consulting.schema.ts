@@ -34,6 +34,7 @@ export class Consulting {
       bp: { type: String, default: null },
       spo2: { type: String, default: null },
       temp: { type: String, default: null },
+      tempUnit: { type: String, default: null },
       rs: { type: String, default: null },
       cvs: { type: String, default: null },
       pa: { type: String, default: null },
