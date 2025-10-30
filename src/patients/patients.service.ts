@@ -302,4 +302,19 @@ export class PatientsService {
 
     return patient;
   }
+
+  async updatePatient(
+    patientRegisterDto: PatientRegisterDto,
+    patient: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.patientModel.findByIdAndUpdate(
+      patient,
+      patientRegisterDto,
+      { new: true },
+    );
+    if (!data) {
+      throw new BadRequestException('Patient not found.');
+    }
+    return data;
+  }
 }

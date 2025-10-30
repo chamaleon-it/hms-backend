@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -81,5 +82,10 @@ export class PatientsController {
       data,
       message: 'Patient is deleted successfully',
     };
+  }
+
+  @Patch(':id')
+  async updatePatient(@Body() patientRegisterDto: PatientRegisterDto,@Param("id") patient:mongoose.Types.ObjectId) {
+    const data = await this.patientsService.updatePatient(patientRegisterDto,patient)
   }
 }

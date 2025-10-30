@@ -151,4 +151,20 @@ export class AppointmentsController {
       message: 'walk-in appointment',
     };
   }
+
+
+  @Patch(":id")
+  async updateAppointment(
+    @Body() createAppointmentDto: CreateAppointmentDto,
+    @Param("id")  id: mongoose.Types.ObjectId
+  ) {
+    const data = await this.appointmentsService.updateAppointment(
+      createAppointmentDto,
+      id,
+    );
+    return {
+      data,
+      message: 'Appointment updated successfully.',
+    };
+  }
 }
