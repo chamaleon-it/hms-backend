@@ -344,15 +344,20 @@ export class AppointmentsService {
     }
   }
 
-
-  async updateAppointment(createAppointmentDto: CreateAppointmentDto,id:mongoose.Types.ObjectId){
-    const data = await this.appointmentModel.findByIdAndUpdate(id,createAppointmentDto,{new:true})
-    if(!data){
-      throw new BadRequestException("No appointment found")
+  async updateAppointment(
+    createAppointmentDto: CreateAppointmentDto,
+    id: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.appointmentModel.findByIdAndUpdate(
+      id,
+      createAppointmentDto,
+      { new: true },
+    );
+    if (!data) {
+      throw new BadRequestException('No appointment found');
     }
-    return data
+    return data;
   }
-
 }
 
 export function safeRegex(input: string) {

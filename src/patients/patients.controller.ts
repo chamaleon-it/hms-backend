@@ -85,7 +85,13 @@ export class PatientsController {
   }
 
   @Patch(':id')
-  async updatePatient(@Body() patientRegisterDto: PatientRegisterDto,@Param("id") patient:mongoose.Types.ObjectId) {
-    const data = await this.patientsService.updatePatient(patientRegisterDto,patient)
+  async updatePatient(
+    @Body() patientRegisterDto: PatientRegisterDto,
+    @Param('id') patient: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.patientsService.updatePatient(
+      patientRegisterDto,
+      patient,
+    );
   }
 }

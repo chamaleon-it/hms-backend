@@ -152,11 +152,10 @@ export class AppointmentsController {
     };
   }
 
-
-  @Patch(":id")
+  @Patch(':id')
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
-    @Param("id")  id: mongoose.Types.ObjectId
+    @Param('id') id: mongoose.Types.ObjectId,
   ) {
     const data = await this.appointmentsService.updateAppointment(
       createAppointmentDto,
