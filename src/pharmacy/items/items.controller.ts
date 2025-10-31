@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -50,7 +51,17 @@ export class ItemsController {
   async getItem() {}
 
   @UseGuards(JwtAuthGuard)
-  async updateItem() {}
+  @Patch(":id")
+  async updateItem(
+    @Body() addItemDto: AddItemDto,
+    @Param('id') id: mongoose.Types.ObjectId
+  ) {
+    const data = await this.itemsService.updateItem(id,addItemDto)
+    return {
+      data,
+      message:"Item updated successfully."
+    }
+  }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')

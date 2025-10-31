@@ -79,7 +79,23 @@ export class ItemsService {
   }
 
   async getItem() {}
-  async updateItem() {}
+
+  async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid item ID.');
+    }
+
+    const data = await this.itemModel
+      .findByIdAndUpdate(id, addItemDto, { new: true, runValidators: true })
+      .lean();
+
+    if (!data) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    return data;
+  }
+
   async deleteItem(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');
