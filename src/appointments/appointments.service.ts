@@ -145,32 +145,32 @@ export class AppointmentsService {
       admit: 0,
     };
 
-    stats.today = results.reduce((acc, r) => acc + r.count, 0);
+    stats.today = results.reduce((acc, r) => acc + r.count, 0) as number;
 
     for (const r of results) {
       switch (r._id) {
         case AppointmentStatus.UPCOMING:
-          stats.upcoming = r.count;
+          stats.upcoming = r.count as number;
           break;
         case AppointmentStatus.CONSULTED:
-          stats.consulted = r.count;
+          stats.consulted = r.count as number;
           break;
         case AppointmentStatus.OBSERVATION:
-          stats.observation = r.count;
+          stats.observation = r.count as number;
           break;
         case AppointmentStatus.COMPLETED:
-          stats.completed = r.count;
+          stats.completed = r.count as number;
           break;
         case AppointmentStatus.NOT_SHOW:
-          stats.notShow = r.count;
+          stats.notShow = r.count as number;
           break;
 
         case AppointmentStatus.TEST:
-          stats.test = r.count;
+          stats.test = r.count as number;
           break;
 
         case AppointmentStatus.ADMIT:
-          stats.admit = r.count;
+          stats.admit = r.count as number;
           break;
       }
     }

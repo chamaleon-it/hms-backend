@@ -14,6 +14,7 @@ import { join } from 'path';
 import { BillingModule } from './billing/billing.module';
 import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
+import { OrdersModule } from './pharmacy/orders/orders.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ItemsModule } from './pharmacy/items/items.module';
     BillingModule,
     ConsultingsModule,
     ItemsModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

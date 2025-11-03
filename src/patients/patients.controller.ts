@@ -93,5 +93,10 @@ export class PatientsController {
       patientRegisterDto,
       patient,
     );
+
+    return {
+      data,
+      message: 'Patient details is updated successfully',
+    };
   }
 }

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument } from 'mongoose';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
 
 export type ConsultingDocument = HydratedDocument<Consulting>;
 
@@ -58,7 +58,7 @@ export class Consulting {
 
   @Prop([
     {
-      drug: { type: String, required: true },
+      name: { type: Types.ObjectId, ref: 'Item', required: true },
       dosage: { type: String, required: true },
       frequency: { type: String, required: true },
       food: { type: String, required: true },
@@ -66,7 +66,7 @@ export class Consulting {
     },
   ])
   medicines: {
-    drug: string;
+    name: Types.ObjectId;
     dosage: string;
     frequency: string;
     food: string;

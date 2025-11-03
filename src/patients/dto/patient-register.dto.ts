@@ -18,7 +18,7 @@ export class PatientRegisterDto {
 
   // @IsEmail({}, { message: 'Invalid email address' })
   @IsOptional()
-  @Transform(({ value }) => value?.trim().toLowerCase())
+  @Transform(({ value }: { value: string }) => value?.trim().toLowerCase())
   email?: string;
 
   @IsString()

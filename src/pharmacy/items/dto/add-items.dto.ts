@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { ItemStatus } from '../schemas/item.schema';
 
-const trim = ({ value }: { value: any }) =>
+const trim = ({ value }: { value: string }) =>
   typeof value === 'string' ? value.trim() : value;
 
 export class AddItemDto {
@@ -39,7 +39,7 @@ export class AddItemDto {
 
   @IsString({ message: 'SKU must be a string.' })
   @MaxLength(64, { message: 'SKU must be at most 64 characters.' })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: string }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
   @IsNotEmpty({ message: 'SKU is required.' })

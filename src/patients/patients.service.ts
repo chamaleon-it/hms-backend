@@ -56,7 +56,6 @@ export class PatientsService {
       minAge = 0,
       maxAge = 100,
       doctor,
-      date,
       status,
       from,
       to,

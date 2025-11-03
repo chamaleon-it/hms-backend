@@ -51,16 +51,16 @@ export class ItemsController {
   async getItem() {}
 
   @UseGuards(JwtAuthGuard)
-  @Patch(":id")
+  @Patch(':id')
   async updateItem(
     @Body() addItemDto: AddItemDto,
-    @Param('id') id: mongoose.Types.ObjectId
+    @Param('id') id: mongoose.Types.ObjectId,
   ) {
-    const data = await this.itemsService.updateItem(id,addItemDto)
+    const data = await this.itemsService.updateItem(id, addItemDto);
     return {
       data,
-      message:"Item updated successfully."
-    }
+      message: 'Item updated successfully.',
+    };
   }
 
   @UseGuards(JwtAuthGuard)

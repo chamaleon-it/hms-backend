@@ -9,6 +9,7 @@ import {
   IsMongoId,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import mongoose from 'mongoose';
 
 class ConsultationNotesDto {
   @IsOptional()
@@ -72,7 +73,7 @@ class ExaminationNoteDto {
 class MedicineDto {
   @IsString({ message: 'Drug name is required and must be a string.' })
   @IsNotEmpty({ message: 'Drug name cannot be empty.' })
-  drug: string;
+  name: mongoose.Types.ObjectId;
 
   @IsString({ message: 'Dosage is required and must be a string.' })
   @IsNotEmpty({ message: 'Dosage cannot be empty.' })
@@ -135,7 +136,7 @@ export class ConsultingDto {
   appointment: null | string;
 
   @IsMongoId({ message: 'Patient must be a valid id' })
-  patient: null | string;
+  patient: mongoose.Types.ObjectId;
 
   @IsOptional()
   @IsDateString({}, { message: 'Follow up must be a valid date or null.' })

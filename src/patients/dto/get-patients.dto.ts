@@ -13,8 +13,6 @@ export class GetPatientsDto {
 
   doctor?: string;
 
-  date?: string;
-
   status?: string;
 
   from?: string;

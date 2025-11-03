@@ -132,7 +132,7 @@ export class UsersService {
       throw new NotFoundException('User not found.');
     }
     user.consultationValues = value;
-    user.save();
+    await user.save();
     return null;
   }
 
