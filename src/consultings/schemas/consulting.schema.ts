@@ -63,6 +63,7 @@ export class Consulting {
       frequency: { type: String, required: true },
       food: { type: String, required: true },
       duration: { type: String, required: true },
+      quantity: { type: Number, required: true },
     },
   ])
   medicines: {
@@ -71,6 +72,7 @@ export class Consulting {
     frequency: string;
     food: string;
     duration: string;
+    quantity:number
   }[];
 
   @Prop({ type: String, default: null })

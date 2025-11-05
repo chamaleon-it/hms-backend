@@ -17,6 +17,7 @@ export enum OrderStatus {
   Failed = 'Failed',
   Canceled = 'Canceled',
   Completed = 'Completed',
+  Deleted = 'Deleted',
 }
 
 @Schema({ _id: false, versionKey: false })
@@ -35,6 +36,12 @@ export class OrderItem {
 
   @Prop({ required: true })
   duration: string;
+
+  @Prop({ required: true })
+  quantity: number;
+
+  @Prop({ required: true, default: false })
+  isPacked: boolean;
 }
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 

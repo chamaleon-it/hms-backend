@@ -7,6 +7,7 @@ import {
   ArrayNotEmpty,
   IsDateString,
   IsMongoId,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import mongoose from 'mongoose';
@@ -90,6 +91,10 @@ class MedicineDto {
   @IsString({ message: 'Duration is required and must be a string.' })
   @IsNotEmpty({ message: 'Duration cannot be empty.' })
   duration: string;
+
+  @IsNumber()
+  @IsNotEmpty({ message: 'Duration cannot be empty.' })
+  quantity: number;
 }
 
 class TestDto {

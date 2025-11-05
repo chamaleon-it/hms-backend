@@ -8,6 +8,7 @@ import {
   IsString,
   ArrayMinSize,
   ValidateNested,
+  IsNumber,
 } from 'class-validator';
 import { OrderPriority, OrderStatus } from '../schemas/order.schema';
 import mongoose from 'mongoose';
@@ -31,6 +32,10 @@ export class OrderItemDto {
   @IsString({ message: 'Duration must be a string' })
   @IsNotEmpty({ message: 'Duration should not be empty' })
   duration!: string;
+
+  @IsNumber()
+    @IsNotEmpty({ message: 'Duration cannot be empty.' })
+    quantity: number;
 }
 
 export class CreateOrderDto {
