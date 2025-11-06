@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
@@ -16,6 +17,7 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { AddItemDto } from './dto/add-items.dto';
 import { GetItemsDto } from './dto/get-items.dto';
 import mongoose from 'mongoose';
+import type { Response } from 'express';
 
 @Controller('pharmacy/items')
 export class ItemsController {
@@ -71,5 +73,16 @@ export class ItemsController {
       data,
       message: 'Item deleted successfully',
     };
+  }
+
+  @Get('export-csv')
+  async exportCsv(@Res() res: Response) {
+    const { csv, filename } = await this.itemsService.exportCsv();
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    res.status(200).send(csv);
   }
 }

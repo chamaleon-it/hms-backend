@@ -8,6 +8,7 @@ import { AddItemDto } from './dto/add-items.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Item, ItemStatus } from './schemas/item.schema';
 import { GetItemsDto } from './dto/get-items.dto';
+import { parse } from 'json2csv';
 
 @Injectable()
 export class ItemsService {
@@ -114,5 +115,12 @@ export class ItemsService {
     }
 
     return data;
+  }
+
+  async exportCsv() {
+    const items = await this.itemModel.find().lean().exec();
+    const csv = parse(items);
+    const filename = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
+    return { csv, filename };
   }
 }

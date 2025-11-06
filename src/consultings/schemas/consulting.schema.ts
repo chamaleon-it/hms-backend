@@ -72,7 +72,7 @@ export class Consulting {
     frequency: string;
     food: string;
     duration: string;
-    quantity:number
+    quantity: number;
   }[];
 
   @Prop({ type: String, default: null })

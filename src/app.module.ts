@@ -15,6 +15,7 @@ import { BillingModule } from './billing/billing.module';
 import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
 import { OrdersModule } from './pharmacy/orders/orders.module';
+import { ReturnModule } from './pharmacy/return/return.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { OrdersModule } from './pharmacy/orders/orders.module';
     ConsultingsModule,
     ItemsModule,
     OrdersModule,
+    ReturnModule,
   ],
   controllers: [AppController],
   providers: [AppService],

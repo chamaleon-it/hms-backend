@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderPriority, OrderStatus } from './schemas/order.schema';
+import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';

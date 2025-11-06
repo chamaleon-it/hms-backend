@@ -34,8 +34,8 @@ export class OrderItemDto {
   duration!: string;
 
   @IsNumber()
-    @IsNotEmpty({ message: 'Duration cannot be empty.' })
-    quantity: number;
+  @IsNotEmpty({ message: 'Duration cannot be empty.' })
+  quantity: number;
 }
 
 export class CreateOrderDto {
