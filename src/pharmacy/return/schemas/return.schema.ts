@@ -39,7 +39,7 @@ export class Return {
   @Prop({ required: true, enum: Object.values(ReturnedBy) })
   returnedBy: ReturnedBy;
 
-  @Prop({ required: true })
+  @Prop({ default:null })
   remarks: string;
 
   @Prop({
