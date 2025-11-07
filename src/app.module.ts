@@ -16,6 +16,7 @@ import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
 import { OrdersModule } from './pharmacy/orders/orders.module';
 import { ReturnModule } from './pharmacy/return/return.module';
+import { PurchaseModule } from './pharmacy/purchase/purchase.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ReturnModule } from './pharmacy/return/return.module';
     ItemsModule,
     OrdersModule,
     ReturnModule,
+    PurchaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
