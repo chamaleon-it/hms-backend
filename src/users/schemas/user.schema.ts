@@ -7,6 +7,7 @@ export enum UserRole {
   NOT_ASSIGNED = 'Not assigned',
   DOCTOR = 'Doctor',
   PHARMACY = 'Pharmacy',
+  PHARMACY_WHOLESALER = 'Pharmacy Wholesaler',
   LAB = 'Lab',
   ADMIN = 'Admin',
   RECEPTION = 'Reception',

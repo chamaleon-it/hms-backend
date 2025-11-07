@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { RefundMode, ReturnedBy, ReturnReason } from '../schemas/return.schema';
 
 export class CreateReturnDto {
   patient: mongoose.Types.ObjectId;
@@ -8,12 +9,12 @@ export class CreateReturnDto {
   items: {
     name: mongoose.Types.ObjectId;
     quantity: number;
-    reason: string;
+    reason: ReturnReason;
   }[];
 
-  refundMode: string;
+  refundMode: RefundMode;
 
-  returnedBy: string;
+  returnedBy: ReturnedBy;
 
-  remarks: string;
+  remarks?: string;
 }

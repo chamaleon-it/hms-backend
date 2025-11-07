@@ -63,6 +63,16 @@ export class UsersController {
     };
   }
 
+  // @UseGuards(JwtAuthGuard)
+  @Get('pharmacy_wholesaler')
+  async getAllPharmacyWholesaler() {
+    const data = await this.usersService.getAllPharmacyWholesaler();
+    return {
+      data,
+      message: 'All pharmacy wholesaler data retrived successfully',
+    };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Patch()
   async updateUser(
