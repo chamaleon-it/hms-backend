@@ -5,7 +5,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Purchase, PurchaseSchema } from './schemas/purchase.schema';
 
 @Module({
-   imports: [MongooseModule.forFeature([{ name: Purchase.name, schema: PurchaseSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: Purchase.name, schema: PurchaseSchema },
+    ]),
+  ],
   controllers: [PurchaseController],
   providers: [PurchaseService],
 })

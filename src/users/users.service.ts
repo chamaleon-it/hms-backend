@@ -72,7 +72,6 @@ export class UsersService {
     return data;
   }
 
-
   async getAllPharmacyWholesaler() {
     const data = await this.userModel
       .find({ role: UserRole.PHARMACY_WHOLESALER })
@@ -80,7 +79,6 @@ export class UsersService {
       .lean();
     return data;
   }
-
 
   async updateUser(id: mongoose.Types.ObjectId, updateUserDto: UpdateUserDto) {
     const user = await this.userModel.findByIdAndUpdate(

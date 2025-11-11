@@ -1,14 +1,11 @@
-
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
-  IsDefined,
   IsInt,
   IsMongoId,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   Min,
@@ -34,7 +31,6 @@ export class CreatePurchaseItemDto {
   notes?: string | null;
 }
 
-
 export class CreatePurchaseDto {
   @IsMongoId()
   wholesaler: mongoose.Types.ObjectId;
@@ -45,7 +41,6 @@ export class CreatePurchaseDto {
   @IsString()
   @IsNotEmpty()
   contactPerson: string;
-
 
   @IsString()
   @IsNotEmpty()

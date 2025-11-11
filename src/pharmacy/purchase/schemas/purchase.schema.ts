@@ -67,6 +67,9 @@ export class Purchase {
     default: false,
   })
   urgent: boolean;
+
+  @Prop({ required: true, unique: true })
+  mrn: string;
 }
 
 export const PurchaseSchema = SchemaFactory.createForClass(Purchase);

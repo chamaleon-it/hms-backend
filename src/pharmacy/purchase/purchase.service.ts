@@ -12,19 +12,21 @@ export class PurchaseService {
   ) {}
 
   async createPurchase(createPurchaseDto: CreatePurchaseDto) {
-    const data = await this.purchaseModel.create(createPurchaseDto);
+    const mrn = await this.generateUniqueMRN();
+    const data = await this.purchaseModel.create({ ...createPurchaseDto, mrn });
     return data;
   }
 
   async findAll(findAllPurchaseDto: FindAllPurchaseDto) {
-    const { pharmacy, status, wholesaler } = findAllPurchaseDto;
-    const limit = Number(findAllPurchaseDto.limit) ?? 100;
-    const page = Number(findAllPurchaseDto.page) ?? 1;
+    const { pharmacy, status, wholesaler, mrn } = findAllPurchaseDto;
+    const limit = Number(findAllPurchaseDto.limit ?? 100);
+    const page = Number(findAllPurchaseDto.page ?? 1);
 
     const query: any = {};
     if (pharmacy) query.pharmacy = pharmacy;
     if (status) query.status = status;
     if (wholesaler) query.wholesaler = wholesaler;
+    if (mrn) query.mrn = { $regex: mrn, $options: 'i' };
 
     const total = await this.purchaseModel.countDocuments(query);
     const data = await this.purchaseModel
@@ -33,7 +35,8 @@ export class PurchaseService {
       .populate('pharmacy', 'name email phoneNumber address')
       .limit(limit)
       .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return {
       data,
@@ -41,5 +44,21 @@ export class PurchaseService {
       page,
       limit,
     };
+  }
+
+  private async generateUniqueMRN(): Promise<string> {
+    let mrn: string;
+    let exists = true;
+
+    do {
+      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
+      mrn = `RXW${randomNum}`;
+
+      // Check if MRN already exists
+      const existing = await this.purchaseModel.exists({ mrn });
+      exists = !!existing;
+    } while (exists);
+
+    return mrn;
   }
 }
