@@ -48,7 +48,9 @@ export class OrdersService {
       .find(filter)
       .populate('patient')
       .populate('doctor', 'name phoneNumber specialization')
-      .populate('items.name');
+      .populate('items.name')
+      .sort({createdAt:-1})
+      ;
     return data;
   }
 

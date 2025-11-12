@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { CreateBillingDto } from './dto/create-billing.dto';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import mongoose from 'mongoose';
 
 @Controller('billing')
 export class BillingController {
@@ -29,5 +30,15 @@ export class BillingController {
     message:"All bills were retrived successfully.",
     data
    }
+  }
+
+  @Get(":id")
+  @UseGuards(JwtAuthGuard)
+  async getBill(@Param("id") id:mongoose.Types.ObjectId){
+    const data = await this.billingService.getBill(id) 
+    return {
+      data,
+      message:"Bill were retrived successfully."
+    }
   }
 }
