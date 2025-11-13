@@ -7,6 +7,7 @@ import { CreateBillingDto } from './dto/create-billing.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
 import mongoose, { Model } from 'mongoose';
+import { GetBillisDto } from './dto/get-bills.dto';
 
 @Injectable()
 export class BillingService {
@@ -36,11 +37,69 @@ export class BillingService {
     return data;
   }
 
-  async getBills(user: mongoose.Types.ObjectId) {
-    return this.billingModel
-      .find({ user }, 'mrn createdAt patient items.total cash online insurance')
+  async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
+    const { q, method, status,date } = getBillisDto;
+    
+    const filter: any = {};
+
+    filter.user = user;
+
+    if (q) {
+      filter.mrn = {
+        $regex: q,
+        $options: 'i',
+      };
+    }
+
+    if (date) {
+      const from = new Date(date);
+      if (isNaN(from.getTime())) {
+      throw new BadRequestException('Invalid date');
+      }
+      const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+      filter.createdAt = { $gte: from, $lt: to };
+    }
+
+    console.log(filter);
+
+    if (method) {
+      if (method === 'Cash') {
+        filter.cash = { $ne: 0 };
+      } else if (method === 'Insurance') {
+        filter.insurance = { $ne: 0 };
+      } else if (method === 'Online') {
+        filter.online = { $ne: 0 };
+      }
+    }
+
+    let data = await this.billingModel
+      .find(filter, 'mrn createdAt patient items.total cash online insurance')
       .populate('patient', 'name mrn')
-      .lean();
+      .sort({ createdAt: -1 }).limit(1000)
+      .lean()
+      .exec();
+
+    if (!status) return data;
+    else {
+      if (status === 'Unpaid') {
+        data = data.filter((d) => !Boolean(d.insurance + d.cash + d.online));
+      } else if (status === 'Paid') {
+        data = data.filter(
+          (d) =>
+            d.items.reduce((a, b) => a + b.total, 0) <=
+            d.insurance + d.cash + d.online,
+        );
+      } else if (status === 'Partial') {
+        data = data.filter(
+          (d) =>
+            d.items.reduce((a, b) => a + b.total, 0) >
+              d.insurance + d.cash + d.online &&
+            Boolean(d.insurance + d.cash + d.online),
+        );
+      }
+    }
+
+    return data;
   }
 
   async getBill(id: mongoose.Types.ObjectId) {
