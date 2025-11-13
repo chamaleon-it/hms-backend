@@ -60,7 +60,6 @@ export class BillingService {
       filter.createdAt = { $gte: from, $lt: to };
     }
 
-    console.log(filter);
 
     if (method) {
       if (method === 'Cash') {
