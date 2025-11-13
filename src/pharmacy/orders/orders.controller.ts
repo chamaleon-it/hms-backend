@@ -17,8 +17,8 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  async getOrders() {
-    const data = await this.ordersService.getOrders();
+  async getOrders(@Query("q")  q:string) {
+    const data = await this.ordersService.getOrders(q);
     return {
       data,
       message: 'All orders where retrived successfully',

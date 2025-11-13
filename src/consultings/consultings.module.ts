@@ -13,9 +13,8 @@ import { Order, OrderSchema } from 'src/pharmacy/orders/schemas/order.schema';
       { name: Consulting.name, schema: ConsultingSchema },
     ]),
     OrdersModule,
-    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
   ],
   controllers: [ConsultingsController],
-  providers: [ConsultingsService, OrdersService],
+  providers: [ConsultingsService,],
 })
 export class ConsultingsModule {}

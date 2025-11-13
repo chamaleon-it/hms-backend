@@ -5,14 +5,18 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderStatus } from './schemas/order.schema';
+import { Order, OrderPriority, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
+import { ItemsService } from '../items/items.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(@InjectModel(Order.name) private orderModel: Model<Order>) {}
+  constructor(
+    @InjectModel(Order.name) private orderModel: Model<Order>,
+    private readonly itemsService: ItemsService,
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -37,20 +41,25 @@ export class OrdersService {
     return data;
   }
 
-  async getOrders() {
+  async getOrders(q:string) {
     const filter: any = {};
 
     filter.status = {
       $ne: OrderStatus.Deleted,
     };
 
+    if(q=== "stat"){
+      filter.priority =OrderPriority.Stat
+    }else if(q==="ready"){
+      filter.status = OrderStatus.Ready
+    }
+
     const data = await this.orderModel
       .find(filter)
       .populate('patient')
       .populate('doctor', 'name phoneNumber specialization')
       .populate('items.name')
-      .sort({createdAt:-1})
-      ;
+      .sort({ createdAt: -1 });
     return data;
   }
 
@@ -121,27 +130,38 @@ export class OrdersService {
       order.status = OrderStatus.Ready;
       await order.save();
     }
+    const qty =
+      order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
+    await this.itemsService.decreaseItem(item, qty);
   }
 
-  async markAllAsPacked(markAllAsPackedDto: MarkAllAsPackedDto): Promise<void> {
-    const orderId = markAllAsPackedDto.order;
+ async markAllAsPacked(markAllAsPackedDto: MarkAllAsPackedDto): Promise<void> {
+  const orderId = markAllAsPackedDto.order;
+  const order = await this.orderModel.findById(orderId).lean().exec();
+  if (!order) {
+    throw new NotFoundException('Order not found. Please check your details.');
+  }
+  const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
 
-    const result = await this.orderModel
-      .updateOne(
-        { _id: orderId },
-        {
-          $set: {
-            'items.$[].isPacked': true,
-            status: OrderStatus.Ready,
-          },
-        },
-      )
-      .exec();
+  if (unpacked.length > 0) {
+    await Promise.all(
+      unpacked.map((it) => this.itemsService.decreaseItem(it.name, it.quantity))
+    );
+  }
 
-    if (result.matchedCount === 0) {
-      throw new NotFoundException(
-        'Order not found. Please check your details.',
-      );
+  const result = await this.orderModel.updateOne(
+    { _id: orderId },
+    {
+      $set: {
+        'items.$[].isPacked': true,
+        status: OrderStatus.Ready,
+      },
     }
+  ).exec();
+
+  if (result.matchedCount === 0) {
+    throw new NotFoundException('Order not found. Please check your details.');
   }
+}
+
 }

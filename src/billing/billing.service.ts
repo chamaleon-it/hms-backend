@@ -8,11 +8,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
 import mongoose, { Model } from 'mongoose';
 import { GetBillisDto } from './dto/get-bills.dto';
+import { AddBillingItemDto } from './dto/add-billing-item.dto';
+import { BillingItem } from './schemas/billingItem.schema';
+import { GetBillingItemDto } from './dto/get-billing-item.dto';
 
 @Injectable()
 export class BillingService {
   constructor(
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
+    @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
@@ -38,8 +42,8 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { q, method, status,date } = getBillisDto;
-    
+    const { q, method, status, date } = getBillisDto;
+
     const filter: any = {};
 
     filter.user = user;
@@ -54,12 +58,11 @@ export class BillingService {
     if (date) {
       const from = new Date(date);
       if (isNaN(from.getTime())) {
-      throw new BadRequestException('Invalid date');
+        throw new BadRequestException('Invalid date');
       }
       const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
       filter.createdAt = { $gte: from, $lt: to };
     }
-
 
     if (method) {
       if (method === 'Cash') {
@@ -74,7 +77,8 @@ export class BillingService {
     let data = await this.billingModel
       .find(filter, 'mrn createdAt patient items.total cash online insurance')
       .populate('patient', 'name mrn')
-      .sort({ createdAt: -1 }).limit(1000)
+      .sort({ createdAt: -1 })
+      .limit(1000)
       .lean()
       .exec();
 
@@ -112,4 +116,39 @@ export class BillingService {
     if (!data) throw new NotFoundException('Bill is not found.');
     return data;
   }
+
+  async addBillingItem(
+    addBillingItemDto: AddBillingItemDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    const isExist = await this.billingItemModel.exists({
+      user,
+      item: addBillingItemDto.item,
+    });
+
+    if (isExist) {
+      throw new BadRequestException('Already added to billing.');
+    }
+    const data = await this.billingItemModel.create({
+      user,
+      item: addBillingItemDto.item,
+    });
+    return data;
+  }
+
+  async getBillingItems({ item }: GetBillingItemDto, user: mongoose.Types.ObjectId) {
+  return this.billingItemModel
+    .find({ user, item: new RegExp(item, 'i') })
+    .limit(5)
+    .sort({ createdAt: -1 })
+    .distinct('item')
+    .lean()
+    .exec();
+}
+
+
+async deleteBillingItem(item:string,user:mongoose.Types.ObjectId){
+  const data = await this.billingItemModel.findOneAndDelete({user,item})
+  return data
+}
 }

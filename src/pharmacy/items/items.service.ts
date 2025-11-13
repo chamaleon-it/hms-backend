@@ -123,4 +123,19 @@ export class ItemsService {
     const filename = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
     return { csv, filename };
   }
+
+  async decreaseItem(id: mongoose.Types.ObjectId, sold: number) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+    const newQuantity = Math.max(item.quantity - sold, 0);
+
+    if (newQuantity !== item.quantity) {
+      item.quantity = newQuantity;
+      await item.save();
+    }
+
+    return item;
+  }
 }
