@@ -60,8 +60,8 @@ export class Billing {
   @Prop({ type: String, required: false })
   note?: string;
 
-  @Prop({type:String,required:true,unique:true})
-  mrn:string
+  @Prop({ type: String, required: true, unique: true })
+  mrn: string;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

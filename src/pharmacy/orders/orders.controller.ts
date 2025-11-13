@@ -17,7 +17,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  async getOrders(@Query("q")  q:string) {
+  async getOrders(@Query('q') q: string) {
     const data = await this.ordersService.getOrders(q);
     return {
       data,

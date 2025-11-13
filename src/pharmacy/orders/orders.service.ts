@@ -41,17 +41,17 @@ export class OrdersService {
     return data;
   }
 
-  async getOrders(q:string) {
+  async getOrders(q: string) {
     const filter: any = {};
 
     filter.status = {
       $ne: OrderStatus.Deleted,
     };
 
-    if(q=== "stat"){
-      filter.priority =OrderPriority.Stat
-    }else if(q==="ready"){
-      filter.status = OrderStatus.Ready
+    if (q === 'stat') {
+      filter.priority = OrderPriority.Stat;
+    } else if (q === 'ready') {
+      filter.status = OrderStatus.Ready;
     }
 
     const data = await this.orderModel
@@ -135,33 +135,40 @@ export class OrdersService {
     await this.itemsService.decreaseItem(item, qty);
   }
 
- async markAllAsPacked(markAllAsPackedDto: MarkAllAsPackedDto): Promise<void> {
-  const orderId = markAllAsPackedDto.order;
-  const order = await this.orderModel.findById(orderId).lean().exec();
-  if (!order) {
-    throw new NotFoundException('Order not found. Please check your details.');
-  }
-  const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
-
-  if (unpacked.length > 0) {
-    await Promise.all(
-      unpacked.map((it) => this.itemsService.decreaseItem(it.name, it.quantity))
-    );
-  }
-
-  const result = await this.orderModel.updateOne(
-    { _id: orderId },
-    {
-      $set: {
-        'items.$[].isPacked': true,
-        status: OrderStatus.Ready,
-      },
+  async markAllAsPacked(markAllAsPackedDto: MarkAllAsPackedDto): Promise<void> {
+    const orderId = markAllAsPackedDto.order;
+    const order = await this.orderModel.findById(orderId).lean().exec();
+    if (!order) {
+      throw new NotFoundException(
+        'Order not found. Please check your details.',
+      );
     }
-  ).exec();
+    const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
 
-  if (result.matchedCount === 0) {
-    throw new NotFoundException('Order not found. Please check your details.');
+    if (unpacked.length > 0) {
+      await Promise.all(
+        unpacked.map((it) =>
+          this.itemsService.decreaseItem(it.name, it.quantity),
+        ),
+      );
+    }
+
+    const result = await this.orderModel
+      .updateOne(
+        { _id: orderId },
+        {
+          $set: {
+            'items.$[].isPacked': true,
+            status: OrderStatus.Ready,
+          },
+        },
+      )
+      .exec();
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(
+        'Order not found. Please check your details.',
+      );
+    }
   }
-}
-
 }

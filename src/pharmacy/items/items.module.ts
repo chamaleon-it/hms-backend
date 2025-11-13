@@ -10,6 +10,6 @@ import { Item, ItemSchema } from './schemas/item.schema';
   ],
   controllers: [ItemsController],
   providers: [ItemsService],
-  exports:[ItemsService]
+  exports: [ItemsService],
 })
 export class ItemsModule {}

@@ -85,7 +85,7 @@ export class BillingService {
     if (!status) return data;
     else {
       if (status === 'Unpaid') {
-        data = data.filter((d) => !Boolean(d.insurance + d.cash + d.online));
+        data = data.filter((d) => !(d.insurance + d.cash + d.online));
       } else if (status === 'Paid') {
         data = data.filter(
           (d) =>
@@ -136,19 +136,20 @@ export class BillingService {
     return data;
   }
 
-  async getBillingItems({ item }: GetBillingItemDto, user: mongoose.Types.ObjectId) {
-  return this.billingItemModel
-    .find({ user, item: new RegExp(item, 'i') })
-    .limit(5)
-    .sort({ createdAt: -1 })
-    .distinct('item')
-    .lean()
-    .exec();
-}
+  async getBillingItems(
+    { item }: GetBillingItemDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    return this.billingItemModel
+      .find({ user, item: new RegExp(item, 'i') })
+      .limit(5)
+      .distinct('item')
+      .lean()
+      .exec();
+  }
 
-
-async deleteBillingItem(item:string,user:mongoose.Types.ObjectId){
-  const data = await this.billingItemModel.findOneAndDelete({user,item})
-  return data
-}
+  async deleteBillingItem(item: string, user: mongoose.Types.ObjectId) {
+    const data = await this.billingItemModel.findOneAndDelete({ user, item });
+    return data;
+  }
 }

@@ -83,16 +83,16 @@ export class BillingController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete("billing_item")
+  @Delete('billing_item')
   async deleteBillingItem(
-    @Query("item") item:string,
+    @Query('item') item: string,
     @GetUser() user: JWTUserInterface,
-  ){
- const data = await this.billingService.deleteBillingItem(item,user.id)
- return {
-  message:"Item is deleted",
-  data
- }
+  ) {
+    const data = await this.billingService.deleteBillingItem(item, user.id);
+    return {
+      message: 'Item is deleted',
+      data,
+    };
   }
 
   @Get(':id')
