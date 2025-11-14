@@ -5,7 +5,6 @@ import {
   IsInt,
   IsMongoId,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -17,10 +16,6 @@ export class CreatePurchaseItemDto {
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @IsNumber({}, { message: 'unitPrice must be a number' })
-  @Min(0)
-  unitPrice: number;
 
   @IsInt({ message: 'quantity must be an integer' })
   @Min(1)
@@ -58,10 +53,6 @@ export class CreatePurchaseDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseItemDto)
   items: CreatePurchaseItemDto[];
-
-  @IsOptional()
-  @IsNumber({}, { message: 'shipping must be a number or null' })
-  shipping?: number | null;
 
   @IsOptional()
   @IsString()

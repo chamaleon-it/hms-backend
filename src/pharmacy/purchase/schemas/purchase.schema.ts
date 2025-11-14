@@ -30,7 +30,6 @@ export class Purchase {
     type: [
       {
         name: { type: String, required: true },
-        unitPrice: { type: Number, required: true },
         quantity: { type: Number, required: true },
         notes: { type: String, default: null },
       },
@@ -39,16 +38,9 @@ export class Purchase {
   })
   items: {
     name: string;
-    unitPrice: number;
     quantity: number;
     notes: null | string;
   }[];
-
-  @Prop({
-    type: Number,
-    default: null,
-  })
-  shipping: number | null;
 
   @Prop({
     type: String,
