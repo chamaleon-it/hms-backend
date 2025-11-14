@@ -26,10 +26,7 @@ export class PurchaseService {
       pharmacy?: string;
       status?: string;
       wholesaler?: string;
-      mrn?: {
-        $regex: string;
-        $options: string;
-      };
+      mrn?: Record<string,string>;
     } = {};
     if (pharmacy) query.pharmacy = pharmacy;
     if (status) query.status = status;
