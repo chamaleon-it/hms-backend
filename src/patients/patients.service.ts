@@ -90,10 +90,7 @@ export class PatientsService {
       filter.gender = gender;
     }
 
-    const ageFilter: {
-      $lte?: Date;
-      $gte?: Date;
-    } = {};
+    const ageFilter: Record<string,Date> = {};
     const now = new Date();
 
     if (minAge && Number.isFinite(Number(minAge))) {
