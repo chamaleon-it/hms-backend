@@ -70,9 +70,7 @@ export class PatientsService {
       createdAt?: Record<string, Date>;
       status?: string | Record<string, PatientStatus>;
       dateOfBirth?: Record<string, Date>;
-      conditions?: {
-        $in?: string[];
-      };
+      conditions?: Record<string, string[]>;
     } = {};
 
     if (query && query.trim() !== '') {
@@ -90,7 +88,7 @@ export class PatientsService {
       filter.gender = gender;
     }
 
-    const ageFilter: Record<string,Date> = {};
+    const ageFilter: Record<string, Date> = {};
     const now = new Date();
 
     if (minAge && Number.isFinite(Number(minAge))) {

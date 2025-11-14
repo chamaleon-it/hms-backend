@@ -43,7 +43,7 @@ export class OrdersService {
 
   async getOrders(q: string) {
     const filter: {
-      status?:Record<string,string> | string;
+      status?: Record<string, string> | string;
       priority?: string;
     } = {};
 
