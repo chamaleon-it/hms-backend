@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -58,6 +59,28 @@ export class OrdersController {
     return {
       message: 'All item is packed',
       data,
+    };
+  }
+
+  @Get('customers')
+  async getCustomers() {
+    const data = await this.ordersService.getCustomers();
+    return {
+      data,
+      message: 'All customers data were retrived successfully.',
+    };
+  }
+
+  @Get('customers/:patient')
+  async getCustomer(@Param('patient') patient: string) {
+    if (!mongoose.isValidObjectId(patient))
+      throw new BadRequestException('Please provide a valid patient id');
+    const data = await this.ordersService.getCustomer(
+      new mongoose.Types.ObjectId(patient),
+    );
+    return {
+      data,
+      message: 'Customer data were retrived successfully.',
     };
   }
 }

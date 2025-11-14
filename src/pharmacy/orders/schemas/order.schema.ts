@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument,  Types } from 'mongoose';
 
 export type OrderDocument = HydratedDocument<Order>;
 
@@ -22,7 +22,7 @@ export enum OrderStatus {
 
 @Schema({ _id: false, versionKey: false })
 export class OrderItem {
-  @Prop({ type: Types.ObjectId, ref: 'Item', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true })
   name: Types.ObjectId; // or rename to `item` or `itemId`
 
   @Prop({ required: true })
@@ -50,10 +50,14 @@ export class Order {
   @Prop({ required: true, unique: true })
   mrn: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Patient', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Patient',
+    required: true,
+  })
   patient: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   doctor: Types.ObjectId;
 
   @Prop({ type: [OrderItemSchema], default: [] })
