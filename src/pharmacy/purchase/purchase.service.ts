@@ -22,7 +22,12 @@ export class PurchaseService {
     const limit = Number(findAllPurchaseDto.limit ?? 100);
     const page = Number(findAllPurchaseDto.page ?? 1);
 
-    const query: any = {};
+    const query: {
+      pharmacy?: string;
+      status?: string;
+      wholesaler?: string;
+      mrn?: Record<string, string>;
+    } = {};
     if (pharmacy) query.pharmacy = pharmacy;
     if (status) query.status = status;
     if (wholesaler) query.wholesaler = wholesaler;

@@ -120,21 +120,22 @@ export class AppointmentsService {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    const results = await this.appointmentModel.aggregate([
-      {
-        $match: {
-          date: { $gte: startOfDay, $lte: endOfDay },
+    const results: { count: number; _id: AppointmentStatus }[] =
+      await this.appointmentModel.aggregate([
+        {
+          $match: {
+            date: { $gte: startOfDay, $lte: endOfDay },
+          },
         },
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
         },
-      },
-    ]);
+      ]);
 
-    const stats = {
+    const stats: Record<string, number> = {
       today: 0,
       upcoming: 0,
       consulted: 0,
@@ -145,32 +146,32 @@ export class AppointmentsService {
       admit: 0,
     };
 
-    stats.today = results.reduce((acc, r) => acc + r.count, 0) as number;
+    stats.today = results.reduce((acc: number, r) => acc + r.count, 0);
 
     for (const r of results) {
       switch (r._id) {
         case AppointmentStatus.UPCOMING:
-          stats.upcoming = r.count as number;
+          stats.upcoming = r.count;
           break;
         case AppointmentStatus.CONSULTED:
-          stats.consulted = r.count as number;
+          stats.consulted = r.count;
           break;
         case AppointmentStatus.OBSERVATION:
-          stats.observation = r.count as number;
+          stats.observation = r.count;
           break;
         case AppointmentStatus.COMPLETED:
-          stats.completed = r.count as number;
+          stats.completed = r.count;
           break;
         case AppointmentStatus.NOT_SHOW:
-          stats.notShow = r.count as number;
+          stats.notShow = r.count;
           break;
 
         case AppointmentStatus.TEST:
-          stats.test = r.count as number;
+          stats.test = r.count;
           break;
 
         case AppointmentStatus.ADMIT:
-          stats.admit = r.count as number;
+          stats.admit = r.count;
           break;
       }
     }

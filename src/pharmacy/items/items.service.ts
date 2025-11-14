@@ -30,7 +30,13 @@ export class ItemsService {
 
     const skip = (page - 1) * limit;
 
-    let filter: any = {};
+    let filter: {
+      $or?: Array<Record<string, Record<string, string>>>;
+      category?: string;
+      quantity?: number | Record<string, number>;
+      expiryDate?: Record<string, Date>;
+      status?: Record<string, string>;
+    } = {};
 
     if (q) {
       const searchRegex = { $regex: q, $options: 'i' };
@@ -50,13 +56,13 @@ export class ItemsService {
     }
 
     if (stock) {
-      const stockConditions: Record<string, any> = {
+      const stockConditions: Record<string, number | Record<string, number>> = {
         Instock: { $gte: 20 },
         Low: { $gt: 0, $lt: 20 },
         Out: 0,
       };
 
-      filter.quantity = stockConditions[stock] ?? filter.quantity;
+      filter.quantity = stockConditions[stock];
     }
 
     if (query.expiry) {
