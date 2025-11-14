@@ -174,4 +174,130 @@ export class OrdersService {
       );
     }
   }
+
+  async getCustomers(): Promise<
+    {
+      patient: {
+        _id: mongoose.Types.ObjectId;
+        name: string;
+        address: string;
+        mrn: string;
+        dateOfBirth: Date;
+        gender: string;
+        phoneNumber: string;
+      };
+      visits: number;
+      lastPurchase: Date;
+      totalSpend: number;
+    }[]
+  > {
+    const customers = await this.orderModel
+      .aggregate([
+        { $match: { patient: { $exists: true, $ne: null } } },
+        { $group: { _id: '$patient' } },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'patient',
+          },
+        },
+        { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
+        { $replaceRoot: { newRoot: '$patient' } },
+        {
+          $project: {
+            name: 1,
+            address: 1,
+            mrn: 1,
+            dateOfBirth: 1,
+            gender: 1,
+            phoneNumber: 1,
+          },
+        },
+      ])
+      .exec();
+
+    const orders = await this.orderModel
+      .find({
+        status: {
+          $ne: OrderStatus.Deleted,
+        },
+        patient: {
+          $in: customers.map((e) => e._id),
+        },
+      })
+      .select('patient items.quantity createdAt')
+      .populate('items.name', 'unitPrice -_id')
+      .populate('patient', 'name address mrn dateOfBirth gender phoneNumber')
+      .sort({ createdAt: -1 });
+
+    return customers.map((e) => {
+      const order: any = orders.filter(
+        (i) => i.patient._id.toString() === e._id.toString(),
+      );
+      const totalSpend = order.reduce(
+        (a, b) =>
+          a +
+          b.items.reduce(
+            (c: any, d: any) => c + d.quantity * d.name.unitPrice,
+            0,
+          ),
+        0,
+      );
+
+      return {
+        totalSpend,
+        visits: order.length,
+        patient: e,
+        lastPurchase: order[0]?.createdAt as Date,
+      };
+    });
+  }
+
+  async getCustomer(patientId: mongoose.Types.ObjectId) {
+    // fetch orders and a single order-with-patient in parallel
+    const [sampleOrder, orders] = await Promise.all([
+      this.orderModel
+        .findOne({ patient: patientId })
+        .populate('patient')
+        .select('patient')
+        .lean()
+        .exec(),
+      this.orderModel
+        .find({ patient: patientId })
+        .populate('items.name', 'unitPrice name generic manufacturer  -_id ')
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec(),
+    ]);
+
+    const patient = sampleOrder?.patient ?? null;
+    const totalVisit = orders.length;
+
+    // compute total spend: sum over orders of sum(quantity * unitPrice)
+    const totalSpend = orders.reduce((orderAcc, order: any) => {
+      const itemsTotal = (order.items || []).reduce(
+        (itemAcc: number, item: any) => {
+          const qty = Number(item.quantity ?? 0);
+          const price = Number(item.name?.unitPrice ?? 0);
+          return itemAcc + qty * price;
+        },
+        0,
+      );
+      return orderAcc + itemsTotal;
+    }, 0);
+
+    const averageSpend = totalVisit > 0 ? totalSpend / totalVisit : 0;
+    const lastPurchase = (orders[0] as any)?.createdAt ?? null;
+
+    return {
+      patient,
+      orders,
+      totalVisit,
+      averageSpend,
+      totalSpend,
+      lastPurchase,
+    };
+  }
 }
