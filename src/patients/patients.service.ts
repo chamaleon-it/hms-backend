@@ -63,7 +63,17 @@ export class PatientsService {
 
     const skip = (page - 1) * limit;
 
-    let filter: any = {};
+    let filter: {
+      gender?: string;
+      $or?: Record<string, Record<string, string>>[];
+      doctor?: mongoose.Types.ObjectId;
+      createdAt?: Record<string, Date>;
+      status?: string | Record<string, PatientStatus>;
+      dateOfBirth?: Record<string, Date>;
+      conditions?: {
+        $in?: string[];
+      };
+    } = {};
 
     if (query && query.trim() !== '') {
       const searchRegex = { $regex: query, $options: 'i' };
@@ -80,7 +90,10 @@ export class PatientsService {
       filter.gender = gender;
     }
 
-    const ageFilter: any = {};
+    const ageFilter: {
+      $lte?: Date;
+      $gte?: Date;
+    } = {};
     const now = new Date();
 
     if (minAge && Number.isFinite(Number(minAge))) {
@@ -110,10 +123,12 @@ export class PatientsService {
     }
 
     if (conditions) {
-      const parsed =
-        typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
+      const parsed: string[] =
+        typeof conditions === 'string'
+          ? (JSON.parse(conditions) as string[])
+          : (conditions as string[]);
 
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (parsed.length > 0) {
         filter.conditions = { $in: parsed };
       }
     }
@@ -211,61 +226,21 @@ export class PatientsService {
       ])
       .exec();
 
-    const r = facets[0] || {};
+    const r = (facets[0] ?? {}) as Record<string, Record<'count', number>[]>;
     const toNum = (arr: { count: number }[] | undefined) =>
       arr && arr[0] ? arr[0].count : 0;
 
     return {
-      total: toNum(
-        r.total as {
-          count: number;
-        }[],
-      ),
-      active: toNum(
-        r.active as {
-          count: number;
-        }[],
-      ),
-      inactive: toNum(
-        r.inactive as {
-          count: number;
-        }[],
-      ),
-      critical: toNum(
-        r.critical as {
-          count: number;
-        }[],
-      ),
-      discharged: toNum(
-        r.discharged as {
-          count: number;
-        }[],
-      ),
-      today: toNum(
-        r.today as {
-          count: number;
-        }[],
-      ),
-      thisWeek: toNum(
-        r.thisWeek as {
-          count: number;
-        }[],
-      ),
-      thisMonth: toNum(
-        r.thisMonth as {
-          count: number;
-        }[],
-      ),
-      male: toNum(
-        r.male as {
-          count: number;
-        }[],
-      ),
-      female: toNum(
-        r.female as {
-          count: number;
-        }[],
-      ),
+      total: toNum(r.total),
+      active: toNum(r.active),
+      inactive: toNum(r.inactive),
+      critical: toNum(r.critical),
+      discharged: toNum(r.discharged),
+      today: toNum(r.today),
+      thisWeek: toNum(r.thisWeek),
+      thisMonth: toNum(r.thisMonth),
+      male: toNum(r.male),
+      female: toNum(r.female),
     };
   }
 

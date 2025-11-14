@@ -44,7 +44,14 @@ export class BillingService {
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
     const { q, method, status, date } = getBillisDto;
 
-    const filter: any = {};
+    const filter: {
+      user?: mongoose.Types.ObjectId;
+      mrn?: Record<string, string>;
+      createdAt?: Record<string, Date>;
+      cash?: Record<string, number>;
+      insurance?: Record<string, number>;
+      online?: Record<string, number>;
+    } = {};
 
     filter.user = user;
 

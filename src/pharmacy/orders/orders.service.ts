@@ -42,7 +42,15 @@ export class OrdersService {
   }
 
   async getOrders(q: string) {
-    const filter: any = {};
+    const filter: {
+      status?:
+        | {
+            $ne: string;
+          }
+        | string;
+
+      priority?: string;
+    } = {};
 
     filter.status = {
       $ne: OrderStatus.Deleted,
