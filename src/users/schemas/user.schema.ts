@@ -129,7 +129,7 @@ export class User {
     type: {
       general: {
         owner: { type: String, default: null, trim: true },
-        gstin: { type: String, default: null, trim: true },
+        gstin: { type: String, default: null, trim: true, uppercase: true },
       },
       billing: {
         prefix: { type: String, default: 'INV', trim: true },
@@ -178,7 +178,7 @@ export class User {
     type: {
       general: {
         contactPerson: { type: String, default: null },
-        gstin: { type: String, default: null },
+        gstin: { type: String, default: null, uppercase: true },
       },
       pricing: {
         defaultMargin: { type: Number, default: 18 },
