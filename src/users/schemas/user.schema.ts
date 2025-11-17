@@ -128,11 +128,11 @@ export class User {
   @Prop({
     type: {
       general: {
-        owner: { type: String, default: null,trim:true },
-        gstin: { type: String, default:null,trim:true },
+        owner: { type: String, default: null, trim: true },
+        gstin: { type: String, default: null, trim: true },
       },
       billing: {
-        prefix: { type: String, default: 'INV',trim:true },
+        prefix: { type: String, default: 'INV', trim: true },
         defaultGst: { type: Number, default: 5 },
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
@@ -146,7 +146,7 @@ export class User {
         whatsapp: { type: Boolean, default: false },
         sms: { type: Boolean, default: false },
         inApp: { type: Boolean, default: false },
-        note: { type: String, default: null,trim:true },
+        note: { type: String, default: null, trim: true },
       },
     },
   })
@@ -171,6 +171,61 @@ export class User {
       sms: boolean;
       inApp: boolean;
       note: string;
+    };
+  };
+
+  @Prop({
+    type: {
+      general: {
+        contactPerson: { type: String, default: null },
+        gstin: { type: String, default: null },
+      },
+      pricing: {
+        defaultMargin: { type: Number, default: 18 },
+        minOrderValue: { type: Number, default: 5000 },
+        creditPeriod: { type: Number, default: 30 },
+        allowCreditOrder: { type: Boolean, default: false },
+      },
+      logistics: {
+        sameDayDispatchCutOf: { type: String, default: '16:00' },
+        defaultCourier: { type: String, default: null },
+        returnWindow: { type: Number, default: 7 },
+        allowPartialDispatch: { type: Boolean, default: false },
+        autoMergeOrders: { type: Boolean, default: false },
+      },
+      notifications: {
+        whatsapp: { type: Boolean, default: false },
+        email: { type: Boolean, default: false },
+        sms: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: false },
+        note: { type: String, default: null },
+      },
+    },
+  })
+  pharmacyWholesaler: {
+    general: {
+      contactPerson: string | null;
+      gstin: string | null;
+    };
+    pricing: {
+      defaultMargin: number;
+      minOrderValue: number;
+      creditPeriod: number;
+      allowCreditOrder: boolean;
+    };
+    logistics: {
+      sameDayDispatchCutOf: string;
+      defaultCourier: string;
+      returnWindow: number;
+      allowPartialDispatch: boolean;
+      autoMergeOrders: boolean;
+    };
+    notifications: {
+      whatsapp: boolean;
+      email: boolean;
+      sms: boolean;
+      inApp: boolean;
+      note?: string | null;
     };
   };
 }
