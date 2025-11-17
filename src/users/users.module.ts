@@ -5,12 +5,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
 import { JwtModule } from '@nestjs/jwt';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
+import { PharmacyWholesalerModule } from './pharmacy-wholesaler/pharmacy-wholesaler.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule,
     PharmacyModule,
+    PharmacyWholesalerModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],
