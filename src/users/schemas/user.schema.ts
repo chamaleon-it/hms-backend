@@ -124,6 +124,55 @@ export class User {
 
   @Prop({ type: SchemaFactory.createForClass(Availability), default: null })
   availability?: Availability | null;
+
+  @Prop({
+    type: {
+      general: {
+        owner: { type: String, default: null,trim:true },
+        gstin: { type: String, default:null,trim:true },
+      },
+      billing: {
+        prefix: { type: String, default: 'INV',trim:true },
+        defaultGst: { type: Number, default: 5 },
+        roundOff: { type: Boolean, default: false },
+        autoPrintAfterSave: { type: Boolean, default: false },
+      },
+      inventory: {
+        lowStockThreshold: { type: Number, default: 10 },
+        expiryAlert: { type: Number, default: 90 },
+        allowNegativeStock: { type: Boolean, default: false },
+      },
+      notifications: {
+        whatsapp: { type: Boolean, default: false },
+        sms: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: false },
+        note: { type: String, default: null,trim:true },
+      },
+    },
+  })
+  pharmacy: {
+    general: {
+      owner: string | null;
+      gstin: string | null;
+    };
+    billing: {
+      prefix: string;
+      defaultGst: number;
+      roundOff: boolean;
+      autoPrintAfterSave: boolean;
+    };
+    inventory: {
+      lowStockThreshold: number;
+      expiryAlert: number;
+      allowNegativeStock: boolean;
+    };
+    notifications: {
+      whatsapp: boolean;
+      sms: boolean;
+      inApp: boolean;
+      note: string;
+    };
+  };
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

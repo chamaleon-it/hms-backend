@@ -256,7 +256,6 @@ export class OrdersService {
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {
-    // fetch orders and a single order-with-patient in parallel
     const [sampleOrder, orders] = await Promise.all([
       this.orderModel
         .findOne({ patient: patientId })
@@ -273,6 +272,10 @@ export class OrdersService {
     ]);
 
     const patient = sampleOrder?.patient ?? null;
+
+    if(!patient){
+      throw new NotFoundException("This patient has not purchased any items.")
+    }
     const totalVisit = orders.length;
 
     // compute total spend: sum over orders of sum(quantity * unitPrice)
