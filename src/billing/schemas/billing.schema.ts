@@ -62,6 +62,9 @@ export class Billing {
 
   @Prop({ type: String, required: true, unique: true })
   mrn: string;
+
+  @Prop({ type: Boolean, required: true, default: false })
+  roundOff: boolean;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

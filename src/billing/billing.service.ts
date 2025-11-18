@@ -11,21 +11,23 @@ import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { BillingItem } from './schemas/billingItem.schema';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class BillingService {
   constructor(
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
+    private readonly usersService: UsersService,
   ) {}
 
-  private async generateUniqueMRN(): Promise<string> {
+  private async generateUniqueMRN(prefix: string): Promise<string> {
     let mrn: string;
     let exists = true;
 
     do {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `INV${randomNum}`;
+      mrn = `${prefix}${randomNum}`;
 
       // Check if MRN already exists
       const existing = await this.billingModel.exists({ mrn });
@@ -36,7 +38,10 @@ export class BillingService {
   }
 
   async generateBill(createBill: CreateBillingDto) {
-    createBill.mrn = await this.generateUniqueMRN();
+    const prefix = await this.usersService.getPharmacyBillingPrefix(
+      createBill.user,
+    );
+    createBill.mrn = await this.generateUniqueMRN(prefix);
     const data = await this.billingModel.create(createBill);
     return data;
   }
@@ -57,7 +62,7 @@ export class BillingService {
 
     if (q) {
       filter.mrn = {
-        $regex: q,
+        $regex: '^' + q,
         $options: 'i',
       };
     }
@@ -82,7 +87,10 @@ export class BillingService {
     }
 
     let data = await this.billingModel
-      .find(filter, 'mrn createdAt patient items.total cash online insurance')
+      .find(
+        filter,
+        'mrn createdAt patient items.total cash online insurance roundOff',
+      )
       .populate('patient', 'name mrn')
       .sort({ createdAt: -1 })
       .limit(1000)
