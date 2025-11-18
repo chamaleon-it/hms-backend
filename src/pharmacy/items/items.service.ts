@@ -9,10 +9,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Item, ItemStatus } from './schemas/item.schema';
 import { GetItemsDto } from './dto/get-items.dto';
 import { parse } from 'json2csv';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ItemsService {
-  constructor(@InjectModel(Item.name) private itemModel: Model<Item>) {}
+  constructor(
+    @InjectModel(Item.name) private itemModel: Model<Item>,
+    private readonly usersService: UsersService,
+  ) {}
 
   async addItems(pharmacy: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
     const found = await this.itemModel.findOne({ sku: addItemDto.sku }).lean();
@@ -39,14 +43,14 @@ export class ItemsService {
     } = {};
 
     if (q) {
-      const searchRegex = { $regex: q, $options: 'i' };
+      const searchRegex = { $regex: '^' + q, $options: 'i' };
       filter = {
         $or: [
           { name: searchRegex },
           { sku: searchRegex },
           { generic: searchRegex },
-          { supplier: searchRegex },
-          { manufacturer: searchRegex },
+          // { supplier: searchRegex },
+          // { manufacturer: searchRegex },
         ],
       };
     }
@@ -130,12 +134,21 @@ export class ItemsService {
     return { csv, filename };
   }
 
-  async decreaseItem(id: mongoose.Types.ObjectId, sold: number) {
+  async decreaseItem(
+    id: mongoose.Types.ObjectId,
+    sold: number,
+    user: mongoose.Types.ObjectId,
+  ) {
+    const allowNegativeStock =
+      await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
+
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
-    const newQuantity = Math.max(item.quantity - sold, 0);
+    const newQuantity = allowNegativeStock
+      ? item.quantity - sold
+      : Math.max(item.quantity - sold, 0);
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;

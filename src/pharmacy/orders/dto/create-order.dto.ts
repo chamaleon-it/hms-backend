@@ -40,7 +40,7 @@ export class OrderItemDto {
 
 export class CreateOrderDto {
   @IsString({ message: 'MRN must be a string' })
-  @IsNotEmpty({ message: 'MRN is required' })
+  @IsOptional()
   mrn?: string;
 
   @IsMongoId({ message: 'Patient ID must be a valid MongoDB ObjectId' })

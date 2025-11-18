@@ -45,6 +45,28 @@ export class UsersService {
     return data;
   }
 
+  async getPharmacyBillingPrefix(id: mongoose.Types.ObjectId): Promise<string> {
+    const user = await this.userModel
+      .findById(id)
+      .select('pharmacy.billing.prefix')
+      .lean()
+      .exec();
+
+    return user?.pharmacy.billing.prefix ?? 'INV';
+  }
+
+  async getPharmacyInventoryAllowNegativeStock(
+    id: mongoose.Types.ObjectId,
+  ): Promise<boolean> {
+    const user = await this.userModel
+      .findById(id)
+      .select('pharmacy.inventory.allowNegativeStock')
+      .lean()
+      .exec();
+
+    return user?.pharmacy.inventory.allowNegativeStock ?? false;
+  }
+
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const user = await this.userModel.findOne({
       email: forgotPasswordDto.email,

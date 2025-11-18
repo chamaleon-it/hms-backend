@@ -91,7 +91,7 @@ export class OrdersService {
   }
 
   async getSingleOrder(q: string) {
-    const searchRegex = { $regex: q, $options: 'i' };
+    const searchRegex = { $regex: '^' + q, $options: 'i' };
 
     const filter = {
       $or: [{ mrn: searchRegex }],
@@ -111,7 +111,10 @@ export class OrdersService {
     return data;
   }
 
-  async itemPacked(packedDto: PackedDto): Promise<void> {
+  async itemPacked(
+    packedDto: PackedDto,
+    user: mongoose.Types.ObjectId,
+  ): Promise<void> {
     const { order: orderId, item } = packedDto;
 
     const order = await this.orderModel
@@ -135,10 +138,13 @@ export class OrdersService {
     }
     const qty =
       order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
-    await this.itemsService.decreaseItem(item, qty);
+    await this.itemsService.decreaseItem(item, qty, user);
   }
 
-  async markAllAsPacked(markAllAsPackedDto: MarkAllAsPackedDto): Promise<void> {
+  async markAllAsPacked(
+    markAllAsPackedDto: MarkAllAsPackedDto,
+    user: mongoose.Types.ObjectId,
+  ): Promise<void> {
     const orderId = markAllAsPackedDto.order;
     const order = await this.orderModel.findById(orderId).lean().exec();
     if (!order) {
@@ -151,7 +157,7 @@ export class OrdersService {
     if (unpacked.length > 0) {
       await Promise.all(
         unpacked.map((it) =>
-          this.itemsService.decreaseItem(it.name, it.quantity),
+          this.itemsService.decreaseItem(it.name, it.quantity, user),
         ),
       );
     }
@@ -273,8 +279,8 @@ export class OrdersService {
 
     const patient = sampleOrder?.patient ?? null;
 
-    if(!patient){
-      throw new NotFoundException("This patient has not purchased any items.")
+    if (!patient) {
+      throw new NotFoundException('This patient has not purchased any items.');
     }
     const totalVisit = orders.length;
 

@@ -132,13 +132,13 @@ export class User {
         gstin: { type: String, default: null, trim: true, uppercase: true },
       },
       billing: {
-        prefix: { type: String, default: 'INV', trim: true },
+        prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         defaultGst: { type: Number, default: 5 },
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
       },
       inventory: {
-        lowStockThreshold: { type: Number, default: 10 },
+        lowStockThreshold: { type: Number, default: 20 },
         expiryAlert: { type: Number, default: 90 },
         allowNegativeStock: { type: Boolean, default: false },
       },
