@@ -24,7 +24,7 @@ export class PatientRegisterDto {
   @IsString()
   doctor: string;
 
-  @IsIn(['Male', 'Female', 'Other'])
+  @IsIn(['Male', 'Female', 'Other', 'Prefer not to say'])
   gender: string;
 
   @IsString()
