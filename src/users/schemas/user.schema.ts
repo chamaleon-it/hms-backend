@@ -177,6 +177,45 @@ export class User {
   @Prop({
     type: {
       general: {
+        owner: { type: String, default: null, trim: true },
+        gstin: { type: String, default: null, trim: true, uppercase: true },
+      },
+      billing: {
+        prefix: { type: String, default: 'INV', trim: true, uppercase: true },
+        defaultGst: { type: Number, default: 5 },
+        roundOff: { type: Boolean, default: false },
+        autoPrintAfterSave: { type: Boolean, default: false },
+      },
+      notifications: {
+        whatsapp: { type: Boolean, default: false },
+        sms: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: false },
+        note: { type: String, default: null, trim: true },
+      },
+    },
+  })
+  lab: {
+    general: {
+      owner: string | null;
+      gstin: string | null;
+    };
+    billing: {
+      prefix: string;
+      defaultGst: number;
+      roundOff: boolean;
+      autoPrintAfterSave: boolean;
+    };
+    notifications: {
+      whatsapp: boolean;
+      sms: boolean;
+      inApp: boolean;
+      note: string;
+    };
+  };
+
+  @Prop({
+    type: {
+      general: {
         contactPerson: { type: String, default: null },
         gstin: { type: String, default: null, uppercase: true },
       },

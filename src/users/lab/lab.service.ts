@@ -4,11 +4,10 @@ import { User } from '../schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
-import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Injectable()
-export class PharmacyService {
+export class LabService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
   async updateGeneral(userId: mongoose.Types.ObjectId, dto: UpdateGeneralDto) {
@@ -20,15 +19,15 @@ export class PharmacyService {
           phoneNumber: dto.phoneNumber,
           email: dto.email,
           address: dto.address,
-          'pharmacy.general.owner': dto.owner,
-          'pharmacy.general.gstin': dto.gstin,
+          'lab.general.owner': dto.owner,
+          'lab.general.gstin': dto.gstin,
         },
       },
       { new: true, runValidators: true }, // return updated document
     );
 
     if (!pharmacy) {
-      throw new NotFoundException('Pharmacy not found');
+      throw new NotFoundException('Lab not found');
     }
 
     return pharmacy;
@@ -39,44 +38,23 @@ export class PharmacyService {
       user,
       {
         $set: {
-          'pharmacy.billing.prefix': dto.prefix,
-          'pharmacy.billing.defaultGst': dto.defaultGst,
-          'pharmacy.billing.roundOff': dto.roundOff,
-          'pharmacy.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
+          'lab.billing.prefix': dto.prefix,
+          'lab.billing.defaultGst': dto.defaultGst,
+          'lab.billing.roundOff': dto.roundOff,
+          'lab.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
         },
       },
       { new: true, runValidators: true },
     );
 
     if (!updated) {
-      throw new NotFoundException('Pharmacy Not Found');
+      throw new NotFoundException('Lab Not Found');
     }
 
     return updated;
   }
 
-  async updateInventory(
-    user: mongoose.Types.ObjectId,
-    dto: UpdateInventoryDto,
-  ) {
-    const updated = await this.userModel.findByIdAndUpdate(
-      user,
-      {
-        $set: {
-          'pharmacy.inventory.lowStockThreshold': dto.lowStockThreshold,
-          'pharmacy.inventory.expiryAlert': dto.expiryAlert,
-          'pharmacy.inventory.allowNegativeStock': dto.allowNegativeStock,
-        },
-      },
-      { new: true, runValidators: true, context: 'query' },
-    );
 
-    if (!updated) {
-      throw new NotFoundException('Pharmacy Not found');
-    }
-
-    return updated;
-  }
 
   async updateNotifications(
     user: mongoose.Types.ObjectId,
@@ -86,11 +64,11 @@ export class PharmacyService {
       user,
       {
         $set: {
-          'pharmacy.notifications.whatsapp': dto.whatsapp,
-          'pharmacy.notifications.sms': dto.sms,
-          'pharmacy.notifications.inApp': dto.inApp,
+          'lab.notifications.whatsapp': dto.whatsapp,
+          'lab.notifications.sms': dto.sms,
+          'lab.notifications.inApp': dto.inApp,
           ...(dto.note && {
-            'pharmacy.notifications.note': dto.note,
+            'lab.notifications.note': dto.note,
           }),
         },
       },
@@ -98,7 +76,7 @@ export class PharmacyService {
     );
 
     if (!updated) {
-      throw new NotFoundException('Pharmacy Not found');
+      throw new NotFoundException('Lab Not found');
     }
 
     return updated;

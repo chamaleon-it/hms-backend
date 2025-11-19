@@ -6,6 +6,7 @@ import { User, UserSchema } from './schemas/user.schema';
 import { JwtModule } from '@nestjs/jwt';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { PharmacyWholesalerModule } from './pharmacy-wholesaler/pharmacy-wholesaler.module';
+import { LabModule } from './lab/lab.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { PharmacyWholesalerModule } from './pharmacy-wholesaler/pharmacy-wholesa
     JwtModule,
     PharmacyModule,
     PharmacyWholesalerModule,
+    LabModule
   ],
   controllers: [UsersController],
   providers: [UsersService],

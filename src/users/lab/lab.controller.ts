@@ -1,16 +1,15 @@
 import { Body, Controller, Patch, UseGuards } from '@nestjs/common';
-import { PharmacyService } from './pharmacy.service';
+import { LabService } from './lab.service';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
-import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
-@Controller('users/pharmacy')
-export class PharmacyController {
-  constructor(private readonly pharmacyService: PharmacyService) {}
+@Controller('users/lab')
+export class LabController {
+  constructor(private readonly labService: LabService) {}
 
   @Patch('general')
   @UseGuards(JwtAuthGuard)
@@ -18,13 +17,13 @@ export class PharmacyController {
     @GetUser() user: JWTUserInterface,
     @Body() updateGeneralDto: UpdateGeneralDto,
   ) {
-    const data = await this.pharmacyService.updateGeneral(
+    const data = await this.labService.updateGeneral(
       user.id,
       updateGeneralDto,
     );
     return {
       data,
-      message: 'Pharmacy general settings updated successfully',
+      message: 'Lab general settings updated successfully',
     };
   }
 
@@ -34,25 +33,13 @@ export class PharmacyController {
     @GetUser() user: JWTUserInterface,
     @Body() dto: UpdateBillingDto,
   ) {
-    const data = await this.pharmacyService.updateBilling(user.id, dto);
+    const data = await this.labService.updateBilling(user.id, dto);
     return {
       data,
-      message: 'Pharmacy billing settings updated successfully',
+      message: 'Lab billing settings updated successfully',
     };
   }
 
-  @Patch('inventory')
-  @UseGuards(JwtAuthGuard)
-  async updateInventory(
-    @GetUser() user: JWTUserInterface,
-    @Body() dto: UpdateInventoryDto,
-  ) {
-    const data = await this.pharmacyService.updateInventory(user.id, dto);
-    return {
-      data,
-      message: 'Pharmacy inventory settings updated successfully',
-    };
-  }
 
   @Patch('notifications')
   @UseGuards(JwtAuthGuard)
@@ -60,10 +47,10 @@ export class PharmacyController {
     @GetUser() user: JWTUserInterface,
     @Body() dto: UpdateNotificationsDto,
   ) {
-    const data = await this.pharmacyService.updateNotifications(user.id, dto);
+    const data = await this.labService.updateNotifications(user.id, dto);
     return {
       data,
-      message: 'Pharmacy notifications settings updated successfully',
+      message: 'Lab notifications settings updated successfully',
     };
   }
 }
