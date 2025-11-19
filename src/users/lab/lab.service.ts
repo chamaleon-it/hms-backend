@@ -5,6 +5,7 @@ import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
+import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 
 @Injectable()
 export class LabService {
@@ -33,6 +34,30 @@ export class LabService {
     return pharmacy;
   }
 
+  async updateCatalogue(
+    user: mongoose.Types.ObjectId,
+    dto: UpdateCatalogueDto,
+  ) {
+    const updated = await this.userModel.findByIdAndUpdate(
+      user,
+      {
+        $set: {
+          'lab.catalogue.showProfilesOnPatientBill':
+            dto.showProfilesOnPatientBill,
+          'lab.catalogue.allowEditingPanelComposition':
+            dto.allowEditingPanelComposition,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Lab Not Found');
+    }
+
+    return updated;
+  }
+
   async updateBilling(user: mongoose.Types.ObjectId, dto: UpdateBillingDto) {
     const updated = await this.userModel.findByIdAndUpdate(
       user,
@@ -53,8 +78,6 @@ export class LabService {
 
     return updated;
   }
-
-
 
   async updateNotifications(
     user: mongoose.Types.ObjectId,

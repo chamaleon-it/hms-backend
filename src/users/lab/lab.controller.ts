@@ -6,6 +6,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
+import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 
 @Controller('users/lab')
 export class LabController {
@@ -17,10 +18,7 @@ export class LabController {
     @GetUser() user: JWTUserInterface,
     @Body() updateGeneralDto: UpdateGeneralDto,
   ) {
-    const data = await this.labService.updateGeneral(
-      user.id,
-      updateGeneralDto,
-    );
+    const data = await this.labService.updateGeneral(user.id, updateGeneralDto);
     return {
       data,
       message: 'Lab general settings updated successfully',
@@ -40,6 +38,18 @@ export class LabController {
     };
   }
 
+  @Patch('catalogue')
+  @UseGuards(JwtAuthGuard)
+  async updateCatalogue(
+    @GetUser() user: JWTUserInterface,
+    @Body() dto: UpdateCatalogueDto,
+  ) {
+    const data = await this.labService.updateCatalogue(user.id, dto);
+    return {
+      data,
+      message: 'Lab catalogue settings updated successfully',
+    };
+  }
 
   @Patch('notifications')
   @UseGuards(JwtAuthGuard)
