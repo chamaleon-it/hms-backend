@@ -25,8 +25,6 @@ export class OrdersService {
     do {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
       mrn = `RX${randomNum}`;
-
-      // Check if MRN already exists
       const existing = await this.orderModel.exists({ mrn });
       exists = !!existing;
     } while (exists);
@@ -181,23 +179,17 @@ export class OrdersService {
     }
   }
 
-  async getCustomers(): Promise<
-    {
-      patient: {
-        _id: mongoose.Types.ObjectId;
-        name: string;
-        address: string;
-        mrn: string;
-        dateOfBirth: Date;
-        gender: string;
-        phoneNumber: string;
-      };
-      visits: number;
-      lastPurchase: Date;
-      totalSpend: number;
-    }[]
-  > {
-    const customers = await this.orderModel
+  async getCustomers() {
+    const customers: {
+      _id: mongoose.ObjectId;
+      name: string;
+      phoneNumber: string;
+      gender: string;
+      dateOfBirth: Date;
+      address: string;
+      mrn: string;
+      createdAt: Date;
+    }[] = await this.orderModel
       .aggregate([
         { $match: { patient: { $exists: true, $ne: null } } },
         { $group: { _id: '$patient' } },
@@ -219,46 +211,64 @@ export class OrdersService {
             dateOfBirth: 1,
             gender: 1,
             phoneNumber: 1,
+            createdAt: 1,
           },
         },
       ])
       .exec();
 
-    const orders = await this.orderModel
+    type OrderPlain = {
+      _id: mongoose.Types.ObjectId;
+      patient: {
+        _id: mongoose.Types.ObjectId;
+        name: string;
+        phoneNumber: string;
+        gender: string;
+        dateOfBirth: Date;
+        mrn: string;
+      };
+      items: {
+        name: { unitPrice: number } | null;
+        quantity: number;
+      }[];
+      createdAt: Date;
+    };
+
+    const orders: OrderPlain[] = (await this.orderModel
       .find({
-        status: {
-          $ne: OrderStatus.Deleted,
-        },
-        patient: {
-          $in: customers.map((e) => e._id),
-        },
+        status: { $ne: OrderStatus.Deleted },
+        patient: { $in: customers.map((e) => e._id) },
       })
       .select('patient items.quantity createdAt')
       .populate('items.name', 'unitPrice -_id')
       .populate('patient', 'name address mrn dateOfBirth gender phoneNumber')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec()) as any;
 
-    return customers.map((e) => {
-      const order: any = orders.filter(
-        (i) => i.patient._id.toString() === e._id.toString(),
-      );
-      const totalSpend = order.reduce(
-        (a, b) =>
-          a +
-          b.items.reduce(
-            (c: any, d: any) => c + d.quantity * d.name.unitPrice,
-            0,
-          ),
-        0,
-      );
+    return customers
+      .sort((a, b) => -a.createdAt.getTime() + b.createdAt.getTime())
+      .map((e) => {
+        const order = orders.filter(
+          (i) => i.patient._id.toString() === e._id.toString(),
+        );
+        const totalSpend: number = order.reduce(
+          (a, b) =>
+            a +
+            b.items.reduce(
+              (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
+              0,
+            ),
+          0,
+        );
 
-      return {
-        totalSpend,
-        visits: order.length,
-        patient: e,
-        lastPurchase: order[0]?.createdAt as Date,
-      };
-    });
+        return {
+          totalSpend,
+          visits: order.length,
+          patient: e,
+          lastPurchase: order[0]?.createdAt,
+        };
+      });
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {
@@ -284,10 +294,12 @@ export class OrdersService {
     }
     const totalVisit = orders.length;
 
-    // compute total spend: sum over orders of sum(quantity * unitPrice)
-    const totalSpend = orders.reduce((orderAcc, order: any) => {
-      const itemsTotal = (order.items || []).reduce(
-        (itemAcc: number, item: any) => {
+    const totalSpend: number = orders.reduce((orderAcc, order: any) => {
+      const itemsTotal: number = (order.items || []).reduce(
+        (
+          itemAcc: number,
+          item: { quantity: number; name: { unitPrice: number } },
+        ) => {
           const qty = Number(item.quantity ?? 0);
           const price = Number(item.name?.unitPrice ?? 0);
           return itemAcc + qty * price;
@@ -298,7 +310,7 @@ export class OrdersService {
     }, 0);
 
     const averageSpend = totalVisit > 0 ? totalSpend / totalVisit : 0;
-    const lastPurchase = (orders[0] as any)?.createdAt ?? null;
+    const lastPurchase: Date | null = (orders[0] as any)?.createdAt ?? null;
 
     return {
       patient,

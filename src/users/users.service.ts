@@ -52,7 +52,7 @@ export class UsersService {
       .lean()
       .exec();
 
-    return user?.pharmacy.billing.prefix ?? 'INV';
+    return user?.pharmacy?.billing?.prefix ?? 'INV';
   }
 
   async getPharmacyInventoryAllowNegativeStock(
@@ -64,7 +64,7 @@ export class UsersService {
       .lean()
       .exec();
 
-    return user?.pharmacy.inventory.allowNegativeStock ?? false;
+    return user?.pharmacy?.inventory?.allowNegativeStock ?? false;
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
