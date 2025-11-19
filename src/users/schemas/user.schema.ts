@@ -180,6 +180,10 @@ export class User {
         owner: { type: String, default: null, trim: true },
         gstin: { type: String, default: null, trim: true, uppercase: true },
       },
+      catalogue: {
+        showProfilesOnPatientBill: { type: Boolean, default: false },
+        allowEditingPanelComposition: { type: Boolean, default: false },
+      },
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         defaultGst: { type: Number, default: 5 },
@@ -204,6 +208,10 @@ export class User {
       defaultGst: number;
       roundOff: boolean;
       autoPrintAfterSave: boolean;
+    };
+    catalogue: {
+      showProfilesOnPatientBill: boolean;
+      allowEditingPanelComposition: boolean;
     };
     notifications: {
       whatsapp: boolean;
