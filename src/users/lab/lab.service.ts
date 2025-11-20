@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from '../schemas/user.schema';
+import { User, UserRole } from '../schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
+import { AddTestDto } from './dto/add-test.dto';
 
 @Injectable()
 export class LabService {
@@ -56,6 +61,48 @@ export class LabService {
     }
 
     return updated;
+  }
+
+  async addTests(user: mongoose.Types.ObjectId, dto: AddTestDto) {
+    const updated = await this.userModel.findByIdAndUpdate(
+      user,
+      {
+        $push: {
+          'lab.tests': {
+            code: dto.code,
+            name: dto.name,
+            type: dto.type,
+            unit: dto.unit,
+            max: dto.max,
+            min: dto.min,
+          },
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Lab Not Found');
+    }
+
+    return updated;
+  }
+
+  async getLab() {
+    const data = await this.userModel
+      .find(
+        {
+          role: UserRole.LAB,
+          'lab.tests.0': { $exists: true },
+        },
+        {
+          name: 1,
+          'lab.tests': 1,
+        },
+      )
+      .lean()
+      .exec();
+      return data.map(d=>({_id:d._id,name:d.name,tests:d.lab.tests}))
   }
 
   async updateBilling(user: mongoose.Types.ObjectId, dto: UpdateBillingDto) {

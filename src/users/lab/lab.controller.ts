@@ -1,4 +1,4 @@
-import { Body, Controller, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { LabService } from './lab.service';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
@@ -7,6 +7,7 @@ import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
+import { AddTestDto } from './dto/add-test.dto';
 
 @Controller('users/lab')
 export class LabController {
@@ -48,6 +49,26 @@ export class LabController {
     return {
       data,
       message: 'Lab catalogue settings updated successfully',
+    };
+  }
+
+  @Patch('tests')
+  @UseGuards(JwtAuthGuard)
+  async updateTest(@GetUser() user: JWTUserInterface, @Body() dto: AddTestDto) {
+    const data = await this.labService.addTests(user.id, dto);
+    return {
+      data,
+      message: 'Lab catalogue settings updated successfully',
+    };
+  }
+
+  @Get('')
+  // @UseGuards(JwtAuthGuard)
+  async getLab() {
+    const data = await this.labService.getLab();
+    return {
+      data,
+      message: 'All labs were retrived successfully.',
     };
   }
 
