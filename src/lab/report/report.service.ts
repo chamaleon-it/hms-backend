@@ -3,6 +3,7 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Report } from '../schemas/report.schema';
+import { GetReportDto } from './dto/get-report.dto';
 
 @Injectable()
 export class ReportService {
@@ -12,14 +13,34 @@ export class ReportService {
     return data;
   }
 
-  async getReport(user: mongoose.Types.ObjectId) {
+  async getReport(user: mongoose.Types.ObjectId, dto: GetReportDto) {
+    const { doctor, lab, q, status, type } = dto;
+
+    const match: any = {
+      $or: [{ doctor: user }, { lab: user }, { patient: user }],
+    };
+
+    // if (doctor) {
+    //   match.doctor = doctor;
+    // }
+
+    // if (lab) {
+    //   match.lab = lab;
+    // }
+    // if (status) {
+    //   match.status = status;
+    // }
+    // if (type) {
+    //   match.name.type = type;
+    // }
+
+    // console.log(match);
+
     const data = await this.reportModel
-      .find({
-        $or: [{ doctor: user }, { lab: user }, { patient: user }],
-      })
+      .find(match)
       .populate('doctor', 'name specialization')
       .populate('lab', 'name specialization')
-      .populate('patient');
+      .populate('patient').sort({createdAt:-1}).lean().exec();
 
     return data;
   }
