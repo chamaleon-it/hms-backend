@@ -12,7 +12,7 @@ import { ReportModule } from 'src/lab/report/report.module';
       { name: Consulting.name, schema: ConsultingSchema },
     ]),
     OrdersModule,
-    ReportModule
+    ReportModule,
   ],
   controllers: [ConsultingsController],
   providers: [ConsultingsService],

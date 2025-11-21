@@ -10,21 +10,25 @@ import { GetReportDto } from './dto/get-report.dto';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
   @Post()
+  @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
     const data = await this.reportService.createReport(dto);
     return {
-      message: 'Report is created successfully',
+      message: 'Test is created successfully',
       data,
     };
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  async getReport(@GetUser() user: JWTUserInterface,@Query() dto:GetReportDto) {
-   const data = await this.reportService.getReport(user.id,dto) 
-   return {
-    data,
-    message:"All Lab report retrived successfully."
-   }
+  async getReport(
+    @GetUser() user: JWTUserInterface,
+    @Query() dto: GetReportDto,
+  ) {
+    const data = await this.reportService.getReport(user.id, dto);
+    return {
+      data,
+      message: 'All Lab report retrived successfully.',
+    };
   }
 }

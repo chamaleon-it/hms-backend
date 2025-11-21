@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty } from 'class-validator';
 
 export class UpdateCatalogueDto {
   @IsBoolean({ message: 'Round off must be a boolean' })

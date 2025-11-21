@@ -14,7 +14,7 @@ import { LabModule } from './lab/lab.module';
     JwtModule,
     PharmacyModule,
     PharmacyWholesalerModule,
-    LabModule
+    LabModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],
