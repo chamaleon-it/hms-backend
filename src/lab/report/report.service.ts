@@ -14,7 +14,7 @@ export class ReportService {
   }
 
   async getReport(user: mongoose.Types.ObjectId, dto: GetReportDto) {
-    const { doctor, lab, q, status, type } = dto;
+    // const { doctor, lab, q, status, type } = dto;
 
     const match: any = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
@@ -40,8 +40,13 @@ export class ReportService {
       .find(match)
       .populate('doctor', 'name specialization')
       .populate('lab', 'name specialization')
-      .populate('patient').sort({createdAt:-1}).lean().exec();
+      .populate('patient')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
 
     return data;
+
+    console.log(dto);
   }
 }

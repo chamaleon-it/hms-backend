@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserRole } from '../schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
@@ -102,7 +98,7 @@ export class LabService {
       )
       .lean()
       .exec();
-      return data.map(d=>({_id:d._id,name:d.name,tests:d.lab.tests}))
+    return data.map((d) => ({ _id: d._id, name: d.name, tests: d.lab.tests }));
   }
 
   async updateBilling(user: mongoose.Types.ObjectId, dto: UpdateBillingDto) {
