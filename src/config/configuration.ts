@@ -5,4 +5,5 @@ export default () => ({
     refreshToken: 'refreshTokenrefreshToken',
     forgotPassword: 'forgotPasswordforgotPassword',
   },
+  in_house_lab_id:process.env.IN_HOUSE_LAB_ID
 });

@@ -4,7 +4,7 @@ import { ReportStatus, SampleType } from 'src/lab/schemas/report.schema';
 export class CreateReportDto {
   patient: Types.ObjectId;
   doctor: Types.ObjectId;
-  lab: Types.ObjectId;
+  lab?: Types.ObjectId;
   date: Date;
   priority: string;
   name: {
