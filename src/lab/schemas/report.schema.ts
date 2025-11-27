@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
+import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
@@ -28,7 +29,7 @@ export class Report {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   doctor: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true,default:configuration().in_house_lab_id, })
   lab: Types.ObjectId;
 
   @Prop({ type: Date, required: true })
