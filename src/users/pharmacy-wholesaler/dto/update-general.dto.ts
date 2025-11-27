@@ -5,9 +5,9 @@ export class UpdateGeneralDto {
   @IsNotEmpty({ message: 'Name is required' })
   name: string;
 
-  @IsString({ message: 'Owner must be a string' })
-  @IsNotEmpty({ message: 'Owner is required' })
-  owner: string;
+  @IsString({ message: 'Contact person must be a string' })
+  @IsNotEmpty({ message: 'Contact person is required' })
+  contactPerson: string;
 
   @IsString({ message: 'Phone number must be a string' })
   @IsNotEmpty({ message: 'Phone number is required' })

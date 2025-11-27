@@ -1,8 +1,4 @@
-import {
-  BadGatewayException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from '../schemas/user.schema';
 import mongoose, { Model } from 'mongoose';

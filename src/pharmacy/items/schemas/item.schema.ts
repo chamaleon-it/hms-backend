@@ -67,7 +67,6 @@ export class Item {
   @Prop({
     type: Number,
     default: 0,
-    min: [0, 'Quantity cannot be negative'],
   })
   quantity: number;
 

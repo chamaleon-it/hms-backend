@@ -83,18 +83,38 @@ export class Consulting {
 
   @Prop([
     {
-      name: [{ type: String, required: true }],
+      name: [
+        {
+          code: { type: String, required: true },
+          name: { type: String, required: true },
+          unit: { type: String, required: true },
+          min: { type: Number },
+          max: { type: Number },
+          type: { type: String, enum: ['Lab', 'Imaging'], required: true },
+          _id: { type: mongoose.Schema.Types.ObjectId },
+        },
+      ],
       date: { type: Date, required: true },
-      lab: { type: String, required: true },
-      slot: { type: String, required: true },
+      lab: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: 'User',
+      },
       priority: { type: String, required: true },
     },
   ])
   test: {
-    name: string[];
+    name: {
+      code: string;
+      max?: number;
+      min?: number;
+      name: string;
+      type: 'Lab' | 'Imaging';
+      unit: string;
+      _id: mongoose.Types.ObjectId;
+    }[];
     date: Date;
-    lab: string;
-    slot: string;
+    lab: mongoose.Types.ObjectId;
     priority: string;
   }[];
 }

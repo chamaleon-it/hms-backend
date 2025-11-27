@@ -128,17 +128,17 @@ export class User {
   @Prop({
     type: {
       general: {
-        owner: { type: String, default: null,trim:true },
-        gstin: { type: String, default:null,trim:true },
+        owner: { type: String, default: null, trim: true },
+        gstin: { type: String, default: null, trim: true, uppercase: true },
       },
       billing: {
-        prefix: { type: String, default: 'INV',trim:true },
+        prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         defaultGst: { type: Number, default: 5 },
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
       },
       inventory: {
-        lowStockThreshold: { type: Number, default: 10 },
+        lowStockThreshold: { type: Number, default: 20 },
         expiryAlert: { type: Number, default: 90 },
         allowNegativeStock: { type: Boolean, default: false },
       },
@@ -146,7 +146,7 @@ export class User {
         whatsapp: { type: Boolean, default: false },
         sms: { type: Boolean, default: false },
         inApp: { type: Boolean, default: false },
-        note: { type: String, default: null,trim:true },
+        note: { type: String, default: null, trim: true },
       },
     },
   })
@@ -171,6 +171,126 @@ export class User {
       sms: boolean;
       inApp: boolean;
       note: string;
+    };
+  };
+
+  @Prop({
+    type: {
+      general: {
+        owner: { type: String, default: null, trim: true },
+        gstin: { type: String, default: null, trim: true, uppercase: true },
+      },
+      catalogue: {
+        showProfilesOnPatientBill: { type: Boolean, default: false },
+        allowEditingPanelComposition: { type: Boolean, default: false },
+      },
+      tests: [
+        {
+          code: { type: String, default: null, trim: true },
+          name: { type: String, default: null, trim: true },
+          type: { type: String, enum: ['Lab', 'Imaging'] },
+          min: { type: Number },
+          max: { type: Number },
+          unit: { type: String, trim: true },
+        },
+      ],
+      billing: {
+        prefix: { type: String, default: 'INV', trim: true, uppercase: true },
+        defaultGst: { type: Number, default: 5 },
+        roundOff: { type: Boolean, default: false },
+        autoPrintAfterSave: { type: Boolean, default: false },
+      },
+      notifications: {
+        whatsapp: { type: Boolean, default: false },
+        sms: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: false },
+        note: { type: String, default: null, trim: true },
+      },
+    },
+  })
+  lab: {
+    general: {
+      owner: string | null;
+      gstin: string | null;
+    };
+    billing: {
+      prefix: string;
+      defaultGst: number;
+      roundOff: boolean;
+      autoPrintAfterSave: boolean;
+    };
+    tests: {
+      code: string;
+      name: string;
+      type: 'Lab' | 'Imaging';
+      min?: number;
+      max?: number;
+      unit: string;
+    }[];
+    catalogue: {
+      showProfilesOnPatientBill: boolean;
+      allowEditingPanelComposition: boolean;
+    };
+    notifications: {
+      whatsapp: boolean;
+      sms: boolean;
+      inApp: boolean;
+      note: string;
+    };
+  };
+
+  @Prop({
+    type: {
+      general: {
+        contactPerson: { type: String, default: null },
+        gstin: { type: String, default: null, uppercase: true },
+      },
+      pricing: {
+        defaultMargin: { type: Number, default: 18 },
+        minOrderValue: { type: Number, default: 5000 },
+        creditPeriod: { type: Number, default: 30 },
+        allowCreditOrder: { type: Boolean, default: false },
+      },
+      logistics: {
+        sameDayDispatchCutOf: { type: String, default: '16:00' },
+        defaultCourier: { type: String, default: null },
+        returnWindow: { type: Number, default: 7 },
+        allowPartialDispatch: { type: Boolean, default: false },
+        autoMergeOrders: { type: Boolean, default: false },
+      },
+      notifications: {
+        whatsapp: { type: Boolean, default: false },
+        email: { type: Boolean, default: false },
+        sms: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: false },
+        note: { type: String, default: null },
+      },
+    },
+  })
+  pharmacyWholesaler: {
+    general: {
+      contactPerson: string | null;
+      gstin: string | null;
+    };
+    pricing: {
+      defaultMargin: number;
+      minOrderValue: number;
+      creditPeriod: number;
+      allowCreditOrder: boolean;
+    };
+    logistics: {
+      sameDayDispatchCutOf: string;
+      defaultCourier: string;
+      returnWindow: number;
+      allowPartialDispatch: boolean;
+      autoMergeOrders: boolean;
+    };
+    notifications: {
+      whatsapp: boolean;
+      email: boolean;
+      sms: boolean;
+      inApp: boolean;
+      note?: string | null;
     };
   };
 }

@@ -99,20 +99,26 @@ class MedicineDto {
 
 class TestDto {
   @IsArray({ message: 'Test names must be an array of strings.' })
-  @ArrayNotEmpty({ message: 'Test names array cannot be empty.' })
-  @IsString({ each: true, message: 'Each test name must be a string.' })
-  name: string[];
+  @ArrayNotEmpty({ message: 'Tests array cannot be empty.' })
+  @ValidateNested({ each: true })
+  @Type(() => Object)
+  name: {
+    code: string;
+    min?: number;
+    max?: number;
+    name: string;
+    type: 'Lab' | 'Imaging';
+    unit: string;
+    _id?: mongoose.Types.ObjectId;
+  }[];
 
   @IsDateString({}, { message: 'Test date must be a valid date.' })
   date: Date;
 
+  @IsOptional()
   @IsString({ message: 'Lab name is required and must be a string.' })
-  @IsNotEmpty({ message: 'Lab name cannot be empty.' })
-  lab: string;
 
-  @IsString({ message: 'Slot is required and must be a string.' })
-  @IsNotEmpty({ message: 'Slot cannot be empty.' })
-  slot: string;
+  lab: mongoose.Types.ObjectId;
 
   @IsString({ message: 'Priority is required and must be a string.' })
   @IsNotEmpty({ message: 'Priority cannot be empty.' })

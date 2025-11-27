@@ -31,7 +31,7 @@ export class PurchaseService {
     if (pharmacy) query.pharmacy = pharmacy;
     if (status) query.status = status;
     if (wholesaler) query.wholesaler = wholesaler;
-    if (mrn) query.mrn = { $regex: mrn, $options: 'i' };
+    if (mrn) query.mrn = { $regex: '^' + mrn, $options: 'i' };
 
     const total = await this.purchaseModel.countDocuments(query);
     const data = await this.purchaseModel
