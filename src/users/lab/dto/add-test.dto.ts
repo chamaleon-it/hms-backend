@@ -22,6 +22,9 @@ export class AddTestDto {
   })
   type: 'Lab' | 'Imaging';
 
+  @IsString({ message: 'Panel must be a string.' })
+  panel: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'Min must be a number.' })

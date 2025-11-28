@@ -189,6 +189,7 @@ export class User {
           code: { type: String, default: null, trim: true },
           name: { type: String, default: null, trim: true },
           type: { type: String, enum: ['Lab', 'Imaging'] },
+          panel: { type: String,},
           min: { type: Number },
           max: { type: Number },
           unit: { type: String, trim: true },
@@ -223,6 +224,7 @@ export class User {
       code: string;
       name: string;
       type: 'Lab' | 'Imaging';
+      panel:string;
       min?: number;
       max?: number;
       unit: string;

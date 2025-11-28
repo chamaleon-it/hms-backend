@@ -45,6 +45,7 @@ export class Report {
       unit: { type: String, required: true },
       min: { type: Number },
       max: { type: Number },
+      panel: { type: String,},
       type: { type: String, enum: ['Lab', 'Imaging'], required: true },
       _id: { type: mongoose.Schema.Types.ObjectId, required: true },
     },
@@ -54,6 +55,7 @@ export class Report {
     max?: number;
     min?: number;
     name: string;
+    panel: string;
     type: 'Lab' | 'Imaging';
     unit: string;
     _id: mongoose.Types.ObjectId;
