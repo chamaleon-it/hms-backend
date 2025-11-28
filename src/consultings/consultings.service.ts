@@ -51,6 +51,7 @@ export class ConsultingsService {
         min?: number;
         name: string;
         type: 'Lab' | 'Imaging';
+        panel:string;
         unit: string;
         _id?: Types.ObjectId | undefined;
       }[];
