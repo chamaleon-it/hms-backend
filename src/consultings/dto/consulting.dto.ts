@@ -108,6 +108,7 @@ class TestDto {
     max?: number;
     name: string;
     type: 'Lab' | 'Imaging';
+    panel:string;
     unit: string;
     _id?: mongoose.Types.ObjectId;
   }[];
