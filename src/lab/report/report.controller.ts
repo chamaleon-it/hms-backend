@@ -9,7 +9,7 @@ import { ResultDto } from './dto/result.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -35,11 +35,12 @@ export class ReportController {
 
 
   @Post("result")
-  async updateResult(@Body() dto:ResultDto){
-const data = await this.reportService.updateResult(dto)
-return {
-  message:"Result updated.  ",
-  data
-}
+  @UseGuards(JwtAuthGuard)
+  async updateResult(@Body() dto: ResultDto) {
+    const data = await this.reportService.updateResult(dto)
+    return {
+      message: "Result updated.  ",
+      data
+    }
   }
 }

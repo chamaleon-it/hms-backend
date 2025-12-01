@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
+
 export class ResultDto {
-    _id: string;
+    _id: mongoose.Types.ObjectId;
     name: {
-        _id: string;
+        _id: mongoose.Types.ObjectId;
         value: string | number;
         name: string;
     }[];

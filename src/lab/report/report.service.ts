@@ -9,7 +9,7 @@ import { ResultDto } from './dto/result.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -44,19 +44,19 @@ export class ReportService {
     if (!report) throw new NotFoundException('Report not found');
 
     name.forEach((n) => {
-      const index = report.name.findIndex((x) => x._id.toString() === n._id);
+      const index = report.name.findIndex((x) => x._id.toString() === n._id.toString());
       if (index !== -1) {
         report.name[index].value = n.value;
       }
     });
 
-     const allFilled = report.name.every((item) => {
-    return item.value !== null && item.value !== "" && item.value !== undefined;
-  });
+    const allFilled = report.name.every((item) => {
+      return item.value !== null && item.value !== "" && item.value !== undefined;
+    });
 
-  report.status = allFilled
-    ? ReportStatus.COMPLETED
-    : ReportStatus.IN_PROGRESS;
+    report.status = allFilled
+      ? ReportStatus.COMPLETED
+      : ReportStatus.IN_PROGRESS;
 
 
     await report.save();
