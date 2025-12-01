@@ -33,8 +33,6 @@ export class ReportService {
       .exec();
 
     return data;
-
-    console.log(dto);
   }
 
   async updateResult(dto: ResultDto) {
