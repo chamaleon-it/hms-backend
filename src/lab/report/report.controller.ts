@@ -5,6 +5,7 @@ import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetReportDto } from './dto/get-report.dto';
+import { ResultDto } from './dto/result.dto';
 
 @Controller('lab/report')
 export class ReportController {
@@ -30,5 +31,15 @@ export class ReportController {
       data,
       message: 'All Lab report retrived successfully.',
     };
+  }
+
+
+  @Post("result")
+  async updateResult(@Body() dto:ResultDto){
+const data = await this.reportService.updateResult(dto)
+return {
+  message:"Result updated.  ",
+  data
+}
   }
 }

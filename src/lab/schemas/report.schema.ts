@@ -48,6 +48,7 @@ export class Report {
       panel: { type: String,},
       type: { type: String, enum: ['Lab', 'Imaging'], required: true },
       _id: { type: mongoose.Schema.Types.ObjectId, required: true },
+      value: { type: mongoose.Schema.Types.Mixed,default:"" }
     },
   ])
   name: {
@@ -59,6 +60,7 @@ export class Report {
     type: 'Lab' | 'Imaging';
     unit: string;
     _id: mongoose.Types.ObjectId;
+    value:string | number
   }[];
 
   @Prop({
