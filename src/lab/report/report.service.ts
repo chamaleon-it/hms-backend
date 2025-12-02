@@ -1,4 +1,9 @@
-import { Body, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
@@ -9,7 +14,7 @@ import { ResultDto } from './dto/result.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -42,23 +47,38 @@ export class ReportService {
     if (!report) throw new NotFoundException('Report not found');
 
     name.forEach((n) => {
-      const index = report.name.findIndex((x) => x._id.toString() === n._id.toString());
+      const index = report.name.findIndex(
+        (x) => x._id.toString() === n._id.toString(),
+      );
       if (index !== -1) {
         report.name[index].value = n.value;
       }
     });
 
     const allFilled = report.name.every((item) => {
-      return item.value !== null && item.value !== "" && item.value !== undefined;
+      return (
+        item.value !== null && item.value !== '' && item.value !== undefined
+      );
     });
 
     report.status = allFilled
       ? ReportStatus.COMPLETED
       : ReportStatus.IN_PROGRESS;
 
-
     await report.save();
 
     return { message: 'Updated successfully' };
+  }
+
+  async getPatientReports(patient: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(patient))
+      throw new BadRequestException('Please provide a valid patient id.');
+    const report = await this.reportModel
+      .find({ patient })
+      .populate('doctor', 'name specialization')
+      .populate('lab', 'name')
+      .lean()
+      .exec();
+    return report;
   }
 }
