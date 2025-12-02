@@ -193,6 +193,7 @@ export class User {
           min: { type: Number },
           max: { type: Number },
           unit: { type: String, trim: true },
+          estimatedTime: { type: Number },
         },
       ],
       billing: {
@@ -228,6 +229,7 @@ export class User {
       min?: number;
       max?: number;
       unit: string;
+      estimatedTime:number;
     }[];
     catalogue: {
       showProfilesOnPatientBill: boolean;
