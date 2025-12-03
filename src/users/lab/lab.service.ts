@@ -68,11 +68,11 @@ export class LabService {
             code: dto.code,
             name: dto.name,
             type: dto.type,
-            panel:dto.panel,
+            panel: dto.panel,
             unit: dto.unit,
             max: dto.max,
             min: dto.min,
-            estimatedTime:dto.estimatedTime
+            estimatedTime: dto.estimatedTime,
           },
         },
       },

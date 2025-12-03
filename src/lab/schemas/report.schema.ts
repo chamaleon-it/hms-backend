@@ -29,7 +29,12 @@ export class Report {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   doctor: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true,default:configuration().in_house_lab_id, })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    default: configuration().in_house_lab_id,
+  })
   lab: Types.ObjectId;
 
   @Prop({ type: Date, required: true })
@@ -38,6 +43,9 @@ export class Report {
   @Prop({ type: String, required: true })
   priority: string;
 
+  @Prop({ type: [String], default: [] })
+  panels: string;
+
   @Prop([
     {
       code: { type: String, required: true },
@@ -45,10 +53,10 @@ export class Report {
       unit: { type: String, required: true },
       min: { type: Number },
       max: { type: Number },
-      panel: { type: String,},
+      panel: { type: String },
       type: { type: String, enum: ['Lab', 'Imaging'], required: true },
       _id: { type: mongoose.Schema.Types.ObjectId, required: true },
-      value: { type: mongoose.Schema.Types.Mixed,default:"" }
+      value: { type: mongoose.Schema.Types.Mixed, default: '' },
     },
   ])
   name: {
@@ -60,7 +68,7 @@ export class Report {
     type: 'Lab' | 'Imaging';
     unit: string;
     _id: mongoose.Types.ObjectId;
-    value:string | number
+    value: string | number;
   }[];
 
   @Prop({

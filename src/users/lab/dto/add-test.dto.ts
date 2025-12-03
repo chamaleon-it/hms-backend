@@ -41,8 +41,8 @@ export class AddTestDto {
   unit: string;
 
   @IsNumber()
-  @IsPositive({message:"estimatedTime always positive."})
+  @IsPositive({ message: 'estimatedTime always positive.' })
   @Type(() => Number)
   @IsNotEmpty({ message: 'Estimated time is required.' })
-  estimatedTime:number
+  estimatedTime: number;
 }

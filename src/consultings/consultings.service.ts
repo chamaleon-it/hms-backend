@@ -45,13 +45,14 @@ export class ConsultingsService {
       lab: Types.ObjectId;
       date: Date;
       priority: string;
+      panels: string[];
       name: {
         code: string;
         max?: number;
         min?: number;
         name: string;
         type: 'Lab' | 'Imaging';
-        panel:string;
+        panel: string;
         unit: string;
         _id?: Types.ObjectId | undefined;
       }[];
@@ -60,10 +61,12 @@ export class ConsultingsService {
     }[] = consultingDto.test.map((t) => ({
       patient: consultingDto.patient,
       doctor: doctorId,
-      lab: t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
+      lab:
+        t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
       date: t.date,
       name: t.name,
       priority: t.priority,
+      panels: t.panels,
       sampleType: SampleType.OTHER,
       status: ReportStatus.PENDING,
     }));

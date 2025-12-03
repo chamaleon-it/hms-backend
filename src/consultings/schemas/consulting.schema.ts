@@ -99,7 +99,7 @@ export class Consulting {
       lab: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        default:configuration().in_house_lab_id,
+        default: configuration().in_house_lab_id,
         ref: 'User',
       },
       priority: { type: String, required: true },
