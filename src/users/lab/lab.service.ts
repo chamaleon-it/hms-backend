@@ -72,6 +72,7 @@ export class LabService {
             unit: dto.unit,
             max: dto.max,
             min: dto.min,
+            estimatedTime:dto.estimatedTime
           },
         },
       },

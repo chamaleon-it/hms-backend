@@ -5,6 +5,7 @@ import {
   IsIn,
   IsOptional,
   IsNumber,
+  IsPositive,
 } from 'class-validator';
 
 export class AddTestDto {
@@ -38,4 +39,10 @@ export class AddTestDto {
   @IsString({ message: 'Unit must be a string.' })
   @IsNotEmpty({ message: 'Unit is required.' })
   unit: string;
+
+  @IsNumber()
+  @IsPositive({message:"estimatedTime always positive."})
+  @Type(() => Number)
+  @IsNotEmpty({ message: 'Estimated time is required.' })
+  estimatedTime:number
 }
