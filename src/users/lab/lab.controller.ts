@@ -8,6 +8,7 @@ import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { AddTestDto } from './dto/add-test.dto';
+import { UpdateTestDto } from './dto/update-test.dto';
 
 @Controller('users/lab')
 export class LabController {
@@ -60,6 +61,12 @@ export class LabController {
       data,
       message: 'Lab catalogue settings updated successfully',
     };
+  }
+
+  @Patch("edit_test")
+  @UseGuards(JwtAuthGuard)
+  async editTest(@GetUser() user: JWTUserInterface, @Body() dto: UpdateTestDto){
+    const data = await this.labService.editTest(user.id,dto)
   }
 
   @Get('')

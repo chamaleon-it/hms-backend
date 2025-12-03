@@ -7,6 +7,7 @@ import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { AddTestDto } from './dto/add-test.dto';
+import { UpdateTestDto } from './dto/update-test.dto';
 
 @Injectable()
 export class LabService {
@@ -149,4 +150,20 @@ export class LabService {
 
     return updated;
   }
+
+async editTest(userId: mongoose.Types.ObjectId, dto: UpdateTestDto) {
+  const user = await this.userModel.findById(userId);
+  if (!user) throw new NotFoundException('User not found.');
+
+  const { _id } = dto;
+
+  const test = user.lab.tests.find((t:any) => t._id.toString() === _id.toString());
+  if (!test) throw new NotFoundException('Test not found.');
+
+  Object.assign(test, dto);
+
+  await user.save();
+  return user;
+}
+
 }
