@@ -108,7 +108,7 @@ class TestDto {
     max?: number;
     name: string;
     type: 'Lab' | 'Imaging';
-    panel:string;
+    panel: string;
     unit: string;
     _id?: mongoose.Types.ObjectId;
   }[];
@@ -123,6 +123,8 @@ class TestDto {
   @IsString({ message: 'Priority is required and must be a string.' })
   @IsNotEmpty({ message: 'Priority cannot be empty.' })
   priority: string;
+
+  panels: string[];
 }
 
 export class ConsultingDto {

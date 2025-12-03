@@ -76,78 +76,78 @@ export class ReportService {
     const report = await this.reportModel
       .find({ patient })
       .populate('doctor', 'name specialization')
-      .populate('lab', 'name').sort({createdAt:-1})
+      .populate('lab', 'name')
+      .sort({ createdAt: -1 })
       .lean()
       .exec();
     return report;
   }
 
   async getPatients() {
- 
-  type PatientOut = {
-    _id: mongoose.Types.ObjectId;
-    name?: string;
-    phoneNumber?: string;
-    gender?: string;
-    dateOfBirth?: Date;
-    address?: string;
-    mrn?: string;
-    createdAt?: Date;
-    visits: number;
-    lastVisit?: Date;
-  };
+    type PatientOut = {
+      _id: mongoose.Types.ObjectId;
+      name?: string;
+      phoneNumber?: string;
+      gender?: string;
+      dateOfBirth?: Date;
+      address?: string;
+      mrn?: string;
+      createdAt?: Date;
+      visits: number;
+      lastVisit?: Date;
+    };
 
-  const patients: PatientOut[] = await this.reportModel.aggregate([
-    { $match: { patient: { $exists: true, $ne: null } } },
+    const patients: PatientOut[] = await this.reportModel
+      .aggregate([
+        { $match: { patient: { $exists: true, $ne: null } } },
 
-    {
-      $group: {
-        _id: '$patient',
-        visits: { $sum: 1 },
-        lastVisit: { $max: '$createdAt' },
-      },
-    },
-
-
-    {
-      $lookup: {
-        from: 'patients',     
-        localField: '_id',   
-        foreignField: '_id', 
-        as: 'patient',
-      },
-    },
-
-
-    { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
-
-    {
-      $replaceRoot: {
-        newRoot: {
-          $mergeObjects: [
-            '$patient',
-            { visits: '$visits', lastVisit: '$lastVisit' },
-          ],
+        {
+          $group: {
+            _id: '$patient',
+            visits: { $sum: 1 },
+            lastVisit: { $max: '$createdAt' },
+          },
         },
-      },
-    },
 
-    {
-      $project: {
-        name: 1,
-        address: 1,
-        mrn: 1,
-        dateOfBirth: 1,
-        gender: 1,
-        phoneNumber: 1,
-        createdAt: 1,
-        visits: 1,
-        lastVisit: 1,
-      },
-    },
-    { $sort: { createdAt: -1 } },
-  ]).exec();
+        {
+          $lookup: {
+            from: 'patients',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'patient',
+          },
+        },
 
-  return patients;
-}
+        { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
+
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: [
+                '$patient',
+                { visits: '$visits', lastVisit: '$lastVisit' },
+              ],
+            },
+          },
+        },
+
+        {
+          $project: {
+            name: 1,
+            address: 1,
+            mrn: 1,
+            dateOfBirth: 1,
+            gender: 1,
+            phoneNumber: 1,
+            createdAt: 1,
+            visits: 1,
+            lastVisit: 1,
+          },
+        },
+        { $sort: { createdAt: -1 } },
+      ])
+      .exec();
+
+    return patients;
+  }
 }

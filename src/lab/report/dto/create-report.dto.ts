@@ -7,13 +7,14 @@ export class CreateReportDto {
   lab?: Types.ObjectId;
   date: Date;
   priority: string;
+  panels: string[];
   name: {
     code: string;
     max?: number;
     min?: number;
     name: string;
     type: 'Lab' | 'Imaging';
-    panel: string,
+    panel: string;
     unit: string;
     _id?: Types.ObjectId | undefined;
   }[];
