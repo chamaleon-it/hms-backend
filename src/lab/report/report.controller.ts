@@ -60,4 +60,13 @@ export class ReportController {
       data,
     };
   }
+
+  @Get("patients")
+  async getPatients(){
+    const data = await this.reportService.getPatients()
+    return {
+      data,
+      message:"All patient data retrived"
+    }
+  }
 }
