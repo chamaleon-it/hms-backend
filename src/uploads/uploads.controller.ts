@@ -9,17 +9,10 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
 
-// If you want per-route options different from module defaults, import from multer.config
-// import { multerOptions } from './multer.config';
-
 @Controller('uploads')
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
-  /**
-   * Single file upload: field name "file"
-   * POST /uploads
-   */
   @Post()
   @UseInterceptors(FileInterceptor('file')) // uses module-registered Multer config
   uploadSingle(@UploadedFile() file?: Express.Multer.File) {

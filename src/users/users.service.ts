@@ -103,11 +103,10 @@ export class UsersService {
   }
 
   async updateUser(id: mongoose.Types.ObjectId, updateUserDto: UpdateUserDto) {
-    const user = await this.userModel.findByIdAndUpdate(
-      id,
-      updateUserDto,
-      { new: true, runValidators: true }, // ✅ Return updated doc & validate
-    );
+    const user = await this.userModel.findByIdAndUpdate(id, updateUserDto, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!user) {
       throw new NotFoundException('User not found.');
