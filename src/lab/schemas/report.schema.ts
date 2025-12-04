@@ -15,7 +15,7 @@ export enum ReportStatus {
   IN_PROGRESS = 'In Progress',
   COMPLETED = 'Completed',
   FLAGGED = 'Flagged',
-  DELETED = "Deleted"
+  DELETED = 'Deleted',
 }
 
 @Schema({ versionKey: false, timestamps: true })
@@ -80,10 +80,10 @@ export class Report {
   sampleType: SampleType;
 
   @Prop({
-    type:Date,
-    default:null
+    type: Date,
+    default: null,
   })
-  sampleCollectedAt:Date | null
+  sampleCollectedAt: Date | null;
 
   @Prop({
     type: String,

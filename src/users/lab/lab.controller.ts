@@ -63,10 +63,17 @@ export class LabController {
     };
   }
 
-  @Patch("edit_test")
+  @Patch('edit_test')
   @UseGuards(JwtAuthGuard)
-  async editTest(@GetUser() user: JWTUserInterface, @Body() dto: UpdateTestDto){
-    const data = await this.labService.editTest(user.id,dto)
+  async editTest(
+    @GetUser() user: JWTUserInterface,
+    @Body() dto: UpdateTestDto,
+  ) {
+    const data = await this.labService.editTest(user.id, dto);
+    return {
+      data,
+      message: 'Lab test updated successfully',
+    };
   }
 
   @Get('')

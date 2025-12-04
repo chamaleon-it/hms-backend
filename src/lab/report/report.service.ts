@@ -29,8 +29,8 @@ export class ReportService {
     };
 
     match.status = {
-      $ne:ReportStatus.DELETED
-    }
+      $ne: ReportStatus.DELETED,
+    };
 
     const data = await this.reportModel
       .find(match)
@@ -78,7 +78,7 @@ export class ReportService {
     if (!mongoose.isValidObjectId(patient))
       throw new BadRequestException('Please provide a valid patient id.');
     const report = await this.reportModel
-      .find({ patient,status:{$ne:ReportStatus.DELETED} })
+      .find({ patient, status: { $ne: ReportStatus.DELETED } })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
       .sort({ createdAt: -1 })
@@ -103,7 +103,12 @@ export class ReportService {
 
     const patients: PatientOut[] = await this.reportModel
       .aggregate([
-        { $match: { patient: { $exists: true, $ne: null },status:{$ne:ReportStatus.DELETED} } },
+        {
+          $match: {
+            patient: { $exists: true, $ne: null },
+            status: { $ne: ReportStatus.DELETED },
+          },
+        },
 
         {
           $group: {
@@ -155,24 +160,24 @@ export class ReportService {
     return patients;
   }
 
-  async sampleCollected(id:mongoose.Types.ObjectId ){
-      const data = await this.reportModel.findById(id)
-      if(!data){
-        throw new NotFoundException("Records not found")
-      }
-      data.status = ReportStatus.IN_PROGRESS
-      data.sampleCollectedAt = new Date()
-      await data.save()
-      return data
+  async sampleCollected(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
     }
+    data.status = ReportStatus.IN_PROGRESS;
+    data.sampleCollectedAt = new Date();
+    await data.save();
+    return data;
+  }
 
-    async deleteReport( id:mongoose.Types.ObjectId){
-        const data = await this.reportModel.findById(id)
-      if(!data){
-        throw new NotFoundException("Records not found")
-      }
-      data.status = ReportStatus.DELETED
-      await data.save()
-      return data
-      }
+  async deleteReport(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.status = ReportStatus.DELETED;
+    await data.save();
+    return data;
+  }
 }

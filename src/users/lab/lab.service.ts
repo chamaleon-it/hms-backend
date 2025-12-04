@@ -151,19 +151,20 @@ export class LabService {
     return updated;
   }
 
-async editTest(userId: mongoose.Types.ObjectId, dto: UpdateTestDto) {
-  const user = await this.userModel.findById(userId);
-  if (!user) throw new NotFoundException('User not found.');
+  async editTest(userId: mongoose.Types.ObjectId, dto: UpdateTestDto) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found.');
 
-  const { _id } = dto;
+    const { _id } = dto;
 
-  const test = user.lab.tests.find((t:any) => t._id.toString() === _id.toString());
-  if (!test) throw new NotFoundException('Test not found.');
+    const test = user.lab.tests.find(
+      (t: any) => t._id.toString() === _id.toString(),
+    );
+    if (!test) throw new NotFoundException('Test not found.');
 
-  Object.assign(test, dto);
+    Object.assign(test, dto);
 
-  await user.save();
-  return user;
-}
-
+    await user.save();
+    return user;
+  }
 }
