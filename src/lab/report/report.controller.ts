@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -40,6 +41,24 @@ export class ReportController {
       data,
       message: 'All Lab report retrived successfully.',
     };
+  }
+
+  @Post("sample_collected/:id")
+  async sampleCollected(@Param("id") id:mongoose.Types.ObjectId ){
+   const data = await this.reportService.sampleCollected(id) 
+   return {
+    message:"Sample is collected",
+    data
+   }
+  }
+
+  @Delete(":id")
+  async deleteReport(@Param("id") id:mongoose.Types.ObjectId){
+   const data = await this.reportService.deleteReport(id) 
+   return {
+    message:"Report is deleted",
+    data
+   }
   }
 
   @Post('result')

@@ -28,6 +28,10 @@ export class ReportService {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
+    match.status = {
+      $ne:ReportStatus.DELETED
+    }
+
     const data = await this.reportModel
       .find(match)
       .populate('doctor', 'name specialization')
@@ -74,7 +78,7 @@ export class ReportService {
     if (!mongoose.isValidObjectId(patient))
       throw new BadRequestException('Please provide a valid patient id.');
     const report = await this.reportModel
-      .find({ patient })
+      .find({ patient,status:{$ne:ReportStatus.DELETED} })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
       .sort({ createdAt: -1 })
@@ -99,7 +103,7 @@ export class ReportService {
 
     const patients: PatientOut[] = await this.reportModel
       .aggregate([
-        { $match: { patient: { $exists: true, $ne: null } } },
+        { $match: { patient: { $exists: true, $ne: null },status:{$ne:ReportStatus.DELETED} } },
 
         {
           $group: {
@@ -150,4 +154,25 @@ export class ReportService {
 
     return patients;
   }
+
+  async sampleCollected(id:mongoose.Types.ObjectId ){
+      const data = await this.reportModel.findById(id)
+      if(!data){
+        throw new NotFoundException("Records not found")
+      }
+      data.status = ReportStatus.IN_PROGRESS
+      data.sampleCollectedAt = new Date()
+      await data.save()
+      return data
+    }
+
+    async deleteReport( id:mongoose.Types.ObjectId){
+        const data = await this.reportModel.findById(id)
+      if(!data){
+        throw new NotFoundException("Records not found")
+      }
+      data.status = ReportStatus.DELETED
+      await data.save()
+      return data
+      }
 }
