@@ -10,6 +10,7 @@ import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { ItemsService } from '../items/items.service';
+import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 
 @Injectable()
 export class OrdersService {
@@ -320,5 +321,17 @@ export class OrdersService {
       totalSpend,
       lastPurchase,
     };
+  }
+
+  updateOrder(dto: UpdateOrderDto) {
+   const order = this.orderModel.findByIdAndUpdate(
+      dto._id,
+      dto,
+      { new: true, runValidators: true },
+    ).lean();
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
   }
 }

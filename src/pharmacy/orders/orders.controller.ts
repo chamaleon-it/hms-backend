@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -17,6 +18,7 @@ import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
@@ -106,6 +108,17 @@ export class OrdersController {
     return {
       data,
       message: 'Customer data were retrived successfully.',
+    };
+  }
+
+
+
+  @Patch("update")
+  async updateOrder(@Body() dto: UpdateOrderDto) {
+    const data = await this.ordersService.updateOrder(dto);
+    return {
+      message: 'Order updated successfully',
+       data,
     };
   }
 }
