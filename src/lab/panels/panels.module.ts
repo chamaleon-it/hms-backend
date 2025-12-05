@@ -5,7 +5,9 @@ import { Panel, PanelSchema } from './schemas/panel.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Panel.name, schema: PanelSchema }])],
+  imports: [
+    MongooseModule.forFeature([{ name: Panel.name, schema: PanelSchema }]),
+  ],
   controllers: [PanelsController],
   providers: [PanelsService],
 })

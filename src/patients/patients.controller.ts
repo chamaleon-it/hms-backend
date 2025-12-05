@@ -21,7 +21,7 @@ import { UpdateRemarksDto } from './dto/update-remarks.dto';
 
 @Controller('patients')
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) { }
+  constructor(private readonly patientsService: PatientsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -90,7 +90,6 @@ export class PatientsController {
     @Body() updateRemarksDto: UpdateRemarksDto,
     @Param('id') patient: mongoose.Types.ObjectId,
   ) {
-
     updateRemarksDto.remarksDate = new Date();
     const data = await this.patientsService.updatePatientRemarks(
       updateRemarksDto,
@@ -118,6 +117,4 @@ export class PatientsController {
       message: 'Patient details is updated successfully',
     };
   }
-
-
 }

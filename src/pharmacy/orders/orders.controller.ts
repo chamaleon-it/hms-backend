@@ -111,14 +111,12 @@ export class OrdersController {
     };
   }
 
-
-
-  @Patch("update")
+  @Patch('update')
   async updateOrder(@Body() dto: UpdateOrderDto) {
     const data = await this.ordersService.updateOrder(dto);
     return {
       message: 'Order updated successfully',
-       data,
+      data,
     };
   }
 }

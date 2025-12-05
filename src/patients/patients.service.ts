@@ -15,7 +15,7 @@ import { UpdateRemarksDto } from './dto/update-remarks.dto';
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -288,7 +288,10 @@ export class PatientsService {
     return data;
   }
 
-  async updatePatientRemarks(updateRemarksDto: UpdateRemarksDto, patient: mongoose.Types.ObjectId) {
+  async updatePatientRemarks(
+    updateRemarksDto: UpdateRemarksDto,
+    patient: mongoose.Types.ObjectId,
+  ) {
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
       updateRemarksDto,

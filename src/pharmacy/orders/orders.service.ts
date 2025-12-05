@@ -324,11 +324,9 @@ export class OrdersService {
   }
 
   updateOrder(dto: UpdateOrderDto) {
-   const order = this.orderModel.findByIdAndUpdate(
-      dto._id,
-      dto,
-      { new: true, runValidators: true },
-    ).lean();
+    const order = this.orderModel
+      .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
+      .lean();
     if (!order) {
       throw new NotFoundException('Order not found');
     }

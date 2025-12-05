@@ -8,7 +8,7 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Report, ReportStatus } from '../schemas/report.schema';
-import { GetReportDto } from './dto/get-report.dto';
+// import { GetReportDto } from './dto/get-report.dto';
 import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';
 
@@ -23,7 +23,10 @@ export class ReportService {
     return data;
   }
 
-  async getReport(user: mongoose.Types.ObjectId, dto: GetReportDto) {
+  async getReport(
+    user: mongoose.Types.ObjectId,
+    // dto: GetReportDto
+  ) {
     const match: any = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };

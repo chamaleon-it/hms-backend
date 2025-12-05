@@ -4,21 +4,24 @@ import mongoose, { HydratedDocument } from 'mongoose';
 export type PanelDocument = HydratedDocument<Panel>;
 
 export enum PanelStatus {
-    ACTIVE = 'Active',
-    INACTIVE = 'Inactive',
-    DELETED = 'Deleted',
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  DELETED = 'Deleted',
 }
 
-
-@Schema({ versionKey: false, })
+@Schema({ versionKey: false })
 export class Panel {
-  @Prop({unique: true, required: true,trim: true,})
+  @Prop({ unique: true, required: true, trim: true })
   name: string;
 
-  @Prop({type: String, enum: Object.values(PanelStatus), default: PanelStatus.ACTIVE})
+  @Prop({
+    type: String,
+    enum: Object.values(PanelStatus),
+    default: PanelStatus.ACTIVE,
+  })
   status: PanelStatus;
 
-  @Prop({type:mongoose.Schema.Types.ObjectId, ref:'User'})
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   user: mongoose.Types.ObjectId;
 }
 

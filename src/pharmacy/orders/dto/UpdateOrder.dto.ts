@@ -1,4 +1,14 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsBoolean, IsMongoId, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsBoolean,
+  IsMongoId,
+  IsNotEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import mongoose from 'mongoose';
 
@@ -63,8 +73,7 @@ export class UpdateOrderItemDto {
 }
 
 export class UpdateOrderDto {
-
-      @IsMongoId()
+  @IsMongoId()
   @IsNotEmpty({ message: 'Order ID cannot be empty.' })
   _id?: mongoose.Types.ObjectId;
 
@@ -86,11 +95,11 @@ export class UpdateOrderDto {
   @IsOptional()
   items?: UpdateOrderItemDto[];
 
-  @IsEnum(["Normal", "High", "Critical"])
+  @IsEnum(['Normal', 'High', 'Critical'])
   @IsOptional()
   priority?: string;
 
-  @IsEnum(["Pending", "Packed", "Completed", "Cancelled"])
+  @IsEnum(['Pending', 'Packed', 'Completed', 'Cancelled'])
   @IsOptional()
   status?: string;
 
