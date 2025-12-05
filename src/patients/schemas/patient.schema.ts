@@ -73,6 +73,12 @@ export class Patient {
 
   @Prop({ required: true, unique: true })
   mrn: string;
+
+  @Prop({ default: null, required: true, trim: true })
+  remarks: string;
+
+  @Prop({ default: null, type: Date })
+  remarksDate: Date;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);
