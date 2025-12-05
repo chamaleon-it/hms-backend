@@ -25,16 +25,16 @@ export class OrderItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true })
   name: Types.ObjectId; // or rename to `item` or `itemId`
 
-  @Prop({ required: true })
+  @Prop({ default:null })
   dosage: string;
 
-  @Prop({ required: true })
+  @Prop({ default:null })
   frequency: string;
 
-  @Prop({ required: true })
+  @Prop({ default:null })
   food: string;
 
-  @Prop({ required: true })
+  @Prop({ default:null })
   duration: string;
 
   @Prop({ required: true })

@@ -18,19 +18,19 @@ export class OrderItemDto {
   name!: mongoose.Types.ObjectId;
 
   @IsString({ message: 'Dosage must be a string' })
-  @IsNotEmpty({ message: 'Dosage should not be empty' })
+  @IsOptional()
   dosage!: string;
 
   @IsString({ message: 'Frequency must be a string' })
-  @IsNotEmpty({ message: 'Frequency should not be empty' })
+  @IsOptional()
   frequency!: string;
 
   @IsString({ message: 'Food instruction must be a string' })
-  @IsNotEmpty({ message: 'Food instruction should not be empty' })
+  @IsOptional()
   food!: string;
 
   @IsString({ message: 'Duration must be a string' })
-  @IsNotEmpty({ message: 'Duration should not be empty' })
+  @IsOptional()
   duration!: string;
 
   @IsNumber()
