@@ -17,10 +17,11 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { GetPatientsDto } from './dto/get-patients.dto';
 import mongoose from 'mongoose';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
+import { UpdateRemarksDto } from './dto/update-remarks.dto';
 
 @Controller('patients')
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(private readonly patientsService: PatientsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -84,6 +85,24 @@ export class PatientsController {
     };
   }
 
+  @Patch('remarks/:id')
+  async updatePatientRemarks(
+    @Body() updateRemarksDto: UpdateRemarksDto,
+    @Param('id') patient: mongoose.Types.ObjectId,
+  ) {
+
+    updateRemarksDto.remarksDate = new Date();
+    const data = await this.patientsService.updatePatientRemarks(
+      updateRemarksDto,
+      patient,
+    );
+
+    return {
+      data,
+      message: 'Patient remarks is updated successfully',
+    };
+  }
+
   @Patch(':id')
   async updatePatient(
     @Body() patientRegisterDto: PatientRegisterDto,
@@ -99,4 +118,6 @@ export class PatientsController {
       message: 'Patient details is updated successfully',
     };
   }
+
+
 }

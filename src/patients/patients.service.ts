@@ -9,12 +9,13 @@ import mongoose, { Model } from 'mongoose';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
+import { UpdateRemarksDto } from './dto/update-remarks.dto';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -279,6 +280,18 @@ export class PatientsService {
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
       patientRegisterDto,
+      { new: true },
+    );
+    if (!data) {
+      throw new BadRequestException('Patient not found.');
+    }
+    return data;
+  }
+
+  async updatePatientRemarks(updateRemarksDto: UpdateRemarksDto, patient: mongoose.Types.ObjectId) {
+    const data = await this.patientModel.findByIdAndUpdate(
+      patient,
+      updateRemarksDto,
       { new: true },
     );
     if (!data) {
