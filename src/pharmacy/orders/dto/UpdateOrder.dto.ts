@@ -99,7 +99,6 @@ export class UpdateOrderDto {
   @IsOptional()
   priority?: string;
 
-  @IsEnum(['Pending', 'Packed', 'Completed', 'Cancelled'])
   @IsOptional()
   status?: string;
 
