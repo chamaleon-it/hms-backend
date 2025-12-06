@@ -157,4 +157,33 @@ export class ItemsService {
 
     return item;
   }
+
+
+  async addBatchItems(id: mongoose.Types.ObjectId, batchData: {
+    batchNumber: string;
+    quantity: number;
+    expiryDate: Date;
+    purchasePrice: number;
+    supplier: string;
+  }) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    item.batches.push({...batchData,createdAt: new Date()});
+    item.quantity += batchData.quantity;
+    
+    
+    
+
+    if(!item.expiryDate || new Date(batchData.expiryDate) < new Date(item.expiryDate) || new Date() > new Date(item.expiryDate)) {
+      item.expiryDate = batchData.expiryDate;
+    }
+    item.purchasePrice = batchData.purchasePrice;
+    item.supplier = batchData.supplier;
+    await item.save();
+
+    return item;
+  }
 }

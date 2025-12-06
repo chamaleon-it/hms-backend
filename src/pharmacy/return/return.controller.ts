@@ -25,6 +25,15 @@ export class ReturnController {
     };
   }
 
+  @Get("patient/:patientId")
+  async findByPatient(@Param('patientId') patientId: string) {
+    const data = await this.returnService.findByPatient(patientId);
+    return {
+      data,
+      message: 'Return data for the patient retrived successfully',
+    };
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.returnService.findOne(id);

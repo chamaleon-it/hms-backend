@@ -53,4 +53,22 @@ export class ReturnService {
     }
     return data;
   }
+
+  async findByPatient(patientId: string) {
+    if (!mongoose.isValidObjectId(patientId)) {
+      throw new BadRequestException('Please provide a valid patient id');
+    }
+    const data = await this.returnModel
+      .find({ patient: patientId })
+      // .populate('patient', 'name phoneNumber email address mrn')
+      .populate('order', 'mrn')
+      .populate(
+        'items.name',
+        '-createdAt -updatedAt -expiryDate -purchasePrice ',
+      )
+      .lean()
+      .exec();
+
+    return data;
+  }
 }

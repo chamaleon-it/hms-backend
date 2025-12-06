@@ -78,6 +78,28 @@ export class Item {
     default: ItemStatus.Active,
   })
   status: ItemStatus;
+
+  @Prop({
+    type: [
+      {
+        batchNumber: { type: String, required: true },
+        quantity: { type: Number, required: true },
+        expiryDate: { type: Date, required: true },
+        purchasePrice: { type: Number, required: true },
+        supplier: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  batches: {
+    batchNumber: string;
+    quantity: number;
+    expiryDate: Date;
+    purchasePrice: number;
+    supplier: string;
+    createdAt: Date;
+  }[];
 }
 
 export const ItemSchema = SchemaFactory.createForClass(Item);
