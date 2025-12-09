@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { ReportController } from './report.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Report, ReportSchema } from '../schemas/report.schema';
+import { Report, ReportSchema } from './schemas/report.schema';
 
 @Module({
   imports: [

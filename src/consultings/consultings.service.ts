@@ -9,7 +9,7 @@ import {
   OrderStatus,
 } from 'src/pharmacy/orders/schemas/order.schema';
 import { ReportService } from 'src/lab/report/report.service';
-import { ReportStatus, SampleType } from 'src/lab/schemas/report.schema';
+import { ReportStatus, SampleType } from 'src/lab/report/schemas/report.schema';
 import configuration from 'src/config/configuration';
 
 @Injectable()

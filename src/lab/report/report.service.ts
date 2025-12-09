@@ -7,7 +7,7 @@ import {
 import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
-import { Report, ReportStatus } from '../schemas/report.schema';
+import { Report, ReportStatus } from './schemas/report.schema';
 // import { GetReportDto } from './dto/get-report.dto';
 import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';

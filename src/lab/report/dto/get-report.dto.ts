@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { ReportStatus } from 'src/lab/schemas/report.schema';
+import { ReportStatus } from 'src/lab/report/schemas/report.schema';
 
 export class GetReportDto {
   type?: 'Lab' | 'Imaging';
