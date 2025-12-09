@@ -46,15 +46,9 @@ export class ConsultingsService {
       date: Date;
       priority: string;
       panels: string[];
-      name: {
-        code: string;
-        max?: number;
-        min?: number;
-        name: string;
-        type: 'Lab' | 'Imaging';
-        panel: string;
-        unit: string;
-        _id?: Types.ObjectId | undefined;
+      test: {
+        name: mongoose.Types.ObjectId;
+        value?: string | number;
       }[];
       sampleType: SampleType;
       status: ReportStatus;
@@ -64,7 +58,7 @@ export class ConsultingsService {
       lab:
         t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
       date: t.date,
-      name: t.name,
+      test: t.name.map(n=>({name:n})),
       priority: t.priority,
       panels: t.panels,
       sampleType: SampleType.OTHER,

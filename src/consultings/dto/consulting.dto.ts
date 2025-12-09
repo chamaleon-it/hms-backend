@@ -100,18 +100,7 @@ class MedicineDto {
 class TestDto {
   @IsArray({ message: 'Test names must be an array of strings.' })
   @ArrayNotEmpty({ message: 'Tests array cannot be empty.' })
-  @ValidateNested({ each: true })
-  @Type(() => Object)
-  name: {
-    code: string;
-    min?: number;
-    max?: number;
-    name: string;
-    type: 'Lab' | 'Imaging';
-    panel: string;
-    unit: string;
-    _id?: mongoose.Types.ObjectId;
-  }[];
+  name: mongoose.Types.ObjectId[];
 
   @IsDateString({}, { message: 'Test date must be a valid date.' })
   date: Date;

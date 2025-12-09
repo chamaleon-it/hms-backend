@@ -2,9 +2,11 @@ import mongoose from 'mongoose';
 
 export class ResultDto {
   _id: mongoose.Types.ObjectId;
-  name: {
+  test: {
     _id: mongoose.Types.ObjectId;
     value: string | number;
-    name: string;
+    name:{
+      _id:mongoose.Types.ObjectId;
+    }
   }[];
 }

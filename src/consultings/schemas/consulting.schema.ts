@@ -84,17 +84,7 @@ export class Consulting {
 
   @Prop([
     {
-      name: [
-        {
-          code: { type: String, required: true },
-          name: { type: String, required: true },
-          unit: { type: String, required: true },
-          min: { type: Number },
-          max: { type: Number },
-          type: { type: String, enum: ['Lab', 'Imaging'], required: true },
-          _id: { type: mongoose.Schema.Types.ObjectId },
-        },
-      ],
+      name: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Test' }],
       date: { type: Date, required: true },
       lab: {
         type: mongoose.Schema.Types.ObjectId,

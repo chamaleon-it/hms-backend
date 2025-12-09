@@ -19,6 +19,7 @@ export class ReportService {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
     }
+    console.log(dto);
     const data = await this.reportModel.create(dto);
     return data;
   }
@@ -35,34 +36,41 @@ export class ReportService {
       $ne: ReportStatus.DELETED,
     };
 
-    const data = await this.reportModel
-      .find(match)
-      .populate('doctor', 'name specialization')
-      .populate('lab', 'name specialization')
-      .populate('patient')
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
+   const data = await this.reportModel
+  .find(match)
+  .populate('doctor', 'name specialization')
+  .populate('lab', 'name specialization')
+  .populate('patient')
+  .populate({
+    path: 'test.name',
+    populate: {
+      path: 'panels',
+    },
+  })
+  .sort({ createdAt: -1 })
+  .lean()
+  .exec();
 
     return data;
   }
 
   async updateResult(dto: ResultDto) {
-    const { _id, name } = dto;
+    const { _id, test } = dto;
 
     const report = await this.reportModel.findById(_id);
     if (!report) throw new NotFoundException('Report not found');
 
-    name.forEach((n) => {
-      const index = report.name.findIndex(
-        (x) => x._id.toString() === n._id.toString(),
+    
+    test.forEach((n) => {
+      const index = report.test.findIndex(
+        (x) => x.name.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
-        report.name[index].value = n.value;
+        report.test[index].value = n.value;
       }
     });
 
-    const allFilled = report.name.every((item) => {
+    const allFilled = report.test.every((item) => {
       return (
         item.value !== null && item.value !== '' && item.value !== undefined
       );

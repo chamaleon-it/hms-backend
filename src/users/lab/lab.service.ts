@@ -6,8 +6,6 @@ import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
-import { AddTestDto } from './dto/add-test.dto';
-import { UpdateTestDto } from './dto/update-test.dto';
 
 @Injectable()
 export class LabService {
@@ -60,39 +58,11 @@ export class LabService {
     return updated;
   }
 
-  async addTests(user: mongoose.Types.ObjectId, dto: AddTestDto) {
-    const updated = await this.userModel.findByIdAndUpdate(
-      user,
-      {
-        $push: {
-          'lab.tests': {
-            code: dto.code,
-            name: dto.name,
-            type: dto.type,
-            panel: dto.panel,
-            unit: dto.unit,
-            max: dto.max,
-            min: dto.min,
-            estimatedTime: dto.estimatedTime,
-          },
-        },
-      },
-      { new: true, runValidators: true },
-    );
-
-    if (!updated) {
-      throw new NotFoundException('Lab Not Found');
-    }
-
-    return updated;
-  }
-
   async getLab() {
     const data = await this.userModel
       .find(
         {
           role: UserRole.LAB,
-          'lab.tests.0': { $exists: true },
         },
         {
           name: 1,
@@ -101,7 +71,7 @@ export class LabService {
       )
       .lean()
       .exec();
-    return data.map((d) => ({ _id: d._id, name: d.name, tests: d.lab.tests }));
+    return data.map((d) => ({ _id: d._id, name: d.name }));
   }
 
   async updateBilling(user: mongoose.Types.ObjectId, dto: UpdateBillingDto) {
@@ -149,22 +119,5 @@ export class LabService {
     }
 
     return updated;
-  }
-
-  async editTest(userId: mongoose.Types.ObjectId, dto: UpdateTestDto) {
-    const user = await this.userModel.findById(userId);
-    if (!user) throw new NotFoundException('User not found.');
-
-    const { _id } = dto;
-
-    const test = user.lab.tests.find(
-      (t: any) => t._id.toString() === _id.toString(),
-    );
-    if (!test) throw new NotFoundException('Test not found.');
-
-    Object.assign(test, dto);
-
-    await user.save();
-    return user;
   }
 }

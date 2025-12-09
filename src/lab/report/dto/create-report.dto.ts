@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { ReportStatus, SampleType } from 'src/lab/report/schemas/report.schema';
 
 export class CreateReportDto {
@@ -8,15 +8,9 @@ export class CreateReportDto {
   date: Date;
   priority: string;
   panels: string[];
-  name: {
-    code: string;
-    max?: number;
-    min?: number;
-    name: string;
-    type: 'Lab' | 'Imaging';
-    panel: string;
-    unit: string;
-    _id?: Types.ObjectId | undefined;
+  test:{
+    name:mongoose.Types.ObjectId;
+    value?: string | number;
   }[];
   sampleType: SampleType;
   status: ReportStatus;

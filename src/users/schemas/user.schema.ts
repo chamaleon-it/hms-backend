@@ -184,18 +184,6 @@ export class User {
         showProfilesOnPatientBill: { type: Boolean, default: false },
         allowEditingPanelComposition: { type: Boolean, default: false },
       },
-      tests: [
-        {
-          code: { type: String, default: null, trim: true },
-          name: { type: String, default: null, trim: true },
-          type: { type: String, enum: ['Lab', 'Imaging'] },
-          panel: { type: String },
-          min: { type: Number },
-          max: { type: Number },
-          unit: { type: String, trim: true },
-          estimatedTime: { type: Number },
-        },
-      ],
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         defaultGst: { type: Number, default: 5 },
@@ -221,16 +209,6 @@ export class User {
       roundOff: boolean;
       autoPrintAfterSave: boolean;
     };
-    tests: {
-      code: string;
-      name: string;
-      type: 'Lab' | 'Imaging';
-      panel: string;
-      min?: number;
-      max?: number;
-      unit: string;
-      estimatedTime: number;
-    }[];
     catalogue: {
       showProfilesOnPatientBill: boolean;
       allowEditingPanelComposition: boolean;

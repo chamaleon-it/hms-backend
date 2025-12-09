@@ -28,7 +28,7 @@ export class PanelsService {
   async getPanels(): Promise<string[]> {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name -_id')
+      .select('name')
       .sort({ _id: 1 })
       .lean()
       .exec();
@@ -52,7 +52,7 @@ export class PanelsService {
   }
 
   async getTests() {
-    const tests = await this.testModel.find().populate('panels',"name -_id").lean().exec();
+    const tests = await this.testModel.find().populate('panels',"name").lean().exec();
     return tests;
   }
 

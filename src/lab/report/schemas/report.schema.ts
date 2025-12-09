@@ -49,26 +49,12 @@ export class Report {
 
   @Prop([
     {
-      code: { type: String, required: true },
-      name: { type: String, required: true },
-      unit: { type: String, required: true },
-      min: { type: Number },
-      max: { type: Number },
-      panel: { type: String },
-      type: { type: String, enum: ['Lab', 'Imaging'], required: true },
-      _id: { type: mongoose.Schema.Types.ObjectId, required: true },
+     name:{ type: mongoose.Schema.Types.ObjectId, ref: 'Test' },
       value: { type: mongoose.Schema.Types.Mixed, default: '' },
     },
   ])
-  name: {
-    code: string;
-    max?: number;
-    min?: number;
-    name: string;
-    panel: string;
-    type: 'Lab' | 'Imaging';
-    unit: string;
-    _id: mongoose.Types.ObjectId;
+  test: {
+    name:mongoose.Types.ObjectId;
     value: string | number;
   }[];
 
