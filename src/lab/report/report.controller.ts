@@ -12,7 +12,6 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
-// import { GetReportDto } from './dto/get-report.dto';
 import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
 
