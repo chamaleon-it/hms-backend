@@ -29,6 +29,24 @@ export class Test {
   @Prop({ default: null })
   max: number;
 
+@Prop({ default: null })
+   womenMin?: number;
+
+   @Prop({ default: null })
+    womenMax?: number;
+
+    @Prop({ default: null })
+    childMin?: number;
+
+    @Prop({ default: null })
+    childMax?: number;
+
+    @Prop({ default: null })
+    nbMin?: number;
+
+    @Prop({ default: null })
+    nbMax?: number;
+
   @Prop({ default: null, trim: true })
   unit: string;
 

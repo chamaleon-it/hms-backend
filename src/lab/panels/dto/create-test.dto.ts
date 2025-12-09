@@ -22,6 +22,30 @@ export class CreateTestDto {
     @IsOptional()
     @IsNumber({}, { message: 'Maximum value must be a number' })
     max?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Women minimum value must be a number' })
+    womenMin?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Women maximum value must be a number' })
+    womenMax?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Child minimum value must be a number' })
+    childMin?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Child maximum value must be a number' })
+    childMax?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Non-binary minimum value must be a number' })
+    nbMin?: number;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Non-binary maximum value must be a number' })
+    nbMax?: number;
     
     @IsOptional()
     @IsString({ message: 'Unit must be a string' })
