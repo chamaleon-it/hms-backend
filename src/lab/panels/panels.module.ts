@@ -7,7 +7,10 @@ import { Test, TestSchema } from './schemas/test.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Panel.name, schema: PanelSchema },{ name: Test.name, schema: TestSchema }]),
+    MongooseModule.forFeature([
+      { name: Panel.name, schema: PanelSchema },
+      { name: Test.name, schema: TestSchema },
+    ]),
   ],
   controllers: [PanelsController],
   providers: [PanelsService],

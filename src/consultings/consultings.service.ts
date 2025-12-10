@@ -58,7 +58,7 @@ export class ConsultingsService {
       lab:
         t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
       date: t.date,
-      test: t.name.map(n=>({name:n})),
+      test: t.name.map((n) => ({ name: n })),
       priority: t.priority,
       panels: t.panels,
       sampleType: SampleType.OTHER,

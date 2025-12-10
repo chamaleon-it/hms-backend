@@ -25,7 +25,7 @@ export class ReturnController {
     };
   }
 
-  @Get("patient/:patientId")
+  @Get('patient/:patientId')
   async findByPatient(@Param('patientId') patientId: string) {
     const data = await this.returnService.findByPatient(patientId);
     return {

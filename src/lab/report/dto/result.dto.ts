@@ -5,8 +5,8 @@ export class ResultDto {
   test: {
     _id: mongoose.Types.ObjectId;
     value: string | number;
-    name:{
-      _id:mongoose.Types.ObjectId;
-    }
+    name: {
+      _id: mongoose.Types.ObjectId;
+    };
   }[];
 }

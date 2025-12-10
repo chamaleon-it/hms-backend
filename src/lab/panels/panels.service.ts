@@ -52,12 +52,16 @@ export class PanelsService {
   }
 
   async getTests() {
-    const tests = await this.testModel.find().populate('panels',"name").lean().exec();
+    const tests = await this.testModel
+      .find()
+      .populate('panels', 'name')
+      .lean()
+      .exec();
     return tests;
   }
 
-  async updateTest(id:mongoose.Types.ObjectId,dto:CreateTestDto){
-    const test = await this.testModel.findByIdAndUpdate(id,dto,{new:true});
+  async updateTest(id: mongoose.Types.ObjectId, dto: CreateTestDto) {
+    const test = await this.testModel.findByIdAndUpdate(id, dto, { new: true });
     return test;
   }
 
@@ -66,12 +70,13 @@ export class PanelsService {
     if (!panel) {
       throw new BadRequestException('Panel not found');
     }
-    
-    
+
     for (const testId of addTestDto.tests) {
       const test = await this.testModel.findById(testId);
       if (!test) {
-        throw new BadRequestException(`Test with id ${testId} not found`);
+        throw new BadRequestException(
+          `Test with id ${testId.toString()} not found`,
+        );
       }
       if (!test.panels) {
         test.panels = [];
@@ -80,7 +85,6 @@ export class PanelsService {
         test.panels.push(panel._id);
         await test.save();
       }
-
     }
     return panel;
   }
@@ -90,11 +94,13 @@ export class PanelsService {
     if (!panel) {
       throw new BadRequestException('Panel not found');
     }
-    
+
     for (const testId of addTestDto.tests) {
       const test = await this.testModel.findById(testId);
       if (!test) {
-        throw new BadRequestException(`Test with id ${testId} not found`);
+        throw new BadRequestException(
+          `Test with id ${testId.toString()} not found`,
+        );
       }
       if (test.panels && test.panels.includes(panel._id)) {
         test.panels = test.panels.filter(

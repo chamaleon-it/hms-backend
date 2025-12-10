@@ -50,8 +50,6 @@ export class LabController {
     };
   }
 
-
-
   @Get('')
   // @UseGuards(JwtAuthGuard)
   async getLab() {
