@@ -45,7 +45,7 @@ export class Report {
   priority: string;
 
   @Prop({ type: [String], default: [] })
-  panels: string;
+  panels: string[];
 
   @Prop([
     {
