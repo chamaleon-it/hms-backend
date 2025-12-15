@@ -52,9 +52,12 @@ export class PanelsController {
     };
   }
 
-  @Post("create_test")
+  @Post('create_test')
   @UseGuards(JwtAuthGuard)
-  async createTest(@Body() dto:CreateTestDto,@GetUser() user: JWTUserInterface,){
+  async createTest(
+    @Body() dto: CreateTestDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
     dto.user = user.id;
     const data = await this.panelsService.createTest(dto);
     return {
@@ -63,10 +66,9 @@ export class PanelsController {
     };
   }
 
-
-  @Get("tests")
+  @Get('tests')
   // @UseGuards(JwtAuthGuard)
-  async getTests(){
+  async getTests() {
     const data = await this.panelsService.getTests();
     return {
       message: 'Tests fetched successfully',
@@ -74,20 +76,23 @@ export class PanelsController {
     };
   }
 
-
-  @Patch("test/:id")
+  @Patch('test/:id')
   @UseGuards(JwtAuthGuard)
-  async updateTest(@Param('id') id:mongoose.Types.ObjectId,@Body() dto:CreateTestDto,@GetUser() user: JWTUserInterface,){
+  async updateTest(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: CreateTestDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
     dto.user = user.id;
-    const data = await this.panelsService.updateTest(id,dto);
+    const data = await this.panelsService.updateTest(id, dto);
     return {
       message: 'Test updated successfully',
       data,
     };
   }
 
-  @Post("add_test")
-  async addTestToPanel(@Body() addTestDto: AddTestDto){ 
+  @Post('add_test')
+  async addTestToPanel(@Body() addTestDto: AddTestDto) {
     const data = await this.panelsService.addTestToPanel(addTestDto);
     return {
       message: 'Test added to panel successfully',
@@ -95,8 +100,8 @@ export class PanelsController {
     };
   }
 
-  @Post("remove_test")
-  async removeTestFromPanel(@Body() addTestDto: AddTestDto){ 
+  @Post('remove_test')
+  async removeTestFromPanel(@Body() addTestDto: AddTestDto) {
     const data = await this.panelsService.removeTestFromPanel(addTestDto);
     return {
       message: 'Test removed from panel successfully',

@@ -86,17 +86,17 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
-
   @UseGuards(JwtAuthGuard)
-  @Post("add_batch/:id")
+  @Post('add_batch/:id')
   async addBatchItems(
     @Param('id') id: mongoose.Types.ObjectId,
-    @Body() batchData: {
+    @Body()
+    batchData: {
       batchNumber: string;
-    quantity: number;
-    expiryDate: Date;
-    purchasePrice: number;
-    supplier: string;
+      quantity: number;
+      expiryDate: Date;
+      purchasePrice: number;
+      supplier: string;
     },
   ) {
     const data = await this.itemsService.addBatchItems(id, batchData);

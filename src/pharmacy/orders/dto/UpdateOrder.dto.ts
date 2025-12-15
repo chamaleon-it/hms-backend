@@ -83,11 +83,11 @@ export class UpdateOrderDto {
 
   @IsString()
   @IsOptional()
-  patient?: string; 
+  patient?: string;
 
   @IsMongoId()
   @IsOptional()
-  doctor?: string; 
+  doctor?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -104,5 +104,5 @@ export class UpdateOrderDto {
 
   @IsString()
   @IsOptional()
-  assignedTo?: string; 
+  assignedTo?: string;
 }

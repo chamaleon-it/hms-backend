@@ -45,16 +45,16 @@ export class Report {
   priority: string;
 
   @Prop({ type: [String], default: [] })
-  panels: string;
+  panels: string[];
 
   @Prop([
     {
-     name:{ type: mongoose.Schema.Types.ObjectId, ref: 'Test' },
+      name: { type: mongoose.Schema.Types.ObjectId, ref: 'Test' },
       value: { type: mongoose.Schema.Types.Mixed, default: '' },
     },
   ])
   test: {
-    name:mongoose.Types.ObjectId;
+    name: mongoose.Types.ObjectId;
     value: string | number;
   }[];
 

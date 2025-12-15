@@ -19,16 +19,50 @@ export class ReportService {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
     }
-    console.log(dto);
-    const data = await this.reportModel.create(dto);
-    return data;
+    const userReport = await this.reportModel.findOne({
+      patient: dto.patient,
+      status: ReportStatus.PENDING,
+      lab: dto.lab,
+    });
+
+    if (!userReport) {
+      const data = await this.reportModel.create(dto);
+      return data;
+    } else {
+      userReport.test.push(
+        ...dto.test
+          .filter(
+            (t) =>
+              !userReport.test.some(
+                (existing) => existing.name.toString() === t.name.toString(),
+              ),
+          )
+          .map((t) => ({ name: t.name, value: t.value ?? '' })),
+      );
+
+      if (dto.panels && dto.panels.length > 0) {
+        userReport.panels.push(
+          ...dto.panels.filter(
+            (p) =>
+              !userReport.panels.some(
+                (existing) => existing.toString() === p.toString(),
+              ),
+          ),
+        );
+      }
+      await userReport.save();
+      return userReport;
+    }
   }
 
   async getReport(
     user: mongoose.Types.ObjectId,
     // dto: GetReportDto
   ) {
-    const match: any = {
+    const match: {
+      status?: { $ne: ReportStatus };
+      $or?: Record<string, mongoose.Types.ObjectId>[];
+    } = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
@@ -36,20 +70,20 @@ export class ReportService {
       $ne: ReportStatus.DELETED,
     };
 
-   const data = await this.reportModel
-  .find(match)
-  .populate('doctor', 'name specialization')
-  .populate('lab', 'name specialization')
-  .populate('patient')
-  .populate({
-    path: 'test.name',
-    populate: {
-      path: 'panels',
-    },
-  })
-  .sort({ createdAt: -1 })
-  .lean()
-  .exec();
+    const data = await this.reportModel
+      .find(match)
+      .populate('doctor', 'name specialization')
+      .populate('lab', 'name specialization')
+      .populate('patient')
+      .populate({
+        path: 'test.name',
+        populate: {
+          path: 'panels',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
 
     return data;
   }
@@ -60,7 +94,6 @@ export class ReportService {
     const report = await this.reportModel.findById(_id);
     if (!report) throw new NotFoundException('Report not found');
 
-    
     test.forEach((n) => {
       const index = report.test.findIndex(
         (x) => x.name.toString() === n.name._id.toString(),
