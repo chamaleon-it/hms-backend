@@ -213,6 +213,7 @@ export class OrdersService {
             gender: 1,
             phoneNumber: 1,
             createdAt: 1,
+            doctor:1,
           },
         },
       ])
