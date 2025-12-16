@@ -74,7 +74,7 @@ export class Patient {
   @Prop({ required: true, unique: true })
   mrn: string;
 
-  @Prop({ default: null, required: true, trim: true })
+  @Prop({ default: null,  trim: true ,})
   remarks: string;
 
   @Prop({ default: null, type: Date })
