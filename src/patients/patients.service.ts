@@ -75,12 +75,14 @@ export class PatientsService {
     } = {};
 
     if (query && query.trim() !== '') {
-      const searchRegex = { $regex: '^' + query, $options: 'i' };
+      const nameRegex = { $regex: '^' + query, $options: 'i' };
+      const searchRegex = { $regex: query, $options: 'i' };
       filter = {
         $or: [
-          { name: searchRegex },
+          { name: nameRegex },
           { phoneNumber: searchRegex },
           { mrn: searchRegex },
+          { address: searchRegex },
         ],
       };
     }
