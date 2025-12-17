@@ -182,9 +182,9 @@ export class ItemsService {
       new Date() > new Date(item.expiryDate)
     ) {
       item.expiryDate = batchData.expiryDate;
+      item.purchasePrice = batchData.purchasePrice;
+      item.supplier = batchData.supplier;
     }
-    item.purchasePrice = batchData.purchasePrice;
-    item.supplier = batchData.supplier;
     await item.save();
 
     return item;
