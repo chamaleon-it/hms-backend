@@ -77,6 +77,13 @@ export class Order {
   })
   status: OrderStatus;
 
+  @Prop({
+    required:true,
+    default:0,
+    type:Number,
+  })
+  discount:number;
+
   @Prop({ default: null })
   assignedTo: string;
 }
