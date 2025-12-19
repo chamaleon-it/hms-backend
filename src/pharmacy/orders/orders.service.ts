@@ -50,10 +50,20 @@ export class OrdersService {
       $ne: OrderStatus.Deleted,
     };
 
-    if (q === 'stat') {
-      filter.priority = OrderPriority.Stat;
-    } else if (q === 'ready') {
+    // if (q === 'stat') {
+    //   filter.priority = OrderPriority.Stat;
+    // } else if (q === 'ready') {
+    //   filter.status = OrderStatus.Ready;
+    // }
+
+    if (q === OrderStatus.Pending) {
+      filter.status = OrderStatus.Pending;
+    } else if (q === OrderStatus.Filling) {
+      filter.status = OrderStatus.Filling;
+    } else if (q === OrderStatus.Ready) {
       filter.status = OrderStatus.Ready;
+    } else if (q === OrderStatus.Completed) {
+      filter.status = OrderStatus.Completed;
     }
 
     const data = await this.orderModel
@@ -213,7 +223,7 @@ export class OrdersService {
             gender: 1,
             phoneNumber: 1,
             createdAt: 1,
-            doctor:1,
+            doctor: 1,
           },
         },
       ])
@@ -327,6 +337,16 @@ export class OrdersService {
   updateOrder(dto: UpdateOrderDto) {
     const order = this.orderModel
       .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
+      .lean();
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
+  }
+
+  async completeOrder(id: mongoose.Types.ObjectId) {
+    const order = this.orderModel
+      .findByIdAndUpdate(id, { status: OrderStatus.Completed }, { new: true })
       .lean();
     if (!order) {
       throw new NotFoundException('Order not found');

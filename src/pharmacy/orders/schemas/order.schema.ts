@@ -78,11 +78,11 @@ export class Order {
   status: OrderStatus;
 
   @Prop({
-    required:true,
-    default:0,
-    type:Number,
+    required: true,
+    default: 0,
+    type: Number,
   })
-  discount:number;
+  discount: number;
 
   @Prop({ default: null })
   assignedTo: string;
