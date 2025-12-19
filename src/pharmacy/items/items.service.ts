@@ -136,7 +136,7 @@ export class ItemsService {
 
   async decreaseItem(
     id: mongoose.Types.ObjectId,
-    sold: number,
+    quantity: number,
     user: mongoose.Types.ObjectId,
   ) {
     const allowNegativeStock =
@@ -147,8 +147,23 @@ export class ItemsService {
       throw new BadRequestException('Item is not available');
     }
     const newQuantity = allowNegativeStock
-      ? item.quantity - sold
-      : Math.max(item.quantity - sold, 0);
+      ? item.quantity - quantity
+      : Math.max(item.quantity - quantity, 0);
+
+    if (newQuantity !== item.quantity) {
+      item.quantity = newQuantity;
+      await item.save();
+    }
+
+    return item;
+  }
+
+  async increaseItem(id: mongoose.Types.ObjectId, quantity: number) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+    const newQuantity = item.quantity + quantity;
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;

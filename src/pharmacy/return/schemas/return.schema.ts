@@ -15,9 +15,14 @@ export enum ReturnedBy {
 }
 
 export enum ReturnReason {
+  DoctorChangedRx = 'Doctor Changed Rx',
   Expired = 'Expired',
+  NearExpiry = 'Near Expiry',
+  QualityIssue = 'Quality Issue',
+  WrongItem = 'Wrong Item',
+  AdverseReaction = 'Adverse Reaction',
+  NotRequired = 'Not Required',
   Damaged = 'Damaged',
-  WrongTtem = 'Wrong item',
   Other = 'Other',
 }
 
@@ -55,7 +60,7 @@ export class Return {
         reason: {
           type: String,
           enum: Object.values(ReturnReason),
-          default: ReturnReason.Expired,
+          default: ReturnReason.DoctorChangedRx,
         },
       },
     ],

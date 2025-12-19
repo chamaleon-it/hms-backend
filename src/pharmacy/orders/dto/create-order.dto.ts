@@ -65,6 +65,10 @@ export class CreateOrderDto {
   })
   status: OrderStatus = OrderStatus.Pending;
 
+  @IsNumber()
+  @IsOptional()
+  discount?: number;
+
   @IsOptional()
   @IsMongoId({ message: 'AssignedTo must be a valid MongoDB ObjectId' })
   assignedTo?: string;

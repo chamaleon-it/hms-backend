@@ -119,4 +119,12 @@ export class OrdersController {
       data,
     };
   }
+  @Patch('complete/:id')
+  async completeOrder(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.ordersService.completeOrder(id);
+    return {
+      message: 'Order completed successfully',
+      data,
+    };
+  }
 }

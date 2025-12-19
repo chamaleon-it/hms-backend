@@ -5,15 +5,35 @@ import {
 } from '@nestjs/common';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Return } from './schemas/return.schema';
+import { Return, ReturnReason } from './schemas/return.schema';
 import mongoose, { Model } from 'mongoose';
+import { ItemsService } from '../items/items.service';
 
 @Injectable()
 export class ReturnService {
-  constructor(@InjectModel(Return.name) private returnModel: Model<Return>) {}
+  constructor(
+    @InjectModel(Return.name) private returnModel: Model<Return>,
+    private readonly itemsService: ItemsService,
+  ) {}
 
   async create(createReturnDto: CreateReturnDto) {
     const data = await this.returnModel.create(createReturnDto);
+
+    const validReasonForQuantityAdd = [
+      ReturnReason.AdverseReaction,
+      ReturnReason.DoctorChangedRx,
+      ReturnReason.NotRequired,
+      ReturnReason.Other,
+      ReturnReason.QualityIssue,
+      ReturnReason.WrongItem,
+    ];
+    const items = createReturnDto.items.filter(
+      (item) => validReasonForQuantityAdd.includes(item.reason) || !item.reason,
+    );
+    items.forEach(async (item) => {
+      await this.itemsService.increaseItem(item.name, item.quantity);
+    });
+
     return data;
   }
 
