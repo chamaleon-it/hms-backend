@@ -26,7 +26,7 @@ export class Patient {
   @Prop({ required: true, trim: true })
   phoneNumber: string;
 
-  @Prop({ trim: true, lowercase: true })
+  @Prop({ trim: true, lowercase: true, default: '' })
   email: string;
 
   @Prop({ enum: Object.values(Gender) })

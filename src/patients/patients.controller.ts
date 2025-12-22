@@ -18,10 +18,11 @@ import { GetPatientsDto } from './dto/get-patients.dto';
 import mongoose from 'mongoose';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
+import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 
 @Controller('patients')
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(private readonly patientsService: PatientsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -115,6 +116,18 @@ export class PatientsController {
     return {
       data,
       message: 'Patient details is updated successfully',
+    };
+  }
+
+  @Get("patient_already_exists")
+  async checkPatientAlreadyExists(@Query() checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto) {
+    const data = await this.patientsService.checkPatientAlreadyExists(checkPatientAlreadyExistsDto);
+    return {
+      data: {
+        isPatientAlreadyExists: Boolean(data),
+        patient: data,
+      },
+      message: data ? 'Patient already exists' : 'Patient does not exist',
     };
   }
 }

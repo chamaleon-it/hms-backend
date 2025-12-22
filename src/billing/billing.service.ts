@@ -19,7 +19,7 @@ export class BillingService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     let mrn: string;
@@ -89,7 +89,7 @@ export class BillingService {
     let data = await this.billingModel
       .find(
         filter,
-        'mrn createdAt patient items.total cash online insurance roundOff',
+        'mrn createdAt patient items.total cash online insurance discount roundOff',
       )
       .populate('patient', 'name mrn')
       .sort({ createdAt: -1 })
@@ -100,19 +100,19 @@ export class BillingService {
     if (!status) return data;
     else {
       if (status === 'Unpaid') {
-        data = data.filter((d) => !(d.insurance + d.cash + d.online));
+        data = data.filter((d) => !(d.insurance + d.cash + d.online + d.discount));
       } else if (status === 'Paid') {
         data = data.filter(
           (d) =>
             d.items.reduce((a, b) => a + b.total, 0) <=
-            d.insurance + d.cash + d.online,
+            d.insurance + d.cash + d.online + d.discount,
         );
       } else if (status === 'Partial') {
         data = data.filter(
           (d) =>
             d.items.reduce((a, b) => a + b.total, 0) >
-              d.insurance + d.cash + d.online &&
-            Boolean(d.insurance + d.cash + d.online),
+            (d.insurance + d.cash + d.online + d.discount) &&
+            Boolean(d.insurance + d.cash + d.online + d.discount),
         );
       }
     }
