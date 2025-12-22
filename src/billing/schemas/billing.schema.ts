@@ -45,6 +45,9 @@ export class Billing {
   @Prop({ type: Number, default: 0 })
   insurance: number;
 
+  @Prop({ type: Number, default: 0 })
+  discount: number;
+
   @Prop({ type: String, required: false })
   payer?: string;
 

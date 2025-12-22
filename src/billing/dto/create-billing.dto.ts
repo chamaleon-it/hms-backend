@@ -80,6 +80,12 @@ export class CreateBillingDto {
   @IsOptional()
   insurance?: number;
 
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @IsOptional()
+  discount?: number;
+
   @IsString()
   @IsOptional()
   payer?: string;
