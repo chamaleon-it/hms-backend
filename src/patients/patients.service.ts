@@ -10,12 +10,13 @@ import { PatientRegisterDto } from './dto/patient-register.dto';
 import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
+import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -302,6 +303,47 @@ export class PatientsService {
     if (!data) {
       throw new BadRequestException('Patient not found.');
     }
+    return data;
+  }
+
+  async checkPatientAlreadyExists(checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto) {
+    const orConditions: any = [];
+
+    if (checkPatientAlreadyExistsDto?.name) {
+      orConditions.push({
+        name: {
+          $regex: `^${checkPatientAlreadyExistsDto.name}$`,
+          $options: 'i',
+        },
+      });
+    }
+
+    if (checkPatientAlreadyExistsDto?.phoneNumber) {
+      let phone = checkPatientAlreadyExistsDto.phoneNumber;
+      phone = phone.replace(/\s+/g, '');
+      phone = phone.replace(/^(\+91|91)/, '');
+      phone = phone.replace(/\D/g, '');
+      if (phone.length === 10) {
+        const regexPattern = phone.split('').join('\\s*');
+
+        orConditions.push({
+          phoneNumber: {
+            $regex: regexPattern,
+            $options: 'i',
+          },
+        });
+      }
+    }
+
+    if (checkPatientAlreadyExistsDto?.email) {
+      orConditions.push({ email: checkPatientAlreadyExistsDto.email.toLowerCase() });
+    }
+
+    if (!orConditions.length) return null;
+
+    const data = await this.patientModel.findOne({
+      $or: orConditions,
+    }).select("name phoneNumber email gender dateOfBirth blood mrn address").lean().exec();
     return data;
   }
 }
