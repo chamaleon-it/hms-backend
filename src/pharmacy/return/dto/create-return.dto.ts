@@ -10,6 +10,7 @@ export class CreateReturnDto {
     name: mongoose.Types.ObjectId;
     quantity: number;
     reason: ReturnReason;
+    unitPrice: number;
   }[];
 
   refundMode: RefundMode;

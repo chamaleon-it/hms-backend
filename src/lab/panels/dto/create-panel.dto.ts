@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmpty, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmpty, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 import mongoose from 'mongoose';
 
 export class CreatePanelDto {
@@ -7,6 +7,12 @@ export class CreatePanelDto {
   @IsString({ message: 'Panel name must be a string' })
   @IsNotEmpty({ message: 'Panel name should not be empty' })
   name: string;
+
+  @Transform(({ value }: { value: number }) => value)
+  @IsNumber({}, { message: 'Panel price must be a number' })
+  @IsNotEmpty({ message: 'Panel price should not be empty' })
+  @Min(1, { message: 'Panel price should be greater than 0' })
+  price: number;
 
   @IsEmpty()
   user: mongoose.Types.ObjectId;

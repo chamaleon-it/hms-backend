@@ -62,6 +62,7 @@ export class Return {
           enum: Object.values(ReturnReason),
           default: ReturnReason.DoctorChangedRx,
         },
+        unitPrice: { type: Number, default: 0 },
       },
     ],
   })

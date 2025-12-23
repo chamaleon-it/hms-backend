@@ -14,6 +14,9 @@ export class CreateTestDto {
   @IsString({ message: 'Name must be a string' })
   name: string;
 
+  @IsNumber({}, { message: 'Price must be a number' })
+  price: number;
+
   @IsString({ message: 'Type must be a string' })
   type: string;
 

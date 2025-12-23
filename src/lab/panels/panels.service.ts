@@ -12,7 +12,7 @@ export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
-  ) {}
+  ) { }
 
   async createPanel(createPanelDto: CreatePanelDto) {
     const isExist = await this.panelModel.findOne({
@@ -25,14 +25,14 @@ export class PanelsService {
     return panel.save();
   }
 
-  async getPanels(): Promise<string[]> {
+  async getPanels(): Promise<{ name: string; price: number }[]> {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name')
+      .select('name price')
       .sort({ _id: 1 })
       .lean()
       .exec();
-    return panels.map((panel) => panel.name);
+    return panels.map((panel) => ({ name: panel.name, price: panel.price }));
   }
 
   async deletePanel(name: string) {
