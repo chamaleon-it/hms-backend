@@ -14,6 +14,9 @@ export class Panel {
   @Prop({ unique: true, required: true, trim: true })
   name: string;
 
+  @Prop({ required: true, default: 0 })
+  price: number;
+
   @Prop({
     type: String,
     enum: Object.values(PanelStatus),
