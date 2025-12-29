@@ -9,7 +9,7 @@ import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Injectable()
 export class PharmacyService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
 
   async updateGeneral(userId: mongoose.Types.ObjectId, dto: UpdateGeneralDto) {
     const pharmacy = await this.userModel.findByIdAndUpdate(
@@ -43,6 +43,7 @@ export class PharmacyService {
           'pharmacy.billing.defaultGst': dto.defaultGst,
           'pharmacy.billing.roundOff': dto.roundOff,
           'pharmacy.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
+          'pharmacy.billing.autoGenerateBill': dto.autoGenerateBill,
         },
       },
       { new: true, runValidators: true },
