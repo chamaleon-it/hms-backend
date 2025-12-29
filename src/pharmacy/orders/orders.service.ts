@@ -17,7 +17,7 @@ export class OrdersService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly itemsService: ItemsService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -352,5 +352,23 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
     return order;
+  }
+
+  async repeatOrder(id: mongoose.Types.ObjectId) {
+    const existOrder = await this.orderModel.findById(id).lean().exec();
+    if (!existOrder) {
+      throw new NotFoundException('Order not found');
+    }
+    const newOrder: any = {}
+    const mrn = await this.generateUniqueMRN();
+    newOrder.mrn = mrn;
+    newOrder.patient = existOrder.patient;
+    newOrder.doctor = existOrder.doctor;
+    newOrder.items = existOrder.items;
+    newOrder.priority = existOrder.priority;
+    newOrder.discount = existOrder.discount;
+    newOrder.assignedTo = existOrder.assignedTo;
+    const data = await this.orderModel.create(newOrder);
+    return data;
   }
 }

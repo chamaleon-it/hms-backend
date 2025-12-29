@@ -16,4 +16,8 @@ export class UpdateBillingDto {
   @IsBoolean({ message: 'Auto print after save must be a boolean' })
   @IsNotEmpty({ message: 'Auto print after save is required' })
   autoPrintAfterSave: boolean;
+
+  @IsBoolean({ message: 'Auto generate bill must be a boolean' })
+  @IsNotEmpty({ message: 'Auto generate bill is required' })
+  autoGenerateBill: boolean;
 }

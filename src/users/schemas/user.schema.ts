@@ -136,6 +136,7 @@ export class User {
         defaultGst: { type: Number, default: 5 },
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
+        autoGenerateBill: { type: Boolean, default: false },
       },
       inventory: {
         lowStockThreshold: { type: Number, default: 20 },
@@ -160,6 +161,7 @@ export class User {
       defaultGst: number;
       roundOff: boolean;
       autoPrintAfterSave: boolean;
+      autoGenerateBill: boolean;
     };
     inventory: {
       lowStockThreshold: number;
