@@ -364,7 +364,12 @@ export class OrdersService {
     newOrder.mrn = mrn;
     newOrder.patient = existOrder.patient;
     newOrder.doctor = existOrder.doctor;
-    newOrder.items = existOrder.items;
+    newOrder.items = existOrder.items.map((item) => {
+      return {
+        ...item,
+        isPacked: false,
+      };
+    });
     newOrder.priority = existOrder.priority;
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;
