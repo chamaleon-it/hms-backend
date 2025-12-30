@@ -12,6 +12,7 @@ import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { BillingItem } from './schemas/billingItem.schema';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
+import { AddPaymentDto } from './dto/add-payment.dto';
 
 @Injectable()
 export class BillingService {
@@ -89,7 +90,7 @@ export class BillingService {
     let data = await this.billingModel
       .find(
         filter,
-        'mrn createdAt patient items.total cash online insurance discount roundOff',
+        'mrn createdAt patient items.total items.unitPrice items.quantity items.gst cash online insurance discount roundOff',
       )
       .populate('patient', 'name mrn')
       .sort({ createdAt: -1 })
@@ -165,6 +166,12 @@ export class BillingService {
 
   async deleteBillingItem(item: string, user: mongoose.Types.ObjectId) {
     const data = await this.billingItemModel.findOneAndDelete({ user, item });
+    return data;
+  }
+
+  async addPayment(id: mongoose.Types.ObjectId, addPaymentDto: AddPaymentDto, user: mongoose.Types.ObjectId) {
+    const data = await this.billingModel.findOneAndUpdate({ _id: id }, { $set: { cash: addPaymentDto.cash, insurance: addPaymentDto.insurance, online: addPaymentDto.online } }, { new: true });
+    if (!data) throw new NotFoundException('Bill is not found.');
     return data;
   }
 }
