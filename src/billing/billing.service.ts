@@ -113,8 +113,8 @@ export class BillingService {
         data = data.filter(
           (d) =>
             d.items.reduce((a, b) => a + b.total, 0) >
-            ((d.insurance + d.cash + d.online + (d.discount ?? 0)) + (d.roundOff ? 1 : 0)) &&
-            Boolean(d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0)),
+            ((d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0))) &&
+            Boolean(d.insurance + d.cash + d.online + (d.discount ?? 0)),
         );
       }
     }
