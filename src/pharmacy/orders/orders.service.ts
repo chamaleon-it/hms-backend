@@ -377,13 +377,42 @@ export class OrdersService {
   }
 
   async completeOrder(id: mongoose.Types.ObjectId) {
-    const order = this.orderModel
+    const data = await this.orderModel
       .findByIdAndUpdate(id, { status: OrderStatus.Completed }, { new: true })
       .lean();
-    if (!order) {
+    if (!data) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+
+
+    // const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    // if (autoGenerateBill) {
+    //   const items = await Promise.all(
+    //     data.items.map(async (item) => {
+    //       const itemData = await this.itemsService.getItem(item.name);
+
+    //       const unitPrice = itemData.unitPrice;
+    //       const quantity = item.quantity;
+
+    //       return {
+    //         name: itemData.name,
+    //         unitPrice,
+    //         quantity,
+    //         discount: 0,
+    //         gst: 0,
+    //         total: unitPrice * quantity,
+    //       };
+    //     })
+    //   );
+
+    //   await this.billingService.generateBill({
+    //     patient: data.patient,
+    //     items,
+    //     user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+    //     discount: data.discount ?? 0,
+    //   });
+    // }
+    return data;
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
