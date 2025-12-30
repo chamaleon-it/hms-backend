@@ -16,5 +16,6 @@ import { UsersModule } from 'src/users/users.module';
   ],
   controllers: [BillingController],
   providers: [BillingService],
+  exports: [BillingService],
 })
-export class BillingModule {}
+export class BillingModule { }

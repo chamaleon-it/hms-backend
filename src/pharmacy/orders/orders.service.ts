@@ -11,12 +11,17 @@ import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
+import { BillingService } from 'src/billing/billing.service';
+import { UsersService } from 'src/users/users.service';
+import configuration from 'src/config/configuration';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly itemsService: ItemsService,
+    private readonly billingService: BillingService,
+    private readonly usersService: UsersService,
   ) { }
 
   private async generateUniqueMRN(): Promise<string> {
@@ -37,6 +42,33 @@ export class OrdersService {
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
     const data = await this.orderModel.create(order);
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    if (autoGenerateBill) {
+      const items = await Promise.all(
+        order.items.map(async (item) => {
+          const itemData = await this.itemsService.getItem(item.name);
+
+          const unitPrice = itemData.unitPrice;
+          const quantity = item.quantity;
+
+          return {
+            name: itemData.name,
+            unitPrice,
+            quantity,
+            discount: 0,
+            gst: 0,
+            total: unitPrice * quantity,
+          };
+        })
+      );
+
+      await this.billingService.generateBill({
+        patient: order.patient,
+        items,
+        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        discount: order.discount ?? 0,
+      });
+    }
     return data;
   }
 
@@ -374,6 +406,35 @@ export class OrdersService {
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
+
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    if (autoGenerateBill) {
+      const items = await Promise.all(
+        data.items.map(async (item) => {
+          const itemData = await this.itemsService.getItem(item.name);
+
+          const unitPrice = itemData.unitPrice;
+          const quantity = item.quantity;
+
+          return {
+            name: itemData.name,
+            unitPrice,
+            quantity,
+            discount: 0,
+            gst: 0,
+            total: unitPrice * quantity,
+          };
+        })
+      );
+
+      await this.billingService.generateBill({
+        patient: data.patient,
+        items,
+        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        discount: data.discount ?? 0,
+      });
+    }
+
     return data;
   }
 }
