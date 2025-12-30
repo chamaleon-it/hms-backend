@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -17,10 +18,11 @@ import mongoose from 'mongoose';
 import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
+import { AddPaymentDto } from './dto/add-payment.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -102,6 +104,20 @@ export class BillingController {
     return {
       data,
       message: 'Bill were retrived successfully.',
+    };
+  }
+
+  @Patch("add_payment/:id")
+  @UseGuards(JwtAuthGuard)
+  async addPayment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() addPaymentDto: AddPaymentDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.addPayment(id, addPaymentDto, user.id);
+    return {
+      data,
+      message: 'Payment is added successfully.',
     };
   }
 }
