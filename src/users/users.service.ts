@@ -20,7 +20,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
@@ -65,6 +65,14 @@ export class UsersService {
       .exec();
 
     return user?.pharmacy?.inventory?.allowNegativeStock ?? false;
+  }
+
+  async getPharmacyBilling(id: string): Promise<User['pharmacy']['billing']> {
+    const user = await this.userModel.findById(id).select('pharmacy.billing').lean();
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+    return user.pharmacy.billing;
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {

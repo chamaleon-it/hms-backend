@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   async addItems(pharmacy: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
     const found = await this.itemModel.findOne({ sku: addItemDto.sku }).lean();
@@ -89,7 +89,19 @@ export class ItemsService {
     return { items, total };
   }
 
-  async getItem() {}
+  async getItem(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid item ID.');
+    }
+
+    const data = await this.itemModel.findById(id).lean();
+
+    if (!data) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    return data;
+  }
 
   async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
     if (!mongoose.isValidObjectId(id)) {
