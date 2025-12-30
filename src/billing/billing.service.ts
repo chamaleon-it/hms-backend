@@ -13,6 +13,7 @@ import { BillingItem } from './schemas/billingItem.schema';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 
 @Injectable()
 export class BillingService {
@@ -90,9 +91,9 @@ export class BillingService {
     let data = await this.billingModel
       .find(
         filter,
-        'mrn createdAt patient items.total items.unitPrice items.quantity items.gst cash online insurance discount roundOff',
       )
-      .populate('patient', 'name mrn')
+      .populate('patient')
+      .populate('patient.doctor')
       .sort({ createdAt: -1 })
       .limit(1000)
       .lean()
@@ -101,19 +102,19 @@ export class BillingService {
     if (!status) return data;
     else {
       if (status === 'Unpaid') {
-        data = data.filter((d) => !(d.insurance + d.cash + d.online + d.discount));
+        data = data.filter((d) => !(d.insurance + d.cash + d.online + (d.discount ?? 0)));
       } else if (status === 'Paid') {
         data = data.filter(
           (d) =>
             d.items.reduce((a, b) => a + b.total, 0) <=
-            d.insurance + d.cash + d.online + d.discount,
+            d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0),
         );
       } else if (status === 'Partial') {
         data = data.filter(
           (d) =>
             d.items.reduce((a, b) => a + b.total, 0) >
-            (d.insurance + d.cash + d.online + d.discount) &&
-            Boolean(d.insurance + d.cash + d.online + d.discount),
+            ((d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0))) &&
+            Boolean(d.insurance + d.cash + d.online + (d.discount ?? 0)),
         );
       }
     }
@@ -127,6 +128,7 @@ export class BillingService {
     const data = await this.billingModel
       .findById(id)
       .populate('patient')
+      .populate('items')
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
@@ -171,6 +173,12 @@ export class BillingService {
 
   async addPayment(id: mongoose.Types.ObjectId, addPaymentDto: AddPaymentDto, user: mongoose.Types.ObjectId) {
     const data = await this.billingModel.findOneAndUpdate({ _id: id }, { $set: { cash: addPaymentDto.cash, insurance: addPaymentDto.insurance, online: addPaymentDto.online } }, { new: true });
+    if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+  async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto) {
+    const data = await this.billingModel.findOneAndUpdate({ _id: id }, { $inc: { cash: markAsPaidDto.amount } }, { new: true });
     if (!data) throw new NotFoundException('Bill is not found.');
     return data;
   }

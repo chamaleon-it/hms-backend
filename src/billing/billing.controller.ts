@@ -19,6 +19,7 @@ import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -118,6 +119,16 @@ export class BillingController {
     return {
       data,
       message: 'Payment is added successfully.',
+    };
+  }
+
+  @Patch("mark_as_paid/:id")
+  @UseGuards(JwtAuthGuard)
+  async markAsPaid(@Param('id') id: mongoose.Types.ObjectId, @Body() markAsPaidDto: MarkAsPaidDto) {
+    const data = await this.billingService.markAsPaid(id, markAsPaidDto);
+    return {
+      data,
+      message: 'Bill is marked as paid successfully.',
     };
   }
 }
