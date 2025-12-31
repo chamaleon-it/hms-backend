@@ -106,8 +106,8 @@ export class BillingService {
       } else if (status === 'Paid') {
         data = data.filter(
           (d) =>
-            d.items.reduce((a, b) => a + b.total, 0) <=
-            d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0),
+            (d.items.reduce((a, b) => a + b.total, 0)) <=
+            (d.insurance + d.cash + d.online + (d.discount ?? 0)),
         );
       } else if (status === 'Partial') {
         data = data.filter(
