@@ -10,5 +10,6 @@ import { Patient, PatientSchema } from './schemas/patient.schema';
   ],
   controllers: [PatientsController],
   providers: [PatientsService],
+  exports: [PatientsService],
 })
-export class PatientsModule {}
+export class PatientsModule { }
