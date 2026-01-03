@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PatientsService } from '../patients/patients.service';
 import { BillingService } from '../billing/billing.service';
 import { OrdersService } from '../pharmacy/orders/orders.service';
+import { ItemsService } from '../pharmacy/items/items.service';
+import { ReturnService } from '../pharmacy/return/return.service';
+import { PurchaseService } from '../pharmacy/purchase/purchase.service';
+import { PharmacyService } from '../users/pharmacy/pharmacy.service';
 import { ReportService } from '../lab/report/report.service';
 import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
@@ -15,6 +19,10 @@ export class SyncService {
         private readonly patientsService: PatientsService,
         private readonly billingService: BillingService,
         private readonly ordersService: OrdersService,
+        private readonly itemsService: ItemsService,
+        private readonly returnService: ReturnService,
+        private readonly purchaseService: PurchaseService,
+        private readonly pharmacyService: PharmacyService,
         private readonly reportService: ReportService,
         @InjectModel(SyncLog.name) private syncLogModel: Model<SyncLog>,
     ) { }
@@ -119,6 +127,49 @@ export class SyncService {
             const id = path.split('/')[3];
             if (!mongoose.isValidObjectId(id)) throw new Error('Invalid order ID');
             return this.ordersService.deleteOrder(new mongoose.Types.ObjectId(id));
+        }
+
+        // Pharmacy Items
+        if (path === '/pharmacy/items' && method === 'POST') {
+            return this.itemsService.addItems(userId, body);
+        }
+        if (path.startsWith('/pharmacy/items/add_batch/') && method === 'POST') {
+            const id = path.split('/')[4];
+            if (!mongoose.isValidObjectId(id)) throw new Error('Invalid item ID');
+            return this.itemsService.addBatchItems(new mongoose.Types.ObjectId(id), body);
+        }
+        if (path.startsWith('/pharmacy/items/') && method === 'PATCH') {
+            const id = path.split('/')[3];
+            if (!mongoose.isValidObjectId(id)) throw new Error('Invalid item ID');
+            return this.itemsService.updateItem(new mongoose.Types.ObjectId(id), body);
+        }
+        if (path.startsWith('/pharmacy/items/') && method === 'DELETE') {
+            const id = path.split('/')[3];
+            if (!mongoose.isValidObjectId(id)) throw new Error('Invalid item ID');
+            return this.itemsService.deleteItem(new mongoose.Types.ObjectId(id));
+        }
+
+        if (path === '/pharmacy/return' && method === 'POST') {
+            return this.returnService.create(body);
+        }
+
+        if (path === '/pharmacy/purchase' && method === 'POST') {
+            body.pharmacy = userId;
+            return this.purchaseService.createPurchase(body);
+        }
+
+        // Users Pharmacy Settings
+        if (path === '/users/pharmacy/general' && method === 'PATCH') {
+            return this.pharmacyService.updateGeneral(new mongoose.Types.ObjectId(userId), body);
+        }
+        if (path === '/users/pharmacy/billing' && method === 'PATCH') {
+            return this.pharmacyService.updateBilling(new mongoose.Types.ObjectId(userId), body);
+        }
+        if (path === '/users/pharmacy/inventory' && method === 'PATCH') {
+            return this.pharmacyService.updateInventory(new mongoose.Types.ObjectId(userId), body);
+        }
+        if (path === '/users/pharmacy/notifications' && method === 'PATCH') {
+            return this.pharmacyService.updateNotifications(new mongoose.Types.ObjectId(userId), body);
         }
 
         // Billing

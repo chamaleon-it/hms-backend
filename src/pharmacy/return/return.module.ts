@@ -12,5 +12,6 @@ import { ItemsModule } from '../items/items.module';
   ],
   controllers: [ReturnController],
   providers: [ReturnService],
+  exports: [ReturnService],
 })
-export class ReturnModule {}
+export class ReturnModule { }

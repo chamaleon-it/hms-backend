@@ -10,5 +10,6 @@ import { User, UserSchema } from '../schemas/user.schema';
   ],
   controllers: [PharmacyController],
   providers: [PharmacyService],
+  exports: [PharmacyService],
 })
-export class PharmacyModule {}
+export class PharmacyModule { }
