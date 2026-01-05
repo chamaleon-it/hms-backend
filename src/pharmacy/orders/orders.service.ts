@@ -100,6 +100,7 @@ export class OrdersService {
 
     const data = await this.orderModel
       .find(filter)
+      .limit(q === OrderStatus.Completed ? 100 : 500)
       .populate('patient')
       .populate('doctor', 'name phoneNumber specialization')
       .populate('items.name')
