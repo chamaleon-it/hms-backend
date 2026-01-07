@@ -21,6 +21,10 @@ export class PatientRegisterDto {
   @Transform(({ value }: { value: string }) => value?.trim().toLowerCase())
   email?: string;
 
+  @IsOptional()
+  @Transform(({ value }: { value: string }) => value?.trim().toUpperCase())
+  mrn?: string;
+
   @IsString()
   doctor: string;
 
@@ -41,9 +45,9 @@ export class PatientRegisterDto {
     if (!str) return undefined;
     return str.includes(',')
       ? str
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
       : [str];
   })
   @IsArray()
