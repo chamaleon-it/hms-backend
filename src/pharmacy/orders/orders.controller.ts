@@ -19,6 +19,8 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
+import { GetCustomersDto } from './dto/get-customers.dto';
+import { GetOrdersDto } from './dto/get-orders.dto';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
@@ -34,10 +36,13 @@ export class OrdersController {
   }
 
   @Get()
-  async getOrders(@Query('q') q: string) {
-    const data = await this.ordersService.getOrders(q);
+  async getOrders(@Query() query: GetOrdersDto) {
+    const { data, total } = await this.ordersService.getOrders(query);
     return {
       data,
+      total,
+      page: Number(query.page),
+      limit: Number(query.limit),
       message: 'All orders where retrived successfully',
     };
   }
@@ -90,10 +95,13 @@ export class OrdersController {
   }
 
   @Get('customers')
-  async getCustomers(@Query("alreadyPurchase") alreadyPurchase: "true" | "false") {
-    const data = await this.ordersService.getCustomers(alreadyPurchase);
+  async getCustomers(@Query() query: GetCustomersDto) {
+    const { data, total } = await this.ordersService.getCustomers(query);
     return {
       data,
+      total,
+      page: Number(query.page),
+      limit: Number(query.limit),
       message: 'All customers data were retrived successfully.',
     };
   }

@@ -15,6 +15,8 @@ import { BillingService } from 'src/billing/billing.service';
 import { UsersService } from 'src/users/users.service';
 import configuration from 'src/config/configuration';
 import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
+import { GetCustomersDto } from './dto/get-customers.dto';
+import { GetOrdersDto } from './dto/get-orders.dto';
 
 @Injectable()
 export class OrdersService {
@@ -74,7 +76,10 @@ export class OrdersService {
     return data;
   }
 
-  async getOrders(q: string) {
+  async getOrders(query: GetOrdersDto) {
+    const { page = 1, limit = 20, q } = query;
+    const skip = (page - 1) * limit;
+
     const filter: {
       status?: Record<string, string> | string;
       priority?: string;
@@ -83,12 +88,6 @@ export class OrdersService {
     filter.status = {
       $ne: OrderStatus.Deleted,
     };
-
-    // if (q === 'stat') {
-    //   filter.priority = OrderPriority.Stat;
-    // } else if (q === 'ready') {
-    //   filter.status = OrderStatus.Ready;
-    // }
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
@@ -100,15 +99,20 @@ export class OrdersService {
       filter.status = OrderStatus.Completed;
     }
 
-    const data = await this.orderModel
-      .find(filter)
-      .limit(q === OrderStatus.Completed ? 100 : 500)
-      .populate('patient')
-      .populate('doctor', 'name phoneNumber specialization')
-      .populate('items.name')
-      // .sort({ createdAt: -1 });
-      .sort({ createdAt: 1 });
-    return data;
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate('patient')
+        .populate('doctor', 'name phoneNumber specialization')
+        .populate('items.name')
+        .sort({ createdAt: 1 })
+        .exec(),
+      this.orderModel.countDocuments(filter),
+    ]);
+
+    return { data, total };
   }
 
   async deleteOrder(id: mongoose.Types.ObjectId) {
@@ -226,135 +230,74 @@ export class OrdersService {
     }
   }
 
-  async getCustomers(alreadyPurchase: "true" | "false") {
-    if (alreadyPurchase === "false") {
-      const allPatients = await this.patientModel.find({
-        status: { $ne: PatientStatus.DELETED }
-      }).sort({ createdAt: -1 }).lean().exec();
+  async getCustomers(query: GetCustomersDto) {
+    const { page = 1, limit = 10, alreadyPurchase = 'true' } = query;
+    const skip = (page - 1) * limit;
 
-      const orders: any[] = await this.orderModel
-        .find({
+    let patientIds: mongoose.Types.ObjectId[] | null = null;
+    let total = 0;
+
+    if (alreadyPurchase === 'true') {
+      const patientIdsFromOrders = await this.orderModel
+        .distinct('patient', {
           status: { $ne: OrderStatus.Deleted },
-          patient: { $in: allPatients.map((e) => e._id) },
+          patient: { $exists: true, $ne: null },
         })
-        .select('patient items.quantity createdAt')
-        .populate('items.name', 'unitPrice -_id')
-        .lean()
         .exec();
-
-      return allPatients.map((e) => {
-        const patientOrders = orders.filter(
-          (i) => i.patient.toString() === e._id.toString(),
-        );
-        const totalSpend: number = patientOrders.reduce(
-          (a, b) =>
-            a +
-            b.items.reduce(
-              (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
-              0,
-            ),
-          0,
-        );
-
-        return {
-          totalSpend,
-          visits: patientOrders.length,
-          patient: e,
-          lastPurchase: patientOrders[0]?.createdAt ?? null,
-        };
+      patientIds = patientIdsFromOrders;
+      total = patientIds.length;
+    } else {
+      total = await this.patientModel.countDocuments({
+        status: { $ne: PatientStatus.DELETED },
       });
     }
 
-    const customers: {
-      _id: mongoose.ObjectId;
-      name: string;
-      phoneNumber: string;
-      gender: string;
-      dateOfBirth: Date;
-      address: string;
-      mrn: string;
-      createdAt: Date;
-    }[] = await this.orderModel
-      .aggregate([
-        { $match: { patient: { $exists: true, $ne: null } } },
-        { $group: { _id: '$patient' } },
-        {
-          $lookup: {
-            from: 'patients',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'patient',
-          },
-        },
-        { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
-        { $replaceRoot: { newRoot: '$patient' } },
-        {
-          $project: {
-            name: 1,
-            address: 1,
-            mrn: 1,
-            dateOfBirth: 1,
-            gender: 1,
-            phoneNumber: 1,
-            createdAt: 1,
-            doctor: 1,
-          },
-        },
-      ])
+    const patientFilter: any = { status: { $ne: PatientStatus.DELETED } };
+    if (alreadyPurchase === 'true' && patientIds) {
+      patientFilter._id = { $in: patientIds };
+    }
+
+    const patients = await this.patientModel
+      .find(patientFilter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
       .exec();
 
-    type OrderPlain = {
-      _id: mongoose.Types.ObjectId;
-      patient: {
-        _id: mongoose.Types.ObjectId;
-        name: string;
-        phoneNumber: string;
-        gender: string;
-        dateOfBirth: Date;
-        mrn: string;
-      };
-      items: {
-        name: { unitPrice: number } | null;
-        quantity: number;
-      }[];
-      createdAt: Date;
-    };
-
-    const orders: OrderPlain[] = (await this.orderModel
+    const orders: any[] = await this.orderModel
       .find({
         status: { $ne: OrderStatus.Deleted },
-        patient: { $in: customers.map((e) => e._id) },
+        patient: { $in: patients.map((e) => e._id) },
       })
       .select('patient items.quantity createdAt')
       .populate('items.name', 'unitPrice -_id')
-      .populate('patient', 'name address mrn dateOfBirth gender phoneNumber')
-      .sort({ createdAt: -1 })
       .lean()
-      .exec()) as any;
+      .exec();
 
-    return customers
-      .sort((a, b) => -a.createdAt.getTime() + b.createdAt.getTime())
-      .map((e) => {
-        const order = orders.filter(
-          (i) => i.patient._id.toString() === e._id.toString(),
-        );
-        const totalSpend: number = order.reduce(
-          (a, b) =>
-            a +
-            b.items.reduce(
-              (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
-              0,
-            ),
-          0,
-        );
+    const data = patients.map((e) => {
+      const patientOrders = orders.filter(
+        (i) => i.patient.toString() === e._id.toString(),
+      );
+      const totalSpend: number = patientOrders.reduce(
+        (a, b) =>
+          a +
+          b.items.reduce(
+            (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
+            0,
+          ),
+        0,
+      );
 
-        return {
-          totalSpend,
-          visits: order.length,
-          patient: e,
-          lastPurchase: order[0]?.createdAt,
-        };
-      });
+      return {
+        totalSpend,
+        visits: patientOrders.length,
+        patient: e,
+        lastPurchase: patientOrders[0]?.createdAt ?? null,
+      };
+    });
+
+    return { data, total };
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {

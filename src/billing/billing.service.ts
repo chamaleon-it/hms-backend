@@ -49,24 +49,15 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { q, method, status, date } = getBillisDto;
+    const { page = 1, limit = 10, q, method, status, date } = getBillisDto;
+    const skip = (page - 1) * limit;
 
-    const filter: {
-      user?: mongoose.Types.ObjectId;
-      mrn?: Record<string, string>;
-      createdAt?: Record<string, Date>;
-      cash?: Record<string, number>;
-      insurance?: Record<string, number>;
-      online?: Record<string, number>;
-    } = {};
+    const pipeline: any[] = [];
 
-    filter.user = user;
+    const match: any = { user: new mongoose.Types.ObjectId(user) };
 
     if (q) {
-      filter.mrn = {
-        $regex: '^' + q,
-        $options: 'i',
-      };
+      match.mrn = { $regex: '^' + q, $options: 'i' };
     }
 
     if (date) {
@@ -75,51 +66,107 @@ export class BillingService {
         throw new BadRequestException('Invalid date');
       }
       const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
-      filter.createdAt = { $gte: from, $lt: to };
+      match.createdAt = { $gte: from, $lt: to };
     }
 
     if (method) {
       if (method === 'Cash') {
-        filter.cash = { $ne: 0 };
+        match.cash = { $ne: 0 };
       } else if (method === 'Insurance') {
-        filter.insurance = { $ne: 0 };
+        match.insurance = { $ne: 0 };
       } else if (method === 'Online') {
-        filter.online = { $ne: 0 };
+        match.online = { $ne: 0 };
       }
     }
 
-    let data = await this.billingModel
-      .find(
-        filter,
-      )
-      .populate('patient')
-      .populate('patient.doctor')
-      .sort({ createdAt: -1 })
-      .limit(1000)
-      .lean()
-      .exec();
+    pipeline.push({ $match: match });
 
-    if (!status) return data;
-    else {
+    // Add calculations for status filtering
+    pipeline.push({
+      $addFields: {
+        itemsTotal: { $sum: '$items.total' },
+        totalPaid: {
+          $add: [
+            '$cash',
+            '$online',
+            '$insurance',
+            { $ifNull: ['$discount', 0] },
+          ],
+        },
+      },
+    });
+
+    if (status) {
       if (status === 'Unpaid') {
-        data = data.filter((d) => !(d.insurance + d.cash + d.online + (d.discount ?? 0)));
+        pipeline.push({ $match: { totalPaid: 0 } });
       } else if (status === 'Paid') {
-        data = data.filter(
-          (d) =>
-            (d.items.reduce((a, b) => a + b.total, 0)) <=
-            (d.insurance + d.cash + d.online + (d.discount ?? 0)),
-        );
+        pipeline.push({
+          $match: { $expr: { $lte: ['$itemsTotal', '$totalPaid'] } },
+        });
       } else if (status === 'Partial') {
-        data = data.filter(
-          (d) =>
-            d.items.reduce((a, b) => a + b.total, 0) >
-            ((d.insurance + d.cash + d.online + (d.discount ?? 0) + (d.roundOff ? 1 : 0))) &&
-            Boolean(d.insurance + d.cash + d.online + (d.discount ?? 0)),
-        );
+        pipeline.push({
+          $match: {
+            $and: [
+              {
+                $expr: {
+                  $gt: [
+                    '$itemsTotal',
+                    {
+                      $add: [
+                        '$totalPaid',
+                        { $cond: ['$roundOff', 1, 0] },
+                      ],
+                    },
+                  ],
+                },
+              },
+              { totalPaid: { $gt: 0 } },
+            ],
+          },
+        });
       }
     }
 
-    return data;
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: 'patients',
+              localField: 'patient',
+              foreignField: '_id',
+              as: 'patient',
+            },
+          },
+          { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'patient.doctor',
+              foreignField: '_id',
+              as: 'patient.doctor',
+            },
+          },
+          {
+            $unwind: {
+              path: '$patient.doctor',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await this.billingModel.aggregate(pipeline).exec();
+
+    const data = result[0].data;
+    const total = result[0].metadata[0]?.total ?? 0;
+
+    return { data, total };
   }
 
   async getBill(id: mongoose.Types.ObjectId) {
