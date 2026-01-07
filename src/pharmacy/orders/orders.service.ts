@@ -14,11 +14,13 @@ import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
 import { UsersService } from 'src/users/users.service';
 import configuration from 'src/config/configuration';
+import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(Patient.name) private patientModel: Model<Patient>,
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
@@ -224,7 +226,45 @@ export class OrdersService {
     }
   }
 
-  async getCustomers() {
+  async getCustomers(alreadyPurchase: "true" | "false") {
+    if (alreadyPurchase === "false") {
+      const allPatients = await this.patientModel.find({
+        status: { $ne: PatientStatus.DELETED }
+      }).sort({ createdAt: -1 }).lean().exec();
+
+      const orders: any[] = await this.orderModel
+        .find({
+          status: { $ne: OrderStatus.Deleted },
+          patient: { $in: allPatients.map((e) => e._id) },
+        })
+        .select('patient items.quantity createdAt')
+        .populate('items.name', 'unitPrice -_id')
+        .lean()
+        .exec();
+
+      return allPatients.map((e) => {
+        const patientOrders = orders.filter(
+          (i) => i.patient.toString() === e._id.toString(),
+        );
+        const totalSpend: number = patientOrders.reduce(
+          (a, b) =>
+            a +
+            b.items.reduce(
+              (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
+              0,
+            ),
+          0,
+        );
+
+        return {
+          totalSpend,
+          visits: patientOrders.length,
+          patient: e,
+          lastPurchase: patientOrders[0]?.createdAt ?? null,
+        };
+      });
+    }
+
     const customers: {
       _id: mongoose.ObjectId;
       name: string;

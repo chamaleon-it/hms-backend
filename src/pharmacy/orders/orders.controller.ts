@@ -90,8 +90,8 @@ export class OrdersController {
   }
 
   @Get('customers')
-  async getCustomers() {
-    const data = await this.ordersService.getCustomers();
+  async getCustomers(@Query("alreadyPurchase") alreadyPurchase: "true" | "false") {
+    const data = await this.ordersService.getCustomers(alreadyPurchase);
     return {
       data,
       message: 'All customers data were retrived successfully.',
