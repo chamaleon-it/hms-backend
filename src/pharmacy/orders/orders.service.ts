@@ -107,7 +107,7 @@ export class OrdersService {
         .populate('patient')
         .populate('doctor', 'name phoneNumber specialization')
         .populate('items.name')
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
         .exec(),
       this.orderModel.countDocuments(filter),
     ]);

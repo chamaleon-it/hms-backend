@@ -38,12 +38,19 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
-    const mrn = await this.generateUniqueMRN();
+    if (!patientRegisterDto.mrn) {
+      const mrn = await this.generateUniqueMRN();
+      patientRegisterDto.mrn = mrn;
+    } else {
+      const mrn = await this.patientModel.exists({ mrn: patientRegisterDto.mrn });
+      if (mrn) {
+        throw new BadRequestException('MRN already exists');
+      }
+    }
 
     const patient = await this.patientModel.create({
       ...patientRegisterDto,
       createdBy,
-      mrn,
     });
     return patient;
   }
