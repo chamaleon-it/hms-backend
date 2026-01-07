@@ -32,4 +32,8 @@ export class GetItemsDto {
   @IsOptional()
   @IsString()
   stock?: 'Instock' | 'Low' | 'Out';
+
+  @IsOptional()
+  @IsString()
+  lowStockThreshold?: number;
 }

@@ -30,7 +30,7 @@ export class ItemsService {
   }
 
   async getItems(query: GetItemsDto) {
-    const { page = 1, limit = 10, q, category, stock } = query;
+    const { page = 1, limit = 10, q, category, stock, lowStockThreshold } = query;
 
     const skip = (page - 1) * limit;
 
@@ -86,7 +86,13 @@ export class ItemsService {
       this.itemModel.countDocuments(filter),
     ]);
 
-    return { items, total };
+
+
+    const lowStockCount = await this.itemModel.countDocuments({
+      quantity: { $lt: Number(lowStockThreshold) ?? 20 },
+    });
+
+    return { items, total, lowStockCount };
   }
 
   async getItem(id: mongoose.Types.ObjectId) {

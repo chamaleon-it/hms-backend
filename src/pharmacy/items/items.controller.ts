@@ -21,7 +21,7 @@ import type { Response } from 'express';
 
 @Controller('pharmacy/items')
 export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
+  constructor(private readonly itemsService: ItemsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -45,12 +45,13 @@ export class ItemsController {
       total: data.total,
       page: Number(query.page),
       limit: Number(query.limit),
+      lowStockCount: data.lowStockCount,
       message: 'All items were retrieved successfully',
     };
   }
 
   @UseGuards(JwtAuthGuard)
-  async getItem() {}
+  async getItem() { }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
