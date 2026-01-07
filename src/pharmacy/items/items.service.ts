@@ -89,7 +89,7 @@ export class ItemsService {
 
 
     const lowStockCount = await this.itemModel.countDocuments({
-      quantity: { $lt: Number(lowStockThreshold) ?? 20 },
+      quantity: { $lt: Number(lowStockThreshold ?? 20) },
     });
 
     return { items, total, lowStockCount };
