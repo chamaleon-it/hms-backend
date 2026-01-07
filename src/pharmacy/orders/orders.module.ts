@@ -6,10 +6,14 @@ import { Order, OrderSchema } from './schemas/order.schema';
 import { ItemsModule } from '../items/items.module';
 import { BillingModule } from 'src/billing/billing.module';
 import { UsersModule } from 'src/users/users.module';
+import { Patient, PatientSchema } from 'src/patients/schemas/patient.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
+    MongooseModule.forFeature([
+      { name: Order.name, schema: OrderSchema },
+      { name: Patient.name, schema: PatientSchema },
+    ]),
     ItemsModule,
     BillingModule,
     UsersModule,

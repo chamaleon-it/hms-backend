@@ -46,10 +46,13 @@ export class BillingController {
     @GetUser() user: JWTUserInterface,
     @Query() getBillisDto: GetBillisDto,
   ) {
-    const data = await this.billingService.getBills(user.id, getBillisDto);
+    const { data, total } = await this.billingService.getBills(user.id, getBillisDto);
     return {
       message: 'All bills were retrived successfully.',
       data,
+      total,
+      page: Number(getBillisDto.page),
+      limit: Number(getBillisDto.limit),
     };
   }
 
