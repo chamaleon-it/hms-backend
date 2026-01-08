@@ -238,14 +238,28 @@ export class OrdersService {
     let total = 0;
 
     if (alreadyPurchase === 'true') {
-      const patientIdsFromOrders = await this.orderModel
-        .distinct('patient', {
-          status: { $ne: OrderStatus.Deleted },
-          patient: { $exists: true, $ne: null },
-        })
-        .exec();
-      patientIds = patientIdsFromOrders;
-      total = patientIds.length;
+      const result = await this.orderModel.aggregate([
+        {
+          $match: {
+            status: { $ne: OrderStatus.Deleted },
+            patient: { $exists: true, $ne: null },
+          },
+        },
+        {
+          $group: {
+            _id: '$patient',
+            lastOrderDate: { $max: '$createdAt' },
+          },
+        },
+        {
+          $sort: { lastOrderDate: -1 },
+        },
+      ]);
+
+      total = result.length;
+      patientIds = result
+        .slice(skip, skip + limit)
+        .map((item) => item._id);
     } else {
       total = await this.patientModel.countDocuments({
         status: { $ne: PatientStatus.DELETED },
@@ -253,17 +267,33 @@ export class OrdersService {
     }
 
     const patientFilter: any = { status: { $ne: PatientStatus.DELETED } };
-    if (alreadyPurchase === 'true' && patientIds) {
-      patientFilter._id = { $in: patientIds };
-    }
+    let patients: any[] = [];
 
-    const patients = await this.patientModel
-      .find(patientFilter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
-      .exec();
+    if (alreadyPurchase === 'true') {
+      if (patientIds && patientIds.length > 0) {
+        patientFilter._id = { $in: patientIds };
+        const patientsUnordered = await this.patientModel
+          .find(patientFilter)
+          .lean()
+          .exec();
+
+        // Reorder patients to match the aggregated resolved order (lastOrderDate desc)
+        const patientMap = new Map(patientsUnordered.map((p) => [p._id.toString(), p]));
+        patients = patientIds
+          .map((id) => patientMap.get(id.toString()))
+          .filter((p) => !!p) as any[];
+      } else {
+        return { data: [], total: 0 };
+      }
+    } else {
+      patients = await this.patientModel
+        .find(patientFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec();
+    }
 
     const orders: any[] = await this.orderModel
       .find({
@@ -279,6 +309,9 @@ export class OrdersService {
       const patientOrders = orders.filter(
         (i) => i.patient.toString() === e._id.toString(),
       );
+      // Sort orders for this patient to ensure lastPurchase is correct
+      patientOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
       const totalSpend: number = patientOrders.reduce(
         (a, b) =>
           a +
