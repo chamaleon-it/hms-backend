@@ -19,6 +19,7 @@ import { ReturnModule } from './pharmacy/return/return.module';
 import { PurchaseModule } from './pharmacy/purchase/purchase.module';
 import { ReportModule } from './lab/report/report.module';
 import { PanelsModule } from './lab/panels/panels.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { PanelsModule } from './lab/panels/panels.module';
     PurchaseModule,
     ReportModule,
     PanelsModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [AppService],
