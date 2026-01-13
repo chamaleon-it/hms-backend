@@ -22,7 +22,7 @@ export class Item {
 
   @Prop({
     trim: true,
-    match: [/^\d{4,8}$/, 'HSN code must be 4–8 digits'],
+    default: "-"
   })
   hsnCode?: string;
 
@@ -34,13 +34,13 @@ export class Item {
   })
   sku: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true, trim: true, default: "Medicine" })
   category: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: "-" })
   supplier?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, default: "-" })
   manufacturer?: string;
 
   @Prop({
@@ -58,7 +58,7 @@ export class Item {
   purchasePrice: number;
 
   @Prop({
-    required: true,
+    default: 0,
     type: Number,
     min: [0, 'Opening stock cannot be negative'],
   })
@@ -72,6 +72,15 @@ export class Item {
 
   @Prop({ type: Date })
   expiryDate?: Date;
+
+  @Prop({ type: String, default: "-" })
+  rackLocation: string
+
+  @Prop({ type: Number, default: 0 })
+  packing: number
+
+  @Prop({ type: Number, default: 0 })
+  gst: number
 
   @Prop({
     enum: ItemStatus,

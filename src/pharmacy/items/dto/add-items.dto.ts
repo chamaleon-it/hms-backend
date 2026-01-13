@@ -33,17 +33,17 @@ export class AddItemDto {
 
   // India GST HSN code is typically 4–8 digits
   @IsOptional()
-  @Matches(/^\d{4,8}$/, { message: 'HSN code must be 4–8 digits.' })
+  // @Matches(/^\d{4,8}$/, { message: 'HSN code must be 4–8 digits.' })
   @Transform(trim)
   hsnCode?: string;
 
+  @IsOptional()
   @IsString({ message: 'SKU must be a string.' })
   @MaxLength(64, { message: 'SKU must be at most 64 characters.' })
   @Transform(({ value }: { value: string }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
-  @IsNotEmpty({ message: 'SKU is required.' })
-  sku!: string;
+  sku?: string;
 
   @IsString({ message: 'Category must be a string.' })
   @Transform(trim)
@@ -93,6 +93,24 @@ export class AddItemDto {
     { message: 'Expiry date must be an ISO date (YYYY-MM-DD or full ISO).' },
   )
   expiryDate?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Batch number must be a string.' })
+  @Transform(trim)
+  batchNumber?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Rack location must be a string.' })
+  @Transform(trim)
+  rackLocation?: string
+
+  @IsOptional()
+  packing: number
+
+  @IsOptional()
+  gst: number
+
+
 
   @IsOptional()
   @IsEnum(ItemStatus, {
