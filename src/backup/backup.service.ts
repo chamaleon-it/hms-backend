@@ -131,6 +131,16 @@ export class BackupService {
             if (/^[0-9a-fA-F]{24}$/.test(item)) {
                 return new Types.ObjectId(item);
             }
+
+            // Check if string is a valid ISO 8601 date
+            // Example: 2026-01-16T08:53:46.889Z
+            const isoDateRegExp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+            if (isoDateRegExp.test(item)) {
+                const date = new Date(item);
+                if (!isNaN(date.getTime())) {
+                    return date;
+                }
+            }
         }
         return item;
     }
