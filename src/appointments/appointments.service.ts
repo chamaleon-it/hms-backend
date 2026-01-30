@@ -15,7 +15,7 @@ export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
@@ -50,6 +50,7 @@ export class AppointmentsService {
       $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
     if (status?.length) $match.status = { $in: status };
 
+    $match.isDeleted = false;
     return this.appointmentModel
       .aggregate([
         { $match },
@@ -125,6 +126,7 @@ export class AppointmentsService {
         {
           $match: {
             date: { $gte: startOfDay, $lte: endOfDay },
+            isDeleted: false,
           },
         },
         {
@@ -190,6 +192,7 @@ export class AppointmentsService {
     const appointments = await this.appointmentModel
       .find({
         date: { $gte: startDate, $lte: endDate },
+        isDeleted: false,
       })
       .select('date patientName type status')
       .sort({ date: 1 })
@@ -250,6 +253,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel
       .find({
         date: { $gte: startOfWeek, $lte: endOfWeek },
+        isDeleted: false,
       })
       .select('date status')
       .populate('patient', 'name')
@@ -307,12 +311,12 @@ export class AppointmentsService {
       endTime?: string | null | undefined;
       days?: string[] | undefined;
       rounds?:
-        | {
-            label?: string | undefined;
-            start?: string | undefined;
-            end?: string | undefined;
-          }[]
-        | undefined;
+      | {
+        label?: string | undefined;
+        start?: string | undefined;
+        end?: string | undefined;
+      }[]
+      | undefined;
     }> = await this.usersService.getDoctorAvailability(doctor);
 
     const isAvailable = availability.days
@@ -359,6 +363,19 @@ export class AppointmentsService {
     }
     return data;
   }
+
+  async deleteAppointment(id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentModel.findByIdAndUpdate(
+      id,
+      { isDeleted: true },
+      { new: true },
+    );
+    if (!data) {
+      throw new BadRequestException('No appointment found');
+    }
+    return data;
+  }
+
 }
 
 export function safeRegex(input: string) {

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -19,7 +20,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(private readonly appointmentsService: AppointmentsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -40,10 +41,11 @@ export class AppointmentsController {
   @UseGuards(JwtAuthGuard)
   @Get('list')
   async getAppointments(@Query() getListDto: GetListDto) {
+    console.log(getListDto)
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
       status: getListDto.status
-        ? (JSON.parse(getListDto.status) as string[])
+        ? getListDto.status
         : [],
       date: getListDto.date || new Date().toString(),
     });
@@ -164,6 +166,15 @@ export class AppointmentsController {
     return {
       data,
       message: 'Appointment updated successfully.',
+    };
+  }
+
+  @Delete(':id')
+  async deleteAppointment(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentsService.deleteAppointment(id);
+    return {
+      data,
+      message: 'Appointment deleted successfully.',
     };
   }
 }
