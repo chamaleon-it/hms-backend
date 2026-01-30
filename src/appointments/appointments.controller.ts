@@ -41,7 +41,6 @@ export class AppointmentsController {
   @UseGuards(JwtAuthGuard)
   @Get('list')
   async getAppointments(@Query() getListDto: GetListDto) {
-    console.log(getListDto)
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
       status: getListDto.status
