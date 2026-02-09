@@ -1,5 +1,49 @@
-import { IsNotEmpty, IsMongoId, IsString, IsDateString, IsBoolean, IsOptional, IsArray, IsNumber } from "class-validator";
+import { IsNotEmpty, IsMongoId, IsString, IsDateString, IsBoolean, IsOptional, IsArray, IsNumber, ArrayNotEmpty, ValidateNested, IsEnum } from "class-validator";
+import { Type } from "class-transformer";
 import mongoose from "mongoose";
+import { PaymentStatus } from "../schemas/purchase-entry.schema";
+
+export class PurchaseItemDto {
+    @IsMongoId()
+    @IsNotEmpty()
+    item: mongoose.Types.ObjectId;
+
+    @IsString()
+    @IsNotEmpty()
+    batch: string;
+
+    @IsNumber()
+    @IsNotEmpty()
+    quantity: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    pack: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    unitPrice: number;
+
+    @IsDateString()
+    @IsNotEmpty()
+    expiryDate: Date;
+
+    @IsNumber()
+    @IsNotEmpty()
+    purchasePrice: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    gst: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    discount: number;
+
+    @IsNumber()
+    @IsNotEmpty()
+    free: number;
+}
 
 export class CreatePurchaseEntryDto {
     @IsMongoId()
@@ -23,19 +67,10 @@ export class CreatePurchaseEntryDto {
     tscEnabled?: boolean
 
     @IsArray()
-    @IsNotEmpty()
-    items: Array<{
-        item: mongoose.Types.ObjectId,
-        batch: string,
-        quantity: number,
-        pack: number,
-        unitPrice: number,
-        expiryDate: Date,
-        purchasePrice: number,
-        gst: number,
-        discount: number,
-        free: number
-    }>
+    @ArrayNotEmpty()
+    @ValidateNested({ each: true })
+    @Type(() => PurchaseItemDto)
+    items: PurchaseItemDto[];
 
     @IsNumber()
     @IsNotEmpty()
@@ -57,8 +92,16 @@ export class CreatePurchaseEntryDto {
     @IsNotEmpty()
     total: number
 
+    @IsNumber()
+    @IsOptional()
+    paidAmount: number
+
     @IsString()
     @IsOptional()
     description?: string
+
+    @IsEnum(PaymentStatus)
+    @IsOptional()
+    paymentStatus?: PaymentStatus
 
 }

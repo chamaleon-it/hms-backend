@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { PurchaseEntryService } from './purchase_entry.service';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
+import { AddPaymentDto } from './dto/add-payment.dto';
 
 @Controller('purchase_entry')
 export class PurchaseEntryController {
@@ -27,6 +28,14 @@ export class PurchaseEntryController {
     return {
       data: await this.purchaseEntryService.findById(id),
       message: "Purchase Entry Found Successfully"
+    };
+  }
+
+  @Patch('add_payment/:id')
+  async addPayment(@Param('id') id: string, @Body() addPaymentDto: AddPaymentDto) {
+    return {
+      data: await this.purchaseEntryService.addPayment(id, addPaymentDto),
+      message: "Payment Added Successfully"
     };
   }
 }

@@ -68,6 +68,9 @@ export class PurchaseEntry {
     @Prop({ default: 0 })
     total: number
 
+    @Prop({ default: 0 })
+    paidAmount: number
+
     @Prop({ type: String, required: false })
     description: string
 

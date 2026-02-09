@@ -29,6 +29,7 @@ export class SuppliersService {
                 $addFields: {
                     totalPurchaseCount: { $size: '$purchaseEntries' },
                     totalPurchaseValue: { $sum: '$purchaseEntries.total' },
+                    totalDue: { $subtract: [{ $sum: '$purchaseEntries.total' }, { $sum: '$purchaseEntries.paidAmount' }] },
                 },
             },
             {
