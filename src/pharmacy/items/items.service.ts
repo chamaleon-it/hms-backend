@@ -83,6 +83,7 @@ export class ItemsService {
       quantity?: number | Record<string, number>;
       expiryDate?: Record<string, Date>;
       status?: Record<string, string>;
+      supplier?: string;
     } = {};
 
     if (q) {
@@ -120,6 +121,10 @@ export class ItemsService {
         targetDate.setDate(now.getDate() + days);
         filter.expiryDate = { $gte: now, $lte: targetDate };
       }
+    }
+
+    if (query.supplier) {
+      filter.supplier = query.supplier;
     }
 
     filter.status = { $ne: ItemStatus.Deleted };
@@ -264,5 +269,10 @@ export class ItemsService {
     await item.save();
 
     return item;
+  }
+
+  async getSuppliers() {
+    const data = await this.itemModel.distinct('supplier').lean();
+    return data.filter((supplier) => (supplier !== '' && supplier !== '-'));
   }
 }
