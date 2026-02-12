@@ -73,7 +73,7 @@ export class ItemsService {
   }
 
   async getItems(query: GetItemsDto) {
-    const { page = 1, limit = 10, q, category, stock, lowStockThreshold } = query;
+    const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView } = query;
 
     const skip = (page - 1) * limit;
 
@@ -103,7 +103,7 @@ export class ItemsService {
       filter.category = category;
     }
 
-    if (stock) {
+    if (stock && !lowStockItemsView) {
       const stockConditions: Record<string, number | Record<string, number>> = {
         Instock: { $gte: 20 },
         Low: { $gt: 0, $lt: 20 },
@@ -111,6 +111,9 @@ export class ItemsService {
       };
 
       filter.quantity = stockConditions[stock];
+    }
+    if (lowStockItemsView) {
+      filter.quantity = { $lt: Number(lowStockThreshold ?? 20) };
     }
 
     if (query.expiry) {

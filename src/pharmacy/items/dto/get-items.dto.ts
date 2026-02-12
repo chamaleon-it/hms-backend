@@ -1,6 +1,6 @@
 // get-items.dto.ts
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class GetItemsDto {
   @IsOptional()
@@ -40,4 +40,9 @@ export class GetItemsDto {
   @IsOptional()
   @IsString()
   supplier?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  lowStockItemsView?: boolean;
 }
