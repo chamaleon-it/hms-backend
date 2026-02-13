@@ -45,4 +45,12 @@ export class GetItemsDto {
   @IsBoolean()
   @Type(() => Boolean)
   lowStockItemsView?: boolean;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: "createdAt" | "quantity" = "createdAt";
+
+  @IsOptional()
+  @IsString()
+  orderBy?: 'asc' | 'desc' = 'asc';
 }

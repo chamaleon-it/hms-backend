@@ -73,7 +73,9 @@ export class ItemsService {
   }
 
   async getItems(query: GetItemsDto) {
-    const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView } = query;
+    const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView, sortBy = "createdAt", orderBy = "desc" } = query;
+
+    console.log(sortBy,)
 
     const skip = (page - 1) * limit;
 
@@ -133,7 +135,8 @@ export class ItemsService {
     filter.status = { $ne: ItemStatus.Deleted };
 
     const [items, total] = await Promise.all([
-      this.itemModel.find(filter).skip(skip).limit(limit).lean().sort({ createdAt: -1 }),
+      this.itemModel.find(filter).skip(skip).limit(limit).lean()
+        .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 }),
       this.itemModel.countDocuments(filter),
     ]);
 
