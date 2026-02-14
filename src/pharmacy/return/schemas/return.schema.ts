@@ -71,6 +71,9 @@ export class Return {
     quantity: number;
     reason: ReturnReason;
   }[];
+
+  @Prop({ default: '-' })
+  billNo: string;
 }
 
 export const ReturnSchema = SchemaFactory.createForClass(Return);

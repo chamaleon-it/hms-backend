@@ -110,6 +110,9 @@ export class Order {
 
   @Prop({ default: '-' })
   paymentReference: string;
+
+  @Prop({ default: '-' })
+  billNo: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -67,12 +67,15 @@ export class OrdersService {
         })
       );
 
-      await this.billingService.generateBill({
+      const bill = await this.billingService.generateBill({
         patient: order.patient,
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
       });
+
+      data.billNo = bill.mrn;
+      await data.save();
     }
     return data;
   }

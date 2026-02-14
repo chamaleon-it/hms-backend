@@ -22,6 +22,7 @@ export class ReturnService {
   ) { }
 
   async create(createReturnDto: CreateReturnDto) {
+    createReturnDto.billNo = `R-${createReturnDto.billNo}`
     const data = await this.returnModel.create(createReturnDto);
 
 
@@ -35,10 +36,8 @@ export class ReturnService {
       items: await Promise.all(
         createReturnDto.items.map(async (e) => {
           const item = await this.itemsService.getItem(e.name);
-
           const quantity = e.quantity;
           const total = e.unitPrice * quantity;
-
           return {
             name: item.name,
             quantity,
@@ -47,7 +46,7 @@ export class ReturnService {
           };
         })
       ),
-      mrn: await this.generateUniqueMRN(prefix),
+      mrn: createReturnDto.billNo,
       transactionType: "Return",
     })
 
