@@ -21,6 +21,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
+import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
@@ -141,6 +142,15 @@ export class OrdersController {
     const data = await this.ordersService.repeatOrder(id);
     return {
       message: 'Order repeated successfully',
+      data,
+    };
+  }
+
+  @Patch('update_payment')
+  async updatePayment(@Body() dto: UpdatePaymentDto) {
+    const data = await this.ordersService.updatePayment(dto);
+    return {
+      message: 'Payment updated successfully',
       data,
     };
   }
