@@ -15,7 +15,7 @@ export class RegisterSupplierDto {
     phone: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsOptional()
     contactPerson: string;
 
     @IsString()
@@ -23,11 +23,11 @@ export class RegisterSupplierDto {
     designation?: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsOptional()
     email: string;
 
     @IsObject()
-    @IsNotEmpty()
+    @IsOptional()
     address: {
         line1: string;
         line2?: string;

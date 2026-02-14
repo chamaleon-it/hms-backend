@@ -17,14 +17,14 @@ export class Supplier {
     @Prop({ required: true })
     phone: string;
 
-    @Prop({ required: true })
-    contactPerson: string;
+    @Prop({ required: false })
+    contactPerson?: string;
 
     @Prop({ required: false })
     designation?: string;
 
-    @Prop({ required: true })
-    email: string;
+    @Prop({ required: false })
+    email?: string;
 
     @Prop({
         type: {

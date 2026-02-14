@@ -21,6 +21,7 @@ import { ReportModule } from './lab/report/report.module';
 import { PanelsModule } from './lab/panels/panels.module';
 import { BackupModule } from './backup/backup.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     PanelsModule,
     BackupModule,
     SuppliersModule,
+    PharmacistModule,
   ],
   controllers: [AppController],
   providers: [AppService],
