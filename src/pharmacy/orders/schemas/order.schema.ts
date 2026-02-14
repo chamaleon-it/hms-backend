@@ -29,7 +29,7 @@ export enum PaymentStatus {
 @Schema({ _id: false, versionKey: false })
 export class OrderItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true })
-  name: Types.ObjectId; // or rename to `item` or `itemId`
+  name: Types.ObjectId;
 
   @Prop({ default: null })
   dosage: string;

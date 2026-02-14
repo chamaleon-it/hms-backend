@@ -281,7 +281,6 @@ export class OrdersService {
           .lean()
           .exec();
 
-        // Reorder patients to match the aggregated resolved order (lastOrderDate desc)
         const patientMap = new Map(patientsUnordered.map((p) => [p._id.toString(), p]));
         patients = patientIds
           .map((id) => patientMap.get(id.toString()))
@@ -313,7 +312,6 @@ export class OrdersService {
       const patientOrders = orders.filter(
         (i) => i.patient.toString() === e._id.toString(),
       );
-      // Sort orders for this patient to ensure lastPurchase is correct
       patientOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       const totalSpend: number = patientOrders.reduce(

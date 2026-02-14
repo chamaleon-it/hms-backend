@@ -76,7 +76,6 @@ export class ReturnService {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
       mrn = `${prefix}${randomNum}`;
 
-      // Check if MRN already exists
       const existing = await this.billingModel.exists({ mrn });
       exists = !!existing;
     } while (exists);
