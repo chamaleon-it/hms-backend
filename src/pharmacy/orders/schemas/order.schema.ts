@@ -86,6 +86,12 @@ export class Order {
 
   @Prop({ default: null })
   assignedTo: string;
+
+  @Prop({ default: 0, required: true })
+  paidAmount: number;
+
+  @Prop({ default: "-" })
+  pharmacist: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

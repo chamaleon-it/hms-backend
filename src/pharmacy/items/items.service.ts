@@ -75,8 +75,6 @@ export class ItemsService {
   async getItems(query: GetItemsDto) {
     const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView, sortBy = "createdAt", orderBy = "desc" } = query;
 
-    console.log(sortBy,)
-
     const skip = (page - 1) * limit;
 
     let filter: {
