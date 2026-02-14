@@ -357,6 +357,8 @@ export class OrdersService {
     }
     const totalVisit = orders.length;
 
+
+
     const totalSpend: number = orders.reduce((orderAcc, order: any) => {
       const itemsTotal: number = (order.items || []).reduce(
         (
@@ -369,11 +371,19 @@ export class OrdersService {
         },
         0,
       );
-      return orderAcc + itemsTotal;
+      return orderAcc + itemsTotal - (order.discount || 0);
     }, 0);
 
     const averageSpend = totalVisit > 0 ? totalSpend / totalVisit : 0;
     const lastPurchase: Date | null = (orders[0] as any)?.createdAt ?? null;
+
+    const totalPaid = orders.reduce((acc, order) => {
+      return acc + (order.paidAmount ?? 0);
+    }, 0);
+
+    const totalDue = totalSpend - totalPaid;
+
+    console.log(totalSpend, totalPaid, totalDue);
 
     return {
       patient,
@@ -382,6 +392,8 @@ export class OrdersService {
       averageSpend,
       totalSpend,
       lastPurchase,
+      totalPaid,
+      totalDue,
     };
   }
 
