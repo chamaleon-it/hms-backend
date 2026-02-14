@@ -383,8 +383,6 @@ export class OrdersService {
 
     const totalDue = totalSpend - totalPaid;
 
-    console.log(totalSpend, totalPaid, totalDue);
-
     return {
       patient,
       orders,
