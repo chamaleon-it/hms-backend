@@ -101,7 +101,19 @@ export class BillingService {
         pipeline.push({ $match: { totalPaid: 0 } });
       } else if (status === 'Paid') {
         pipeline.push({
-          $match: { $expr: { $lte: ['$itemsTotal', '$totalPaid'] } },
+          $match: {
+            $expr: {
+              $lte: [
+                '$itemsTotal',
+                {
+                  $add: [
+                    '$totalPaid',
+                    { $cond: ['$roundOff', 1, 0] },
+                  ],
+                },
+              ],
+            },
+          },
         });
       } else if (status === 'Partial') {
         pipeline.push({
