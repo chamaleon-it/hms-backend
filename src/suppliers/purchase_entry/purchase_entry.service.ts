@@ -32,7 +32,7 @@ export class PurchaseEntryService {
             const supplier = await this.supplierModel.findById(createPurchaseEntryDto.supplier).exec();
             await this.itemsService.addBatchItems(item.item, {
                 batchNumber: item.batch,
-                quantity: item.quantity,
+                quantity: item.quantity + item.free,
                 expiryDate: item.expiryDate,
                 purchasePrice: item.purchasePrice,
                 supplier: supplier?.name || "-",
