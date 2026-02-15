@@ -24,8 +24,8 @@ export class ReturnService {
   async create(createReturnDto: CreateReturnDto) {
     createReturnDto.billNo = `R-${createReturnDto.billNo}`
     const existingBilling = await this.billingModel.exists({ mrn: createReturnDto.billNo })
-    if (!existingBilling) {
-      throw new BadRequestException('Thi bill already returned or bill number is invalid');
+    if (existingBilling) {
+      throw new BadRequestException('A return with this bill number already exists. Please use a unique bill number.');
     }
     const data = await this.returnModel.create(createReturnDto);
 
