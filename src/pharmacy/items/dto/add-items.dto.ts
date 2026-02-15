@@ -79,12 +79,14 @@ export class AddItemDto {
   @Type(() => Number)
   @IsInt({ message: 'Opening stock must be an integer.' })
   @Min(0, { message: 'Opening stock cannot be negative.' })
-  openingStockQuantity!: number;
+  @IsOptional()
+  openingStockQuantity?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Quantity must be an integer.' })
   @Min(0, { message: 'Quantity cannot be negative.' })
+  @IsOptional()
   quantity?: number;
 
   @IsOptional()
@@ -105,10 +107,10 @@ export class AddItemDto {
   rackLocation?: string
 
   @IsOptional()
-  packing: number
+  packing?: number
 
   @IsOptional()
-  gst: number
+  gst?: number
 
 
 
