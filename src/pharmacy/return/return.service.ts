@@ -23,12 +23,11 @@ export class ReturnService {
 
   async create(createReturnDto: CreateReturnDto) {
     createReturnDto.billNo = `R-${createReturnDto.billNo}`
+    const existingBilling = await this.billingModel.exists({ mrn: createReturnDto.billNo })
+    if (!existingBilling) {
+      throw new BadRequestException('Thi bill already returned or bill number is invalid');
+    }
     const data = await this.returnModel.create(createReturnDto);
-
-
-    const prefix = await this.usersService.getPharmacyBillingPrefix(
-      new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-    );
 
     await this.billingModel.create({
       patient: createReturnDto.patient,
