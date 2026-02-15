@@ -50,8 +50,14 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
-  async getItem() { }
+  @Get("suppliers")
+  async getSuppliers() {
+    const data = await this.itemsService.getSuppliers();
+    return {
+      data,
+      message: 'All suppliers were retrieved successfully',
+    };
+  }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')

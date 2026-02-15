@@ -20,10 +20,16 @@ export enum OrderStatus {
   Deleted = 'Deleted',
 }
 
+export enum PaymentStatus {
+  Pending = 'Pending',
+  Paid = 'Paid',
+  Partial = 'Partial',
+}
+
 @Schema({ _id: false, versionKey: false })
 export class OrderItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true })
-  name: Types.ObjectId; // or rename to `item` or `itemId`
+  name: Types.ObjectId;
 
   @Prop({ default: null })
   dosage: string;
@@ -86,6 +92,27 @@ export class Order {
 
   @Prop({ default: null })
   assignedTo: string;
+
+
+
+  @Prop({ default: "-" })
+  pharmacist: string;
+
+  @Prop({
+    required: true,
+    enum: Object.values(PaymentStatus),
+    default: PaymentStatus.Pending,
+  })
+  paymentStatus: PaymentStatus;
+
+  @Prop({ default: 0, required: true })
+  paidAmount: number;
+
+  @Prop({ default: '-' })
+  paymentReference: string;
+
+  @Prop({ default: '-' })
+  billNo: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

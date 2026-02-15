@@ -17,6 +17,7 @@ import configuration from 'src/config/configuration';
 import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
+import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Injectable()
 export class OrdersService {
@@ -66,12 +67,15 @@ export class OrdersService {
         })
       );
 
-      await this.billingService.generateBill({
+      const bill = await this.billingService.generateBill({
         patient: order.patient,
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
       });
+
+      data.billNo = bill.mrn;
+      await data.save();
     }
     return data;
   }
@@ -277,7 +281,6 @@ export class OrdersService {
           .lean()
           .exec();
 
-        // Reorder patients to match the aggregated resolved order (lastOrderDate desc)
         const patientMap = new Map(patientsUnordered.map((p) => [p._id.toString(), p]));
         patients = patientIds
           .map((id) => patientMap.get(id.toString()))
@@ -309,7 +312,6 @@ export class OrdersService {
       const patientOrders = orders.filter(
         (i) => i.patient.toString() === e._id.toString(),
       );
-      // Sort orders for this patient to ensure lastPurchase is correct
       patientOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       const totalSpend: number = patientOrders.reduce(
@@ -356,6 +358,8 @@ export class OrdersService {
     }
     const totalVisit = orders.length;
 
+
+
     const totalSpend: number = orders.reduce((orderAcc, order: any) => {
       const itemsTotal: number = (order.items || []).reduce(
         (
@@ -368,11 +372,17 @@ export class OrdersService {
         },
         0,
       );
-      return orderAcc + itemsTotal;
+      return orderAcc + itemsTotal - (order.discount || 0);
     }, 0);
 
     const averageSpend = totalVisit > 0 ? totalSpend / totalVisit : 0;
     const lastPurchase: Date | null = (orders[0] as any)?.createdAt ?? null;
+
+    const totalPaid = orders.reduce((acc, order) => {
+      return acc + (order.paidAmount ?? 0);
+    }, 0);
+
+    const totalDue = totalSpend - totalPaid;
 
     return {
       patient,
@@ -381,6 +391,8 @@ export class OrdersService {
       averageSpend,
       totalSpend,
       lastPurchase,
+      totalPaid,
+      totalDue,
     };
   }
 
@@ -403,33 +415,6 @@ export class OrdersService {
     }
 
 
-    // const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
-    // if (autoGenerateBill) {
-    //   const items = await Promise.all(
-    //     data.items.map(async (item) => {
-    //       const itemData = await this.itemsService.getItem(item.name);
-
-    //       const unitPrice = itemData.unitPrice;
-    //       const quantity = item.quantity;
-
-    //       return {
-    //         name: itemData.name,
-    //         unitPrice,
-    //         quantity,
-    //         discount: 0,
-    //         gst: 0,
-    //         total: unitPrice * quantity,
-    //       };
-    //     })
-    //   );
-
-    //   await this.billingService.generateBill({
-    //     patient: data.patient,
-    //     items,
-    //     user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-    //     discount: data.discount ?? 0,
-    //   });
-    // }
     return data;
   }
 
@@ -482,6 +467,19 @@ export class OrdersService {
       });
     }
 
+    return data;
+  }
+
+  async updatePayment(dto: UpdatePaymentDto) {
+    const data = await this.orderModel
+      .findByIdAndUpdate(dto.orderId, dto, { new: true, runValidators: true })
+      .populate('patient')
+      .populate('doctor', 'name phoneNumber specialization')
+      .populate('items.name')
+      .lean();
+    if (!data) {
+      throw new NotFoundException('Order not found');
+    }
     return data;
   }
 }

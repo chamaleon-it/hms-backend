@@ -68,6 +68,16 @@ export class Billing {
 
   @Prop({ type: Boolean, required: true, default: false })
   roundOff: boolean;
+
+  @Prop({
+    type: String,
+    enum: ["Sale", "Return"],
+    default: "Sale",
+  })
+  transactionType: "Sale" | "Return"
+
+  @Prop({ type: String, required: false })
+  salesMRN?: string;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

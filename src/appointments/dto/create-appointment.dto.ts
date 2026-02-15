@@ -14,11 +14,13 @@ import {
 } from 'class-validator';
 
 export class CreateAppointmentDto {
+  @IsOptional()
   @IsMongoId({ message: 'Patient must be a valid MongoDB ObjectId.' })
-  patient: mongoose.Types.ObjectId;
+  patient?: mongoose.Types.ObjectId;
 
+  @IsOptional()
   @IsMongoId({ message: 'Doctor must be a valid MongoDB ObjectId.' })
-  doctor: mongoose.Types.ObjectId;
+  doctor?: mongoose.Types.ObjectId;
 
   @IsOptional()
   @IsEnum(AppointmentMethod, {
@@ -26,6 +28,7 @@ export class CreateAppointmentDto {
   })
   method?: AppointmentMethod;
 
+  @IsOptional()
   @IsDateString({}, { message: 'Date must be a valid ISO date string.' })
   date: Date;
 

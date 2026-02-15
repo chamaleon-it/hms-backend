@@ -18,19 +18,62 @@ export class ItemsService {
     private readonly usersService: UsersService,
   ) { }
 
+  private async generateUniqueSKU(): Promise<string> {
+    let sku: string;
+    let exists = true;
+
+    do {
+      const randomNum = Math.floor(10000 + Math.random() * 90000);
+      sku = `MED${randomNum}`;
+
+      // Check if SKU already exists
+      const existing = await this.itemModel.exists({ sku });
+      exists = !!existing;
+    } while (exists);
+
+    return sku;
+  }
+
   async addItems(pharmacy: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
-    const found = await this.itemModel.findOne({ sku: addItemDto.sku }).lean();
-    if (found) {
-      throw new BadRequestException(
-        'This SKU is already assigned to another product.',
-      );
+    if (!addItemDto.sku) {
+      addItemDto.sku = await this.generateUniqueSKU();
+    } else {
+      const found = await this.itemModel.findOne({ sku: addItemDto.sku }).lean();
+      if (found) {
+        throw new BadRequestException(
+          'This SKU is already assigned to another product.',
+        );
+      }
     }
-    const data = await this.itemModel.create({ ...addItemDto, pharmacy });
+
+    if (!addItemDto.generic) {
+      addItemDto.generic = addItemDto.name
+    }
+
+    if (!addItemDto.rackLocation) {
+      addItemDto.rackLocation = "-"
+    }
+    if (!addItemDto.hsnCode) {
+      addItemDto.hsnCode = "-"
+    }
+    if (!addItemDto.supplier) {
+      addItemDto.supplier = "-"
+    }
+
+    if (!addItemDto.manufacturer) {
+      addItemDto.manufacturer = "-"
+    }
+
+
+    const data = await this.itemModel.create({ ...addItemDto, quantity: 0, pharmacy });
+    if (addItemDto.batchNumber) {
+      await this.addBatchItems(data._id, { batchNumber: addItemDto.batchNumber, expiryDate: addItemDto?.expiryDate ? new Date(addItemDto?.expiryDate) : new Date(), purchasePrice: addItemDto.purchasePrice, quantity: addItemDto.quantity ?? 0, supplier: addItemDto.supplier || "-" })
+    }
     return data;
   }
 
   async getItems(query: GetItemsDto) {
-    const { page = 1, limit = 10, q, category, stock, lowStockThreshold } = query;
+    const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView, sortBy = "createdAt", orderBy = "desc" } = query;
 
     const skip = (page - 1) * limit;
 
@@ -40,6 +83,7 @@ export class ItemsService {
       quantity?: number | Record<string, number>;
       expiryDate?: Record<string, Date>;
       status?: Record<string, string>;
+      supplier?: string;
     } = {};
 
     if (q) {
@@ -59,7 +103,7 @@ export class ItemsService {
       filter.category = category;
     }
 
-    if (stock) {
+    if (stock && !lowStockItemsView) {
       const stockConditions: Record<string, number | Record<string, number>> = {
         Instock: { $gte: 20 },
         Low: { $gt: 0, $lt: 20 },
@@ -67,6 +111,9 @@ export class ItemsService {
       };
 
       filter.quantity = stockConditions[stock];
+    }
+    if (lowStockItemsView) {
+      filter.quantity = { $lt: Number(lowStockThreshold ?? 20) };
     }
 
     if (query.expiry) {
@@ -79,10 +126,15 @@ export class ItemsService {
       }
     }
 
+    if (query.supplier) {
+      filter.supplier = query.supplier;
+    }
+
     filter.status = { $ne: ItemStatus.Deleted };
 
     const [items, total] = await Promise.all([
-      this.itemModel.find(filter).skip(skip).limit(limit).lean(),
+      this.itemModel.find(filter).skip(skip).limit(limit).lean()
+        .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 }),
       this.itemModel.countDocuments(filter),
     ]);
 
@@ -221,5 +273,10 @@ export class ItemsService {
     await item.save();
 
     return item;
+  }
+
+  async getSuppliers() {
+    const data = await this.itemModel.distinct('supplier').lean();
+    return data.filter((supplier) => (supplier !== '' && supplier !== '-'));
   }
 }

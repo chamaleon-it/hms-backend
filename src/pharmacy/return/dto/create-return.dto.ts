@@ -18,4 +18,6 @@ export class CreateReturnDto {
   returnedBy: ReturnedBy;
 
   remarks?: string;
+
+  billNo?: string;
 }
