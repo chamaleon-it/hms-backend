@@ -72,4 +72,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsMongoId({ message: 'AssignedTo must be a valid MongoDB ObjectId' })
   assignedTo?: string;
+
+  @IsString()
+  @IsOptional()
+  allergies?: string;
+
+  @IsOptional()
+  pharmacist?: string;
 }
