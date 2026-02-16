@@ -20,4 +20,8 @@ export class UpdateBillingDto {
   @IsBoolean({ message: 'Auto generate bill must be a boolean' })
   @IsNotEmpty({ message: 'Auto generate bill is required' })
   autoGenerateBill: boolean;
+
+  @IsBoolean({ message: 'Auto generate prescription must be a boolean' })
+  @IsNotEmpty({ message: 'Auto generate prescription is required' })
+  autoGeneratePrescription: boolean;
 }

@@ -137,6 +137,7 @@ export class User {
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
         autoGenerateBill: { type: Boolean, default: false },
+        autoGeneratePrescription: { type: Boolean, default: false },
       },
       inventory: {
         lowStockThreshold: { type: Number, default: 20 },

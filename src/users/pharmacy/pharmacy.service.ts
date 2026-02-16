@@ -44,6 +44,7 @@ export class PharmacyService {
           'pharmacy.billing.roundOff': dto.roundOff,
           'pharmacy.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
           'pharmacy.billing.autoGenerateBill': dto.autoGenerateBill,
+          'pharmacy.billing.autoGeneratePrescription': dto.autoGeneratePrescription,
         },
       },
       { new: true, runValidators: true },
