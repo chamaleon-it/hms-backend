@@ -18,12 +18,14 @@ import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { Billing } from 'src/billing/schemas/billing.schema';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
@@ -619,6 +621,14 @@ export class OrdersService {
       .populate('doctor', 'name phoneNumber specialization')
       .populate('items.name')
       .lean();
+
+    if (data?.billNo) {
+      await this.billingModel
+        .findOneAndUpdate({ mrn: data?.billNo }, { cash: data.paidAmount }, { new: true, runValidators: true })
+        .lean();
+    }
+
+
     if (!data) {
       throw new NotFoundException('Order not found');
     }
