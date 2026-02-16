@@ -147,7 +147,7 @@ export class OrdersService {
     const searchRegex = { $regex: '^' + q, $options: 'i' };
 
     const filter = {
-      $or: [{ mrn: searchRegex }],
+      $or: [{ mrn: searchRegex }, { billNo: searchRegex }],
     };
 
     const data = await this.orderModel
