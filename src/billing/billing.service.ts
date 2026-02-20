@@ -14,12 +14,14 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import { Order, OrderStatus, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 
 @Injectable()
 export class BillingService {
   constructor(
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
+    @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
   ) { }
 
@@ -45,6 +47,22 @@ export class BillingService {
     );
     createBill.mrn = await this.generateUniqueMRN(prefix);
     const data = await this.billingModel.create(createBill);
+    if (createBill.rxId) {
+      const order: any = await this.orderModel.findOne({ mrn: createBill.rxId }).populate('items.name')
+      if (order) {
+        order.billNo = data.mrn;
+        const paidAmount = (createBill.cash ?? 0) + (createBill.online ?? 0) + (createBill.insurance ?? 0) + (createBill.discount ?? 0);
+        order.paidAmount = paidAmount >= order.items.reduce((total, item) => total + item.quantity * item.name.unitPrice, 0) ? order.items.reduce((total, item) => total + item.quantity * item.name.unitPrice, 0) : paidAmount;
+        if (paidAmount === 0) {
+          order.paymentStatus = PaymentStatus.Pending
+        } else if (paidAmount < order.items.reduce((total, item) => total + item.quantity * item.name.unitPrice, 0)) {
+          order.paymentStatus = PaymentStatus.Partial
+        } else if (paidAmount >= order.items.reduce((total, item) => total + item.quantity * item.name.unitPrice, 0)) {
+          order.paymentStatus = PaymentStatus.Paid
+        }
+        await order.save();
+      }
+    }
     return data;
   }
 
