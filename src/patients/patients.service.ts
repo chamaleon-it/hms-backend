@@ -83,8 +83,8 @@ export class PatientsService {
     } = {};
 
     if (query && query.trim() !== '') {
-      const nameRegex = { $regex: '^' + query, $options: 'i' };
-      const searchRegex = { $regex: query, $options: 'i' };
+      const nameRegex = { $regex: `^${query}`, $options: 'i' };
+      const searchRegex = { $regex: `^${query}`, $options: 'i' };
       filter = {
         $or: [
           { name: nameRegex },
