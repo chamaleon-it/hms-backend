@@ -26,6 +26,9 @@ export class Test {
   @Prop({ default: null })
   estimatedTime: number;
 
+  @Prop({ default: "number", enum: ["number", "text", "boolean"] })
+  dataType: "number" | "text" | "boolean"
+
   @Prop({ default: null })
   min: number;
 
