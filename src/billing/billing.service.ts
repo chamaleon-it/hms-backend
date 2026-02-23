@@ -218,7 +218,7 @@ export class BillingService {
   ) {
     const isExist = await this.billingItemModel.exists({
       user,
-      item: addBillingItemDto.item,
+      code: addBillingItemDto.code,
     });
 
     if (isExist) {
@@ -235,9 +235,15 @@ export class BillingService {
     { item }: GetBillingItemDto,
     user: mongoose.Types.ObjectId,
   ) {
+
+    const filter: any = { user };
+
+    if (item) {
+      filter.item = new RegExp(`^${item}`, 'i');
+    }
+
     return this.billingItemModel
-      .find({ user, item: new RegExp(item, 'i') })
-      .limit(5)
+      .find(filter)
       .lean()
       .exec();
   }
