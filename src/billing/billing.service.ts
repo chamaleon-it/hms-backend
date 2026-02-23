@@ -208,7 +208,7 @@ export class BillingService {
     }
     const data = await this.billingItemModel.create({
       user,
-      item: addBillingItemDto.item,
+      ...addBillingItemDto,
     });
     return data;
   }
@@ -220,7 +220,6 @@ export class BillingService {
     return this.billingItemModel
       .find({ user, item: new RegExp(item, 'i') })
       .limit(5)
-      .distinct('item')
       .lean()
       .exec();
   }
