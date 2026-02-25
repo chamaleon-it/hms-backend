@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, Model, Types } from 'mongoose';
 import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
@@ -82,6 +82,26 @@ export class Report {
 
   @Prop({ default: false })
   isFlagged: boolean
+
+  @Prop({ type: Number, unique: true })
+  mrn: number;
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+
+
+ReportSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    const model = this.constructor as Model<ReportDocument>;
+
+    const lastReport = await model
+      .findOne()
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean();
+
+    this.mrn = lastReport ? lastReport.mrn + 1 : 1;
+  }
+
+  next();
+});
