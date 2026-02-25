@@ -14,14 +14,14 @@ import { ResultDto } from './dto/result.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
     }
     const userReport = await this.reportModel.findOne({
       patient: dto.patient,
-      status: ReportStatus.PENDING,
+      status: ReportStatus.UPCOMING,
       lab: dto.lab,
     });
 
@@ -60,15 +60,13 @@ export class ReportService {
     // dto: GetReportDto
   ) {
     const match: {
-      status?: { $ne: ReportStatus };
       $or?: Record<string, mongoose.Types.ObjectId>[];
+      isDeleted?: boolean
     } = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
-    match.status = {
-      $ne: ReportStatus.DELETED,
-    };
+    match.isDeleted = false
 
     const data = await this.reportModel
       .find(match)
@@ -111,7 +109,7 @@ export class ReportService {
 
     report.status = allFilled
       ? ReportStatus.COMPLETED
-      : ReportStatus.IN_PROGRESS;
+      : ReportStatus.WAITING_FOR_RESULT;
 
     await report.save();
 
@@ -122,7 +120,7 @@ export class ReportService {
     if (!mongoose.isValidObjectId(patient))
       throw new BadRequestException('Please provide a valid patient id.');
     const report = await this.reportModel
-      .find({ patient, status: { $ne: ReportStatus.DELETED } })
+      .find({ patient, isDeleted: false })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
       .sort({ createdAt: -1 })
@@ -150,7 +148,7 @@ export class ReportService {
         {
           $match: {
             patient: { $exists: true, $ne: null },
-            status: { $ne: ReportStatus.DELETED },
+            isDeleted: false,
           },
         },
 
@@ -209,8 +207,18 @@ export class ReportService {
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    data.status = ReportStatus.IN_PROGRESS;
+    data.status = ReportStatus.SAMPLE_COLLECTED;
     data.sampleCollectedAt = new Date();
+    await data.save();
+    return data;
+  }
+
+  async startTest(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.status = ReportStatus.WAITING_FOR_RESULT;
     await data.save();
     return data;
   }
@@ -220,7 +228,7 @@ export class ReportService {
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    data.status = ReportStatus.DELETED;
+    data.isDeleted = true;
     await data.save();
     return data;
   }

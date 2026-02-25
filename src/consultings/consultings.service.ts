@@ -18,7 +18,7 @@ export class ConsultingsService {
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
-  ) {}
+  ) { }
 
   async create(
     consultingDto: ConsultingDto,
@@ -62,7 +62,7 @@ export class ConsultingsService {
       priority: t.priority,
       panels: t.panels,
       sampleType: SampleType.OTHER,
-      status: ReportStatus.PENDING,
+      status: ReportStatus.UPCOMING,
     }));
 
     await Promise.all(tests.map((t) => this.reportService.createReport(t)));

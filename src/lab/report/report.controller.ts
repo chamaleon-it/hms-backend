@@ -17,7 +17,7 @@ import mongoose from 'mongoose';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -44,6 +44,15 @@ export class ReportController {
   @Post('sample_collected/:id')
   async sampleCollected(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.sampleCollected(id);
+    return {
+      message: 'Sample is collected',
+      data,
+    };
+  }
+
+  @Post('start_test/:id')
+  async startTest(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.startTest(id);
     return {
       message: 'Sample is collected',
       data,

@@ -11,11 +11,10 @@ export enum SampleType {
 }
 
 export enum ReportStatus {
-  PENDING = 'Pending',
-  IN_PROGRESS = 'In Progress',
+  UPCOMING = 'Upcoming',
+  SAMPLE_COLLECTED = 'Sample Collected',
+  WAITING_FOR_RESULT = "Waiting For Result",
   COMPLETED = 'Completed',
-  FLAGGED = 'Flagged',
-  DELETED = 'Deleted',
 }
 
 @Schema({ versionKey: false, timestamps: true })
@@ -74,9 +73,15 @@ export class Report {
   @Prop({
     type: String,
     enum: Object.values(ReportStatus),
-    default: ReportStatus.PENDING,
+    default: ReportStatus.UPCOMING,
   })
   status: ReportStatus;
+
+  @Prop({ default: false })
+  isDeleted: boolean
+
+  @Prop({ default: false })
+  isFlagged: boolean
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
