@@ -26,4 +26,9 @@ export class PharmacistService {
     async updatePharmacist(id: string, updatePharmacistDto: RegisterPharmacistDto) {
         return await this.pharmacistModel.findByIdAndUpdate(id, updatePharmacistDto, { new: true }).lean();
     }
+
+    async updateInCharge(id: string) {
+        await this.pharmacistModel.updateMany({ inCharge: true }, { inCharge: false });
+        return await this.pharmacistModel.findByIdAndUpdate(id, { inCharge: true }, { new: true }).lean();
+    }
 }

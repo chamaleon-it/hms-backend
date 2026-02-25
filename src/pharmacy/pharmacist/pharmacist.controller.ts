@@ -30,6 +30,14 @@ export class PharmacistController {
     };
   }
 
+  @Patch('incharge/:id')
+  async updateInCharge(@Param('id') id: string) {
+    return {
+      data: await this.pharmacistService.updateInCharge(id),
+      message: "Pharmacist updated successfully"
+    };
+  }
+
   @Patch(':id')
   async updatePharmacist(@Param('id') id: string, @Body() updatePharmacistDto: RegisterPharmacistDto) {
     return {
@@ -37,4 +45,6 @@ export class PharmacistController {
       message: "Pharmacist updated successfully"
     };
   }
+
+
 }

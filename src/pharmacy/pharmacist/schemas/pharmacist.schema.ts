@@ -21,6 +21,9 @@ export class Pharmacist {
     @Prop({ default: false })
     isDeleted: boolean;
 
+    @Prop({ default: false })
+    inCharge: boolean;
+
 }
 
 export const PharmacistSchema = SchemaFactory.createForClass(Pharmacist);
