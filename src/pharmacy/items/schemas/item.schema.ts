@@ -22,7 +22,7 @@ export class Item {
 
   @Prop({
     trim: true,
-    default: "-"
+    default: '-',
   })
   hsnCode?: string;
 
@@ -34,13 +34,13 @@ export class Item {
   })
   sku: string;
 
-  @Prop({ required: true, trim: true, default: "Medicine" })
+  @Prop({ required: true, trim: true, default: 'Medicine' })
   category: string;
 
-  @Prop({ trim: true, default: "-" })
+  @Prop({ trim: true, default: '-' })
   supplier?: string;
 
-  @Prop({ trim: true, default: "-" })
+  @Prop({ trim: true, default: '-' })
   manufacturer?: string;
 
   @Prop({
@@ -73,14 +73,14 @@ export class Item {
   @Prop({ type: Date })
   expiryDate?: Date;
 
-  @Prop({ type: String, default: "-" })
-  rackLocation: string
+  @Prop({ type: String, default: '-' })
+  rackLocation: string;
 
   @Prop({ type: Number, default: 0 })
-  packing: number
+  packing: number;
 
   @Prop({ type: Number, default: 0 })
-  gst: number
+  gst: number;
 
   @Prop({
     enum: ItemStatus,

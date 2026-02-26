@@ -6,150 +6,156 @@ import * as path from 'path';
 
 @Injectable()
 export class BackupService {
-    private readonly logger = new Logger(BackupService.name);
-    private readonly backupDir = path.join(process.cwd(), 'backups');
+  private readonly logger = new Logger(BackupService.name);
+  private readonly backupDir = path.join(process.cwd(), 'backups');
 
-    constructor(@InjectConnection() private readonly connection: Connection) {
-        if (!fs.existsSync(this.backupDir)) {
-            fs.mkdirSync(this.backupDir);
-        }
+  constructor(@InjectConnection() private readonly connection: Connection) {
+    if (!fs.existsSync(this.backupDir)) {
+      fs.mkdirSync(this.backupDir);
+    }
+  }
+
+  async backupDatabase(): Promise<{ message: string; backupId: string }> {
+    const session = await this.connection.startSession();
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, '-');
+      const backupFile = path.join(this.backupDir, `${timestamp}.json`);
+
+      if (!this.connection.db) {
+        throw new Error('Database connection not established');
+      }
+
+      const collections = await this.connection.db.listCollections().toArray();
+      const backupData: Record<string, any[]> = {};
+
+      for (const collectionInfo of collections) {
+        const collectionName = collectionInfo.name;
+        const data = await this.connection.db
+          .collection(collectionName)
+          .find({})
+          .toArray();
+
+        backupData[collectionName] = data;
+      }
+
+      fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+
+      this.logger.log(`Backup created at ${backupFile}`);
+      return { message: 'Backup created successfully', backupId: timestamp };
+    } catch (error) {
+      this.logger.error('Backup failed', error);
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async listBackups() {
+    if (!fs.existsSync(this.backupDir)) {
+      return [];
+    }
+    const files = fs
+      .readdirSync(this.backupDir)
+      .filter((f) => f.endsWith('.json'));
+    // Return names without extension for cleaner ID
+    return files.map((f) => path.basename(f, '.json')).reverse();
+  }
+
+  async restoreDatabase(backupId: string) {
+    // Try to find the file. backupId matches the filename without extension or with?
+    // Let's assume input is just timestamp (ID).
+    let backupPath = path.join(this.backupDir, `${backupId}.json`);
+
+    // Fallback for backward compatibility if user checks old folders?
+    // The user asked to change it, so let's stick to the new single file format strictly for now.
+    if (!fs.existsSync(backupPath)) {
+      // fallback: check if it was just passed with extension
+      if (fs.existsSync(path.join(this.backupDir, backupId))) {
+        backupPath = path.join(this.backupDir, backupId);
+      } else {
+        throw new Error(`Backup ${backupId} not found`);
+      }
     }
 
-    async backupDatabase(): Promise<{ message: string; backupId: string }> {
-        const session = await this.connection.startSession();
-        try {
-            const timestamp = new Date().toISOString().replace(/:/g, '-');
-            const backupFile = path.join(this.backupDir, `${timestamp}.json`);
+    const session = await this.connection.startSession();
 
-            if (!this.connection.db) {
-                throw new Error('Database connection not established');
-            }
+    try {
+      if (!this.connection.db) {
+        throw new Error('Database connection not established');
+      }
 
-            const collections = await this.connection.db.listCollections().toArray();
-            const backupData: Record<string, any[]> = {};
+      const db = this.connection.db;
 
-            for (const collectionInfo of collections) {
-                const collectionName = collectionInfo.name;
-                const data = await this.connection.db
-                    .collection(collectionName)
-                    .find({})
-                    .toArray();
+      await session.withTransaction(async () => {
+        const fileContent = fs.readFileSync(backupPath, 'utf-8');
+        const backupData = JSON.parse(fileContent);
 
-                backupData[collectionName] = data;
-            }
+        // backupData should be { collectionName: [documents] }
+        const collectionNames = Object.keys(backupData);
 
-            fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+        for (const collectionName of collectionNames) {
+          const data = backupData[collectionName];
 
-            this.logger.log(`Backup created at ${backupFile}`);
-            return { message: 'Backup created successfully', backupId: timestamp };
-        } catch (error) {
-            this.logger.error('Backup failed', error);
-            throw error;
-        } finally {
-            await session.endSession();
+          const collections = await db
+            .listCollections({ name: collectionName })
+            .toArray();
+          if (collections.length > 0) {
+            await db.collection(collectionName).deleteMany({}, { session });
+          }
+
+          if (Array.isArray(data) && data.length > 0) {
+            const dataToInsert = this.restoreRecursively(data);
+            await db
+              .collection(collectionName)
+              .insertMany(dataToInsert, { session });
+          }
         }
+      });
+
+      this.logger.log(`Database restored from ${backupId}`);
+      return { message: 'Database restored successfully' };
+    } catch (error) {
+      this.logger.error('Restore failed', error);
+      throw error;
+    } finally {
+      await session.endSession();
     }
+  }
 
-    async listBackups() {
-        if (!fs.existsSync(this.backupDir)) {
-            return [];
+  private restoreRecursively(item: any): any {
+    if (Array.isArray(item)) {
+      return item.map((i) => this.restoreRecursively(i));
+    } else if (item !== null && typeof item === 'object') {
+      const newItem: any = {};
+      for (const key of Object.keys(item)) {
+        // If the key is _id or any other field, we check the value
+        newItem[key] = this.restoreRecursively(item[key]);
+      }
+      return newItem;
+    } else if (typeof item === 'string') {
+      // Check if string is a valid ObjectId (24 hex characters)
+      if (/^[0-9a-fA-F]{24}$/.test(item)) {
+        return new Types.ObjectId(item);
+      }
+
+      // Check if string is a valid ISO 8601 date
+      // Example: 2026-01-16T08:53:46.889Z
+      const isoDateRegExp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+      if (isoDateRegExp.test(item)) {
+        const date = new Date(item);
+        if (!isNaN(date.getTime())) {
+          return date;
         }
-        const files = fs.readdirSync(this.backupDir).filter(f => f.endsWith('.json'));
-        // Return names without extension for cleaner ID
-        return files.map(f => path.basename(f, '.json')).reverse();
+      }
     }
+    return item;
+  }
 
-    async restoreDatabase(backupId: string) {
-        // Try to find the file. backupId matches the filename without extension or with?
-        // Let's assume input is just timestamp (ID).
-        let backupPath = path.join(this.backupDir, `${backupId}.json`);
-
-        // Fallback for backward compatibility if user checks old folders? 
-        // The user asked to change it, so let's stick to the new single file format strictly for now.
-        if (!fs.existsSync(backupPath)) {
-            // fallback: check if it was just passed with extension
-            if (fs.existsSync(path.join(this.backupDir, backupId))) {
-                backupPath = path.join(this.backupDir, backupId);
-            } else {
-                throw new Error(`Backup ${backupId} not found`);
-            }
-        }
-
-        const session = await this.connection.startSession();
-
-        try {
-            if (!this.connection.db) {
-                throw new Error('Database connection not established');
-            }
-
-            const db = this.connection.db;
-
-            await session.withTransaction(async () => {
-                const fileContent = fs.readFileSync(backupPath, 'utf-8');
-                const backupData = JSON.parse(fileContent);
-
-                // backupData should be { collectionName: [documents] }
-                const collectionNames = Object.keys(backupData);
-
-                for (const collectionName of collectionNames) {
-                    const data = backupData[collectionName];
-
-                    const collections = await db.listCollections({ name: collectionName }).toArray();
-                    if (collections.length > 0) {
-                        await db.collection(collectionName).deleteMany({}, { session });
-                    }
-
-                    if (Array.isArray(data) && data.length > 0) {
-                        const dataToInsert = this.restoreRecursively(data);
-                        await db.collection(collectionName).insertMany(dataToInsert, { session });
-                    }
-                }
-            });
-
-            this.logger.log(`Database restored from ${backupId}`);
-            return { message: 'Database restored successfully' };
-        } catch (error) {
-            this.logger.error('Restore failed', error);
-            throw error;
-        } finally {
-            await session.endSession();
-        }
+  async restoreLatestBackup() {
+    const backups = await this.listBackups();
+    if (backups.length === 0) {
+      throw new BadRequestException('No backups found');
     }
-
-    private restoreRecursively(item: any): any {
-        if (Array.isArray(item)) {
-            return item.map(i => this.restoreRecursively(i));
-        } else if (item !== null && typeof item === 'object') {
-            const newItem: any = {};
-            for (const key of Object.keys(item)) {
-                // If the key is _id or any other field, we check the value
-                newItem[key] = this.restoreRecursively(item[key]);
-            }
-            return newItem;
-        } else if (typeof item === 'string') {
-            // Check if string is a valid ObjectId (24 hex characters)
-            if (/^[0-9a-fA-F]{24}$/.test(item)) {
-                return new Types.ObjectId(item);
-            }
-
-            // Check if string is a valid ISO 8601 date
-            // Example: 2026-01-16T08:53:46.889Z
-            const isoDateRegExp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-            if (isoDateRegExp.test(item)) {
-                const date = new Date(item);
-                if (!isNaN(date.getTime())) {
-                    return date;
-                }
-            }
-        }
-        return item;
-    }
-
-    async restoreLatestBackup() {
-        const backups = await this.listBackups();
-        if (backups.length === 0) {
-            throw new BadRequestException('No backups found');
-        }
-        return this.restoreDatabase(backups[0]);
-    }
+    return this.restoreDatabase(backups[0]);
+  }
 }

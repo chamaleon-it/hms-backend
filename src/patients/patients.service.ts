@@ -16,7 +16,7 @@ import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -42,7 +42,9 @@ export class PatientsService {
       const mrn = await this.generateUniqueMRN();
       patientRegisterDto.mrn = mrn;
     } else {
-      const mrn = await this.patientModel.exists({ mrn: patientRegisterDto.mrn });
+      const mrn = await this.patientModel.exists({
+        mrn: patientRegisterDto.mrn,
+      });
       if (mrn) {
         throw new BadRequestException('MRN already exists');
       }
@@ -313,7 +315,9 @@ export class PatientsService {
     return data;
   }
 
-  async checkPatientAlreadyExists(checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto) {
+  async checkPatientAlreadyExists(
+    checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto,
+  ) {
     const orConditions: any = [];
 
     if (checkPatientAlreadyExistsDto?.name) {
@@ -343,14 +347,20 @@ export class PatientsService {
     }
 
     if (checkPatientAlreadyExistsDto?.email) {
-      orConditions.push({ email: checkPatientAlreadyExistsDto.email.toLowerCase() });
+      orConditions.push({
+        email: checkPatientAlreadyExistsDto.email.toLowerCase(),
+      });
     }
 
     if (!orConditions.length) return null;
 
-    const data = await this.patientModel.findOne({
-      $or: orConditions,
-    }).select("name phoneNumber email gender dateOfBirth blood mrn address").lean().exec();
+    const data = await this.patientModel
+      .findOne({
+        $or: orConditions,
+      })
+      .select('name phoneNumber email gender dateOfBirth blood mrn address')
+      .lean()
+      .exec();
     return data;
   }
 }

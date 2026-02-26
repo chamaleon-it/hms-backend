@@ -28,8 +28,8 @@ export class CreateTestDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsEnum(["number", "text", "boolean"])
-  dataType: "number" | "text" | "boolean"
+  @IsEnum(['number', 'text', 'boolean'])
+  dataType: 'number' | 'text' | 'boolean';
 
   @IsOptional()
   @IsNumber({}, { message: 'Minimum value must be a number' })

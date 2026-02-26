@@ -24,4 +24,4 @@ import { Billing, BillingSchema } from 'src/billing/schemas/billing.schema';
   providers: [OrdersService],
   exports: [OrdersService],
 })
-export class OrdersModule { }
+export class OrdersModule {}

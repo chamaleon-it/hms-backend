@@ -9,7 +9,6 @@ export default () => ({
   in_house_pharmacy_id: process.env.IN_HOUSE_PHARMACY_ID as string,
 });
 
-
 // export default () => ({
 //   databaseUrl: "mongodb+srv://root:hms321@hms.rtnjqlm.mongodb.net/development?retryWrites=true&w=majority&appName=HMS", // "mongodb://localhost:27017/dev", //process.env.DATABASE_URL as string,
 //   secret: {

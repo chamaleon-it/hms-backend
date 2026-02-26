@@ -93,9 +93,7 @@ export class Order {
   @Prop({ default: null })
   assignedTo: string;
 
-
-
-  @Prop({ default: "-" })
+  @Prop({ default: '-' })
   pharmacist: string;
 
   @Prop({

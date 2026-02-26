@@ -48,7 +48,7 @@ export class GetItemsDto {
 
   @IsOptional()
   @IsString()
-  sortBy?: "createdAt" | "quantity" = "createdAt";
+  sortBy?: 'createdAt' | 'quantity' = 'createdAt';
 
   @IsOptional()
   @IsString()

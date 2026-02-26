@@ -11,6 +11,8 @@ import { Report, ReportStatus } from './schemas/report.schema';
 // import { GetReportDto } from './dto/get-report.dto';
 import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';
+import { SampleCollectedDto } from './dto/sample-collected.dto';
+import { GetReportDto } from './dto/get-report.dto';
 
 @Injectable()
 export class ReportService {
@@ -21,7 +23,7 @@ export class ReportService {
     }
     const userReport = await this.reportModel.findOne({
       patient: dto.patient,
-      status: ReportStatus.PENDING,
+      status: ReportStatus.UPCOMING,
       lab: dto.lab,
     });
 
@@ -55,20 +57,20 @@ export class ReportService {
     }
   }
 
-  async getReport(
-    user: mongoose.Types.ObjectId,
-    // dto: GetReportDto
-  ) {
-    const match: {
-      status?: { $ne: ReportStatus };
-      $or?: Record<string, mongoose.Types.ObjectId>[];
-    } = {
+  async getReport(user: mongoose.Types.ObjectId, dto: GetReportDto) {
+    const match: any = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
-    match.status = {
-      $ne: ReportStatus.DELETED,
-    };
+    if (dto.status) {
+      if (dto.status === 'Flagged') {
+        match.isFlagged = true;
+      } else {
+        match.status = dto.status;
+      }
+    }
+
+    match.isDeleted = false;
 
     const data = await this.reportModel
       .find(match)
@@ -111,7 +113,7 @@ export class ReportService {
 
     report.status = allFilled
       ? ReportStatus.COMPLETED
-      : ReportStatus.IN_PROGRESS;
+      : ReportStatus.WAITING_FOR_RESULT;
 
     await report.save();
 
@@ -122,7 +124,7 @@ export class ReportService {
     if (!mongoose.isValidObjectId(patient))
       throw new BadRequestException('Please provide a valid patient id.');
     const report = await this.reportModel
-      .find({ patient, status: { $ne: ReportStatus.DELETED } })
+      .find({ patient, isDeleted: false })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
       .sort({ createdAt: -1 })
@@ -150,7 +152,7 @@ export class ReportService {
         {
           $match: {
             patient: { $exists: true, $ne: null },
-            status: { $ne: ReportStatus.DELETED },
+            isDeleted: false,
           },
         },
 
@@ -204,13 +206,25 @@ export class ReportService {
     return patients;
   }
 
-  async sampleCollected(id: mongoose.Types.ObjectId) {
+  async sampleCollected(id: mongoose.Types.ObjectId, dto: SampleCollectedDto) {
     const data = await this.reportModel.findById(id);
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    data.status = ReportStatus.IN_PROGRESS;
+    data.status = ReportStatus.SAMPLE_COLLECTED;
     data.sampleCollectedAt = new Date();
+    data.sampleId = dto.sampleId;
+    await data.save();
+    return data;
+  }
+
+  async startTest(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.status = ReportStatus.WAITING_FOR_RESULT;
+    data.testStartedAt = new Date();
     await data.save();
     return data;
   }
@@ -220,7 +234,99 @@ export class ReportService {
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    data.status = ReportStatus.DELETED;
+    data.isDeleted = true;
+    await data.save();
+    return data;
+  }
+
+  async markAsFlagged(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.isFlagged = true;
+    await data.save();
+    return data;
+  }
+
+  async markAsUnflagged(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.isFlagged = false;
+    await data.save();
+    return data;
+  }
+
+  async getStatistics() {
+    const data = await this.reportModel.aggregate([
+      {
+        $match: {
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          upcoming: {
+            $sum: {
+              $cond: {
+                if: { $eq: ['$status', ReportStatus.UPCOMING] },
+                then: 1,
+                else: 0,
+              },
+            },
+          },
+          sampleCollected: {
+            $sum: {
+              $cond: {
+                if: { $eq: ['$status', ReportStatus.SAMPLE_COLLECTED] },
+                then: 1,
+                else: 0,
+              },
+            },
+          },
+          waitingForResult: {
+            $sum: {
+              $cond: {
+                if: { $eq: ['$status', ReportStatus.WAITING_FOR_RESULT] },
+                then: 1,
+                else: 0,
+              },
+            },
+          },
+          completed: {
+            $sum: {
+              $cond: {
+                if: { $eq: ['$status', ReportStatus.COMPLETED] },
+                then: 1,
+                else: 0,
+              },
+            },
+          },
+          flagged: {
+            $sum: {
+              $cond: {
+                if: { $eq: ['$isFlagged', true] },
+                then: 1,
+                else: 0,
+              },
+            },
+          },
+        },
+      },
+    ]);
+    return data[0];
+  }
+
+  async resetTimer(id: mongoose.Types.ObjectId, dto: { duration: number }) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.extraTime = data.extraTime + dto.duration;
     await data.save();
     return data;
   }

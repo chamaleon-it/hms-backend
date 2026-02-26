@@ -5,8 +5,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Pharmacist, PharmacistSchema } from './schemas/pharmacist.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Pharmacist.name, schema: PharmacistSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: Pharmacist.name, schema: PharmacistSchema },
+    ]),
+  ],
   controllers: [PharmacistController],
   providers: [PharmacistService],
 })
-export class PharmacistModule { }
+export class PharmacistModule {}

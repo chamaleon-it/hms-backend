@@ -1,5 +1,5 @@
 export class AddPaymentDto {
-    cash: number;
-    insurance: number;
-    online: number;
+  cash: number;
+  insurance: number;
+  online: number;
 }

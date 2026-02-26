@@ -4,38 +4,37 @@ import { RegisterSupplierDto } from './dto/register-supplier.dto';
 
 @Controller('suppliers')
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) { }
+  constructor(private readonly suppliersService: SuppliersService) {}
 
   @Post()
   async registerSupplier(@Body() dto: RegisterSupplierDto) {
     return {
-      message: "Supplier registered successfully",
-      data: await this.suppliersService.registerSupplier(dto)
+      message: 'Supplier registered successfully',
+      data: await this.suppliersService.registerSupplier(dto),
     };
   }
 
   @Get()
   async findAll() {
     return {
-      message: "All suppliers were retrived successfully",
-      data: await this.suppliersService.findAll()
+      message: 'All suppliers were retrived successfully',
+      data: await this.suppliersService.findAll(),
     };
   }
 
-  @Get("get_id_and_name")
+  @Get('get_id_and_name')
   async getIdAndName() {
     return {
-      message: "Supplier id was retrived successfully",
-      data: await this.suppliersService.getIdAndName()
+      message: 'Supplier id was retrived successfully',
+      data: await this.suppliersService.getIdAndName(),
     };
   }
 
-  @Get(":id")
-  async findOne(@Param("id") id: string) {
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
     return {
-      message: "Supplier was retrived successfully",
-      data: await this.suppliersService.findOne(id)
+      message: 'Supplier was retrived successfully',
+      data: await this.suppliersService.findOne(id),
     };
   }
-
 }

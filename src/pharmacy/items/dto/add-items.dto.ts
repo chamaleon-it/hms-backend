@@ -7,7 +7,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -104,15 +103,13 @@ export class AddItemDto {
   @IsOptional()
   @IsString({ message: 'Rack location must be a string.' })
   @Transform(trim)
-  rackLocation?: string
+  rackLocation?: string;
 
   @IsOptional()
-  packing?: number
+  packing?: number;
 
   @IsOptional()
-  gst?: number
-
-
+  gst?: number;
 
   @IsOptional()
   @IsEnum(ItemStatus, {

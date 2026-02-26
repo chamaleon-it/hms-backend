@@ -19,13 +19,17 @@ export class ReturnService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async create(createReturnDto: CreateReturnDto) {
-    createReturnDto.billNo = `R-${createReturnDto.billNo}`
-    const existingBilling = await this.billingModel.exists({ mrn: createReturnDto.billNo })
+    createReturnDto.billNo = `R-${createReturnDto.billNo}`;
+    const existingBilling = await this.billingModel.exists({
+      mrn: createReturnDto.billNo,
+    });
     if (existingBilling) {
-      throw new BadRequestException('A return with this bill number already exists. Please use a unique bill number.');
+      throw new BadRequestException(
+        'A return with this bill number already exists. Please use a unique bill number.',
+      );
     }
     const data = await this.returnModel.create(createReturnDto);
 
@@ -43,11 +47,11 @@ export class ReturnService {
             unitPrice: e.unitPrice,
             total,
           };
-        })
+        }),
       ),
       mrn: createReturnDto.billNo,
-      transactionType: "Return",
-    })
+      transactionType: 'Return',
+    });
 
     const validReasonForQuantityAdd = [
       ReturnReason.AdverseReaction,

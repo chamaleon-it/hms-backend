@@ -3,7 +3,7 @@ import { BackupService } from './backup.service';
 
 @Controller('backup')
 export class BackupController {
-  constructor(private readonly backupService: BackupService) { }
+  constructor(private readonly backupService: BackupService) {}
 
   @Post('create')
   async createBackup() {
@@ -15,7 +15,7 @@ export class BackupController {
     const data = await this.backupService.listBackups();
     return {
       data,
-      message: "Backups list",
+      message: 'Backups list',
       latestBackup: data[0],
     };
   }
@@ -25,7 +25,7 @@ export class BackupController {
     return this.backupService.restoreDatabase(id);
   }
 
-  @Post("restore_latest")
+  @Post('restore_latest')
   async restoreLatestBackup() {
     return this.backupService.restoreLatestBackup();
   }
