@@ -71,6 +71,24 @@ export class Report {
   sampleCollectedAt: Date | null;
 
   @Prop({
+    type: Date,
+    default: null,
+  })
+  testStartedAt: Date | null;
+
+  @Prop({
+    type: String,
+    default: null,
+  })
+  sampleId: string | null;
+
+  @Prop({
+    type: Number,
+    default: 0
+  })
+  extraTime: number // in minutes
+
+  @Prop({
     type: String,
     enum: Object.values(ReportStatus),
     default: ReportStatus.UPCOMING,

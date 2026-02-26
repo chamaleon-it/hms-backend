@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ReportService } from './report.service';
@@ -14,6 +15,8 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
+import { SampleCollectedDto } from './dto/sample-collected.dto';
+import { GetReportDto } from './dto/get-report.dto';
 
 @Controller('lab/report')
 export class ReportController {
@@ -32,9 +35,9 @@ export class ReportController {
   @UseGuards(JwtAuthGuard)
   async getReport(
     @GetUser() user: JWTUserInterface,
-    // @Query() dto: GetReportDto,
+    @Query() dto: GetReportDto,
   ) {
-    const data = await this.reportService.getReport(user.id);
+    const data = await this.reportService.getReport(user.id, dto);
     return {
       data,
       message: 'All Lab report retrived successfully.',
@@ -42,8 +45,8 @@ export class ReportController {
   }
 
   @Post('sample_collected/:id')
-  async sampleCollected(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.sampleCollected(id);
+  async sampleCollected(@Param('id') id: mongoose.Types.ObjectId, @Body() dto: SampleCollectedDto) {
+    const data = await this.reportService.sampleCollected(id, dto);
     return {
       message: 'Sample is collected',
       data,
@@ -54,7 +57,7 @@ export class ReportController {
   async startTest(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.startTest(id);
     return {
-      message: 'Sample is collected',
+      message: 'Test is started',
       data,
     };
   }
@@ -93,6 +96,42 @@ export class ReportController {
     return {
       data,
       message: 'All patient data retrived',
+    };
+  }
+
+  @Get("statistics")
+  async getStatistics() {
+    const data = await this.reportService.getStatistics();
+    delete data._id;
+    return {
+      data,
+      message: 'All statistics retrived',
+    };
+  }
+
+  @Post('mark_as_flagged/:id')
+  async markAsFlagged(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.markAsFlagged(id);
+    return {
+      message: 'Report is marked as flagged',
+      data,
+    };
+  }
+  @Post('mark_as_unflagged/:id')
+  async markAsUnflagged(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.markAsUnflagged(id);
+    return {
+      message: 'Report is marked as unflagged',
+      data,
+    };
+  }
+
+  @Post("reset_timer/:id")
+  async resetTimer(@Param("id") id: mongoose.Types.ObjectId, @Body() dto: { duration: number }) {
+    const data = await this.reportService.resetTimer(id, dto);
+    return {
+      message: 'Timer is reset',
+      data,
     };
   }
 }
