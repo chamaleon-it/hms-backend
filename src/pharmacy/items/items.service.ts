@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -38,7 +38,9 @@ export class ItemsService {
     if (!addItemDto.sku) {
       addItemDto.sku = await this.generateUniqueSKU();
     } else {
-      const found = await this.itemModel.findOne({ sku: addItemDto.sku }).lean();
+      const found = await this.itemModel
+        .findOne({ sku: addItemDto.sku })
+        .lean();
       if (found) {
         throw new BadRequestException(
           'This SKU is already assigned to another product.',
@@ -47,33 +49,54 @@ export class ItemsService {
     }
 
     if (!addItemDto.generic) {
-      addItemDto.generic = addItemDto.name
+      addItemDto.generic = addItemDto.name;
     }
 
     if (!addItemDto.rackLocation) {
-      addItemDto.rackLocation = "-"
+      addItemDto.rackLocation = '-';
     }
     if (!addItemDto.hsnCode) {
-      addItemDto.hsnCode = "-"
+      addItemDto.hsnCode = '-';
     }
     if (!addItemDto.supplier) {
-      addItemDto.supplier = "-"
+      addItemDto.supplier = '-';
     }
 
     if (!addItemDto.manufacturer) {
-      addItemDto.manufacturer = "-"
+      addItemDto.manufacturer = '-';
     }
 
-
-    const data = await this.itemModel.create({ ...addItemDto, quantity: 0, pharmacy });
+    const data = await this.itemModel.create({
+      ...addItemDto,
+      quantity: 0,
+      pharmacy,
+    });
     if (addItemDto.batchNumber) {
-      await this.addBatchItems(data._id, { batchNumber: addItemDto.batchNumber, expiryDate: addItemDto?.expiryDate ? new Date(addItemDto?.expiryDate) : new Date(), purchasePrice: addItemDto.purchasePrice, quantity: addItemDto.quantity ?? 0, supplier: addItemDto.supplier || "-" })
+      await this.addBatchItems(data._id, {
+        batchNumber: addItemDto.batchNumber,
+        expiryDate: addItemDto?.expiryDate
+          ? new Date(addItemDto?.expiryDate)
+          : new Date(),
+        purchasePrice: addItemDto.purchasePrice,
+        quantity: addItemDto.quantity ?? 0,
+        supplier: addItemDto.supplier || '-',
+      });
     }
     return data;
   }
 
   async getItems(query: GetItemsDto) {
-    const { page = 1, limit = 10, q, category, stock, lowStockThreshold, lowStockItemsView, sortBy = "createdAt", orderBy = "desc" } = query;
+    const {
+      page = 1,
+      limit = 10,
+      q,
+      category,
+      stock,
+      lowStockThreshold,
+      lowStockItemsView,
+      sortBy = 'createdAt',
+      orderBy = 'desc',
+    } = query;
 
     const skip = (page - 1) * limit;
 
@@ -133,12 +156,14 @@ export class ItemsService {
     filter.status = { $ne: ItemStatus.Deleted };
 
     const [items, total] = await Promise.all([
-      this.itemModel.find(filter).skip(skip).limit(limit).lean()
+      this.itemModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .lean()
         .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 }),
       this.itemModel.countDocuments(filter),
     ]);
-
-
 
     const lowStockCount = await this.itemModel.countDocuments({
       quantity: { $lt: Number(lowStockThreshold ?? 20) },
@@ -277,6 +302,6 @@ export class ItemsService {
 
   async getSuppliers() {
     const data = await this.itemModel.distinct('supplier').lean();
-    return data.filter((supplier) => (supplier !== '' && supplier !== '-'));
+    return data.filter((supplier) => supplier !== '' && supplier !== '-');
   }
 }

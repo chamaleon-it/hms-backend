@@ -25,7 +25,7 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
@@ -137,7 +137,7 @@ export class OrdersController {
     };
   }
 
-  @Post("repeat_order/:id")
+  @Post('repeat_order/:id')
   async repeatOrder(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.ordersService.repeatOrder(id);
     return {

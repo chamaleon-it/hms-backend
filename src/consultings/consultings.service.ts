@@ -18,7 +18,7 @@ export class ConsultingsService {
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
-  ) { }
+  ) {}
 
   async create(
     consultingDto: ConsultingDto,

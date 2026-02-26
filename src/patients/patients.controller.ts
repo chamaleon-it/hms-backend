@@ -22,7 +22,7 @@ import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists
 
 @Controller('patients')
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) { }
+  constructor(private readonly patientsService: PatientsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -119,9 +119,13 @@ export class PatientsController {
     };
   }
 
-  @Get("patient_already_exists")
-  async checkPatientAlreadyExists(@Query() checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto) {
-    const data = await this.patientsService.checkPatientAlreadyExists(checkPatientAlreadyExistsDto);
+  @Get('patient_already_exists')
+  async checkPatientAlreadyExists(
+    @Query() checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto,
+  ) {
+    const data = await this.patientsService.checkPatientAlreadyExists(
+      checkPatientAlreadyExistsDto,
+    );
     return {
       data: {
         isPatientAlreadyExists: Boolean(data),

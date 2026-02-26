@@ -20,7 +20,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) { }
+  constructor(private readonly reportService: ReportService) {}
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -45,7 +45,10 @@ export class ReportController {
   }
 
   @Post('sample_collected/:id')
-  async sampleCollected(@Param('id') id: mongoose.Types.ObjectId, @Body() dto: SampleCollectedDto) {
+  async sampleCollected(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: SampleCollectedDto,
+  ) {
     const data = await this.reportService.sampleCollected(id, dto);
     return {
       message: 'Sample is collected',
@@ -99,7 +102,7 @@ export class ReportController {
     };
   }
 
-  @Get("statistics")
+  @Get('statistics')
   async getStatistics() {
     const data = await this.reportService.getStatistics();
     delete data._id;
@@ -126,8 +129,11 @@ export class ReportController {
     };
   }
 
-  @Post("reset_timer/:id")
-  async resetTimer(@Param("id") id: mongoose.Types.ObjectId, @Body() dto: { duration: number }) {
+  @Post('reset_timer/:id')
+  async resetTimer(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: { duration: number },
+  ) {
     const data = await this.reportService.resetTimer(id, dto);
     return {
       message: 'Timer is reset',

@@ -16,7 +16,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -57,23 +57,20 @@ export class ReportService {
     }
   }
 
-  async getReport(
-    user: mongoose.Types.ObjectId,
-    dto: GetReportDto
-  ) {
+  async getReport(user: mongoose.Types.ObjectId, dto: GetReportDto) {
     const match: any = {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
     if (dto.status) {
-      if (dto.status === "Flagged") {
+      if (dto.status === 'Flagged') {
         match.isFlagged = true;
       } else {
         match.status = dto.status;
       }
     }
 
-    match.isDeleted = false
+    match.isDeleted = false;
 
     const data = await this.reportModel
       .find(match)
@@ -318,9 +315,6 @@ export class ReportService {
               },
             },
           },
-
-
-
         },
       },
     ]);

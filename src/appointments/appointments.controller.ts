@@ -20,7 +20,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) { }
+  constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -43,9 +43,7 @@ export class AppointmentsController {
   async getAppointments(@Query() getListDto: GetListDto) {
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
-      status: getListDto.status
-        ? getListDto.status
-        : [],
+      status: getListDto.status ? getListDto.status : [],
       date: getListDto.date || new Date().toString(),
     });
     return {

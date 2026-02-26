@@ -17,4 +17,4 @@ import { UsersModule } from 'src/users/users.module';
   controllers: [ReturnController],
   providers: [ReturnService],
 })
-export class ReturnModule { }
+export class ReturnModule {}

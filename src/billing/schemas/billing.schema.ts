@@ -71,10 +71,10 @@ export class Billing {
 
   @Prop({
     type: String,
-    enum: ["Sale", "Return"],
-    default: "Sale",
+    enum: ['Sale', 'Return'],
+    default: 'Sale',
   })
-  transactionType: "Sale" | "Return"
+  transactionType: 'Sale' | 'Return';
 
   @Prop({ type: String, required: false })
   salesMRN?: string;

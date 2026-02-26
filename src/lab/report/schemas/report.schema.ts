@@ -13,7 +13,7 @@ export enum SampleType {
 export enum ReportStatus {
   UPCOMING = 'Upcoming',
   SAMPLE_COLLECTED = 'Sample Collected',
-  WAITING_FOR_RESULT = "Waiting For Result",
+  WAITING_FOR_RESULT = 'Waiting For Result',
   COMPLETED = 'Completed',
 }
 
@@ -84,9 +84,9 @@ export class Report {
 
   @Prop({
     type: Number,
-    default: 0
+    default: 0,
   })
-  extraTime: number // in minutes
+  extraTime: number; // in minutes
 
   @Prop({
     type: String,
@@ -96,17 +96,16 @@ export class Report {
   status: ReportStatus;
 
   @Prop({ default: false })
-  isDeleted: boolean
+  isDeleted: boolean;
 
   @Prop({ default: false })
-  isFlagged: boolean
+  isFlagged: boolean;
 
   @Prop({ type: Number, unique: true })
   mrn: number;
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
-
 
 ReportSchema.pre('save', async function (next) {
   if (this.isNew) {

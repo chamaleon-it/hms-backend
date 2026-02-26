@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderPriority, OrderStatus } from './schemas/order.schema';
+import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
@@ -49,7 +49,9 @@ export class OrdersService {
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
     const data = await this.orderModel.create(order);
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
+      configuration().in_house_pharmacy_id,
+    );
     if (autoGenerateBill) {
       const items = await Promise.all(
         order.items.map(async (item) => {
@@ -66,7 +68,7 @@ export class OrdersService {
             gst: 0,
             total: unitPrice * quantity,
           };
-        })
+        }),
       );
 
       const bill = await this.billingService.generateBill({
@@ -274,7 +276,8 @@ export class OrdersService {
     }
 
     if (gender) {
-      patientFilter.gender = gender === "Other" ? { $nin: ["Male", "Female"] } : gender;
+      patientFilter.gender =
+        gender === 'Other' ? { $nin: ['Male', 'Female'] } : gender;
     }
 
     if (doctor && alreadyPurchase === 'false') {
@@ -365,7 +368,10 @@ export class OrdersService {
           },
         });
         if (mongoose.isValidObjectId(q)) {
-          (aggregationPipeline[aggregationPipeline.length - 1].$match.$or as any[]).push({
+          (
+            aggregationPipeline[aggregationPipeline.length - 1].$match
+              .$or as any[]
+          ).push({
             'patientDetail._id': new mongoose.Types.ObjectId(q),
           });
         }
@@ -508,8 +514,6 @@ export class OrdersService {
     }
     const totalVisit = orders.length;
 
-
-
     const totalSpend: number = orders.reduce((orderAcc, order: any) => {
       const itemsTotal: number = (order.items || []).reduce(
         (
@@ -564,7 +568,6 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-
     return data;
   }
 
@@ -573,7 +576,7 @@ export class OrdersService {
     if (!existOrder) {
       throw new NotFoundException('Order not found');
     }
-    const newOrder: any = {}
+    const newOrder: any = {};
     const mrn = await this.generateUniqueMRN();
     newOrder.mrn = mrn;
     newOrder.patient = existOrder.patient;
@@ -589,7 +592,9 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
+      configuration().in_house_pharmacy_id,
+    );
     if (autoGenerateBill) {
       const items = await Promise.all(
         data.items.map(async (item) => {
@@ -606,7 +611,7 @@ export class OrdersService {
             gst: 0,
             total: unitPrice * quantity,
           };
-        })
+        }),
       );
 
       await this.billingService.generateBill({
@@ -630,10 +635,13 @@ export class OrdersService {
 
     if (data?.billNo) {
       await this.billingModel
-        .findOneAndUpdate({ mrn: data?.billNo }, { cash: data.paidAmount }, { new: true, runValidators: true })
+        .findOneAndUpdate(
+          { mrn: data?.billNo },
+          { cash: data.paidAmount },
+          { new: true, runValidators: true },
+        )
         .lean();
     }
-
 
     if (!data) {
       throw new NotFoundException('Order not found');

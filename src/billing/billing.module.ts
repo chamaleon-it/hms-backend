@@ -20,4 +20,4 @@ import { Order, OrderSchema } from 'src/pharmacy/orders/schemas/order.schema';
   providers: [BillingService],
   exports: [BillingService],
 })
-export class BillingModule { }
+export class BillingModule {}
