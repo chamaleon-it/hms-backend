@@ -79,6 +79,15 @@ export class Patient {
 
   @Prop({ default: null, type: Date })
   remarksDate: Date;
+
+  @Prop({ default: null, trim: true })
+  guardian: string;
+
+  @Prop({ default: null, trim: true })
+  guardianPhoneNumber: string;
+
+  @Prop({ default: null, trim: true })
+  guardianRelation: string;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

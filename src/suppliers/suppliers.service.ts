@@ -3,12 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Supplier } from './schemas/supplier.schema';
 import { RegisterSupplierDto } from './dto/register-supplier.dto';
+import { UpdateSupplierDto } from './dto/update-suppllier.dto';
 
 @Injectable()
 export class SuppliersService {
   constructor(
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
-  ) {}
+  ) { }
 
   async registerSupplier(dto: RegisterSupplierDto) {
     const supplier = new this.supplierModel(dto);
@@ -56,5 +57,9 @@ export class SuppliersService {
       .find({ isDeleted: false })
       .select({ name: 1, _id: 1 })
       .exec();
+  }
+
+  async updateSupplier(id: string, dto: UpdateSupplierDto) {
+    return await this.supplierModel.findByIdAndUpdate(id, dto, { new: true }).exec();
   }
 }

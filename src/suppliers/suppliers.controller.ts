@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { RegisterSupplierDto } from './dto/register-supplier.dto';
+import { UpdateSupplierDto } from './dto/update-suppllier.dto';
 
 @Controller('suppliers')
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) {}
+  constructor(private readonly suppliersService: SuppliersService) { }
 
   @Post()
   async registerSupplier(@Body() dto: RegisterSupplierDto) {
@@ -35,6 +36,14 @@ export class SuppliersController {
     return {
       message: 'Supplier was retrived successfully',
       data: await this.suppliersService.findOne(id),
+    };
+  }
+
+  @Patch(':id')
+  async updateSupplier(@Param('id') id: string, @Body() dto: UpdateSupplierDto) {
+    return {
+      message: 'Supplier updated successfully',
+      data: await this.suppliersService.updateSupplier(id, dto),
     };
   }
 }
