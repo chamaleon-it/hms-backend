@@ -20,7 +20,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -105,7 +105,6 @@ export class ReportController {
   @Get('statistics')
   async getStatistics() {
     const data = await this.reportService.getStatistics();
-    delete data._id;
     return {
       data,
       message: 'All statistics retrived',
