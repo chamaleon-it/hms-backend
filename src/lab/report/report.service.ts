@@ -16,7 +16,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -83,7 +83,7 @@ export class ReportService {
           path: 'panels',
         },
       })
-      .sort({ createdAt: -1 })
+      // .sort({ createdAt: -1 })
       .lean()
       .exec();
 
