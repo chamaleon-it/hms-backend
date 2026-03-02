@@ -139,4 +139,13 @@ export class ReportController {
       data,
     };
   }
+
+  @Post("recover/:id")
+  async recoverReport(@Param("id") id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.recoverReport(id);
+    return {
+      message: 'Report is recovered',
+      data,
+    };
+  }
 }

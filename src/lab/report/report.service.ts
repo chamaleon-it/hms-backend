@@ -62,15 +62,20 @@ export class ReportService {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
+    match.isDeleted = false;
+
     if (dto.status) {
       if (dto.status === 'Flagged') {
         match.isFlagged = true;
-      } else {
+      } else if (dto.status === "Deleted") {
+        match.isDeleted = true;
+      }
+      else {
         match.status = dto.status;
       }
     }
 
-    match.isDeleted = false;
+
 
     const data = await this.reportModel
       .find(match)
@@ -327,6 +332,16 @@ export class ReportService {
       throw new NotFoundException('Records not found');
     }
     data.extraTime = data.extraTime + dto.duration;
+    await data.save();
+    return data;
+  }
+
+  async recoverReport(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.isDeleted = false;
     await data.save();
     return data;
   }
