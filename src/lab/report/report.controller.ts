@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -145,6 +146,19 @@ export class ReportController {
     const data = await this.reportService.recoverReport(id);
     return {
       message: 'Report is recovered',
+      data,
+    };
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateReport(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: CreateReportDto,
+  ) {
+    const data = await this.reportService.updateReport(id, dto);
+    return {
+      message: 'Report is updated successfully',
       data,
     };
   }

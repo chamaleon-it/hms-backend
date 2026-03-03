@@ -102,8 +102,10 @@ export class ReportService {
     if (!report) throw new NotFoundException('Report not found');
 
     test.forEach((n) => {
+      if (!n?.name?._id) return;
+
       const index = report.test.findIndex(
-        (x) => x.name.toString() === n.name._id.toString(),
+        (x) => x?.name?.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
         report.test[index].value = n.value;
@@ -345,4 +347,28 @@ export class ReportService {
     await data.save();
     return data;
   }
+
+  async updateReport(id: mongoose.Types.ObjectId, dto: CreateReportDto) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+
+    if (dto.test) {
+      data.test = dto.test.map((t) => ({ name: t.name, value: t.value ?? '' })) as any;
+    }
+    if (dto.panels) {
+      data.panels = dto.panels;
+    }
+    if (dto.priority) {
+      data.priority = dto.priority;
+    }
+    if (dto.date) {
+      data.date = dto.date;
+    }
+
+    await data.save();
+    return data;
+  }
+
 }
