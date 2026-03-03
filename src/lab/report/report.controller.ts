@@ -150,6 +150,15 @@ export class ReportController {
     };
   }
 
+  @Post("repeat/:id")
+  async repeatReport(@Param("id") id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.repeatReport(id);
+    return {
+      message: 'Report is repeated',
+      data,
+    };
+  }
+
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   async updateReport(
