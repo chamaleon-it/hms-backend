@@ -102,8 +102,10 @@ export class ReportService {
     if (!report) throw new NotFoundException('Report not found');
 
     test.forEach((n) => {
+      if (!n?.name?._id) return;
+
       const index = report.test.findIndex(
-        (x) => x.name.toString() === n.name._id.toString(),
+        (x) => x?.name?.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
         report.test[index].value = n.value;
