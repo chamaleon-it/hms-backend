@@ -25,6 +25,7 @@ export class ReportService {
       patient: dto.patient,
       status: ReportStatus.UPCOMING,
       lab: dto.lab,
+      isDeleted: false,
     });
 
     if (!userReport) {
@@ -372,4 +373,12 @@ export class ReportService {
     return data;
   }
 
+  async repeatReport(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    const newReport = await this.createReport({ date: new Date(), doctor: data.doctor, panels: data.panels, test: data.test, patient: data.patient, priority: data.priority, sampleType: data.sampleType, status: ReportStatus.UPCOMING, lab: data.lab })
+    return newReport;
+  }
 }
