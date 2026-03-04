@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -20,7 +21,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -105,7 +106,6 @@ export class ReportController {
   @Get('statistics')
   async getStatistics() {
     const data = await this.reportService.getStatistics();
-    delete data._id;
     return {
       data,
       message: 'All statistics retrived',
@@ -137,6 +137,37 @@ export class ReportController {
     const data = await this.reportService.resetTimer(id, dto);
     return {
       message: 'Timer is reset',
+      data,
+    };
+  }
+
+  @Post("recover/:id")
+  async recoverReport(@Param("id") id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.recoverReport(id);
+    return {
+      message: 'Report is recovered',
+      data,
+    };
+  }
+
+  @Post("repeat/:id")
+  async repeatReport(@Param("id") id: mongoose.Types.ObjectId) {
+    const data = await this.reportService.repeatReport(id);
+    return {
+      message: 'Report is repeated',
+      data,
+    };
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateReport(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: CreateReportDto,
+  ) {
+    const data = await this.reportService.updateReport(id, dto);
+    return {
+      message: 'Report is updated successfully',
       data,
     };
   }

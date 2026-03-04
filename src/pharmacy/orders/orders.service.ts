@@ -97,11 +97,11 @@ export class OrdersService {
     const filter: {
       status?: Record<string, string> | string;
       priority?: string;
+      isDeleted?: boolean
     } = {};
 
-    filter.status = {
-      $ne: OrderStatus.Deleted,
-    };
+
+    filter.isDeleted = false
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
@@ -111,6 +111,8 @@ export class OrdersService {
       filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
+    } else if (q === "Deleted") {
+      filter.isDeleted = true
     }
 
     const [data, total] = await Promise.all([
@@ -139,7 +141,7 @@ export class OrdersService {
       .findByIdAndUpdate(
         id,
         {
-          status: OrderStatus.Deleted,
+          isDeleted: true,
         },
         { new: true, runValidators: true },
       )
@@ -306,7 +308,7 @@ export class OrdersService {
     let total = 0;
 
     const orderMatch: any = {
-      status: { $ne: OrderStatus.Deleted },
+      isDeleted: false,
       patient: { $exists: true, $ne: null },
     };
 
@@ -453,7 +455,7 @@ export class OrdersService {
 
     const orders: any[] = await this.orderModel
       .find({
-        status: { $ne: OrderStatus.Deleted },
+        isDeleted: false,
         patient: { $in: patients.map((e) => e._id) },
       })
       .select('patient items.quantity createdAt')
@@ -643,6 +645,14 @@ export class OrdersService {
         .lean();
     }
 
+    if (!data) {
+      throw new NotFoundException('Order not found');
+    }
+    return data;
+  }
+
+  async recoverOrder(id: mongoose.Types.ObjectId) {
+    const data = await this.orderModel.findByIdAndUpdate(id, { isDeleted: false }, { new: true, runValidators: true }).lean();
     if (!data) {
       throw new NotFoundException('Order not found');
     }

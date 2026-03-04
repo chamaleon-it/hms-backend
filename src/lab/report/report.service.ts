@@ -16,7 +16,7 @@ import { GetReportDto } from './dto/get-report.dto';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) {}
+  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -25,6 +25,7 @@ export class ReportService {
       patient: dto.patient,
       status: ReportStatus.UPCOMING,
       lab: dto.lab,
+      isDeleted: false,
     });
 
     if (!userReport) {
@@ -62,15 +63,20 @@ export class ReportService {
       $or: [{ doctor: user }, { lab: user }, { patient: user }],
     };
 
+    match.isDeleted = false;
+
     if (dto.status) {
       if (dto.status === 'Flagged') {
         match.isFlagged = true;
-      } else {
+      } else if (dto.status === "Deleted") {
+        match.isDeleted = true;
+      }
+      else {
         match.status = dto.status;
       }
     }
 
-    match.isDeleted = false;
+
 
     const data = await this.reportModel
       .find(match)
@@ -83,7 +89,7 @@ export class ReportService {
           path: 'panels',
         },
       })
-      .sort({ createdAt: -1 })
+      // .sort({ createdAt: -1 })
       .lean()
       .exec();
 
@@ -97,8 +103,10 @@ export class ReportService {
     if (!report) throw new NotFoundException('Report not found');
 
     test.forEach((n) => {
+      if (!n?.name?._id) return;
+
       const index = report.test.findIndex(
-        (x) => x.name.toString() === n.name._id.toString(),
+        (x) => x?.name?.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
         report.test[index].value = n.value;
@@ -127,6 +135,7 @@ export class ReportService {
       .find({ patient, isDeleted: false })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
+      .populate('test.name')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
@@ -329,5 +338,47 @@ export class ReportService {
     data.extraTime = data.extraTime + dto.duration;
     await data.save();
     return data;
+  }
+
+  async recoverReport(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    data.isDeleted = false;
+    await data.save();
+    return data;
+  }
+
+  async updateReport(id: mongoose.Types.ObjectId, dto: CreateReportDto) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+
+    if (dto.test) {
+      data.test = dto.test.map((t) => ({ name: t.name, value: t.value ?? '' })) as any;
+    }
+    if (dto.panels) {
+      data.panels = dto.panels;
+    }
+    if (dto.priority) {
+      data.priority = dto.priority;
+    }
+    if (dto.date) {
+      data.date = dto.date;
+    }
+
+    await data.save();
+    return data;
+  }
+
+  async repeatReport(id: mongoose.Types.ObjectId) {
+    const data = await this.reportModel.findById(id);
+    if (!data) {
+      throw new NotFoundException('Records not found');
+    }
+    const newReport = await this.createReport({ date: new Date(), doctor: data.doctor, panels: data.panels, test: data.test, patient: data.patient, priority: data.priority, sampleType: data.sampleType, status: ReportStatus.UPCOMING, lab: data.lab })
+    return newReport;
   }
 }
