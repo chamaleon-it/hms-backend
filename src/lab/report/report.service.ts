@@ -134,6 +134,7 @@ export class ReportService {
       .find({ patient, isDeleted: false })
       .populate('doctor', 'name specialization')
       .populate('lab', 'name')
+      .populate('test.name')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
