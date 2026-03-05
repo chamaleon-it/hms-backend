@@ -45,6 +45,22 @@ export class ReportController {
     };
   }
 
+  @Get('by_date')
+  @UseGuards(JwtAuthGuard)
+  async getReportByDate(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('status') status?: string,
+    @Query('patient') patient?: string,
+  ) {
+    const patientId = patient ? new mongoose.Types.ObjectId(patient) : undefined;
+    const data = await this.reportService.getReportByDate(startDate, endDate, patientId, status);
+    return {
+      data,
+      message: 'All Lab report retrived by date successfully.',
+    };
+  }
+
   @Post('sample_collected/:id')
   async sampleCollected(
     @Param('id') id: mongoose.Types.ObjectId,
