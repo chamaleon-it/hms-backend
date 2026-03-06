@@ -76,6 +76,12 @@ export class ReportService {
       }
     }
 
+    if (dto.startDate && dto.endDate) {
+      match.createdAt = {
+        $gte: dto.startDate,
+        $lte: dto.endDate,
+      }
+    }
 
 
     const data = await this.reportModel
