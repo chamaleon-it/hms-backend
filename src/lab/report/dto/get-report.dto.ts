@@ -7,4 +7,6 @@ export class GetReportDto {
   q?: string;
   doctor?: mongoose.Types.ObjectId;
   lab?: mongoose.Types.ObjectId;
+  startDate?: Date;
+  endDate?: Date;
 }

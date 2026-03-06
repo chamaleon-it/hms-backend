@@ -7,7 +7,7 @@ export class CreateReportDto {
   lab?: Types.ObjectId;
   date: Date;
   priority: string;
-  panels: string[];
+  panels?: string[];
   test: {
     name: mongoose.Types.ObjectId;
     value?: string | number;
