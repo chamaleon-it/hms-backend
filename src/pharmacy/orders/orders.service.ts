@@ -98,7 +98,15 @@ export class OrdersService {
       status?: Record<string, string> | string;
       priority?: string;
       isDeleted?: boolean
+      createdAt?: Record<string, Date>
     } = {};
+
+    if (query.startDate && query.endDate) {
+      filter.createdAt = {
+        $gte: query.startDate,
+        $lte: query.endDate,
+      };
+    }
 
 
     filter.isDeleted = false
