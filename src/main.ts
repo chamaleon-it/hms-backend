@@ -7,18 +7,18 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.enableCors({
     origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'http://localhost:3004',
-      'https://synapsehms.com',
+      'http://localhost:4000',
+      'http://localhost:4001',
+      'http://localhost:4002',
+      'http://localhost:4003',
+      'http://localhost:4004',
+      'https://mukalel.synapsehms.com',
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
-  await app.listen(3001);
+  await app.listen(4001);
 }
 
 bootstrap();
