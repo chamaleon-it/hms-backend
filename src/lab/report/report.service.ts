@@ -398,39 +398,4 @@ export class ReportService {
     return newReport;
   }
 
-  async getReportByDate(startDate: string, endDate: string, patient?: mongoose.Types.ObjectId, status?: string) {
-    const query: any = { date: { $gte: new Date(startDate), $lte: new Date(endDate) }, isDeleted: false };
-
-    if (patient) {
-      query.patient = patient;
-    }
-
-    if (status) {
-      if (status === 'Flagged') {
-        query.isFlagged = true;
-      } else if (status === "Deleted") {
-        query.isDeleted = true;
-      } else {
-        query.status = status;
-      }
-    }
-
-    const data = await this.reportModel.find(query)
-      .populate('doctor', 'name specialization')
-      .populate('lab', 'name specialization')
-      .populate('patient')
-      .populate({
-        path: 'test.name',
-        populate: {
-          path: 'panels',
-          populate: {
-            path: 'tests',
-            select: 'name'
-          }
-        },
-      })
-      .lean()
-      .exec();
-    return data;
-  }
 }
