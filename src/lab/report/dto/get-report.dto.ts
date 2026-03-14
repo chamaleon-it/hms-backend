@@ -3,8 +3,10 @@ import { ReportStatus } from 'src/lab/report/schemas/report.schema';
 
 export class GetReportDto {
   type?: 'Lab' | 'Imaging';
-  status?: ReportStatus;
+  status?: ReportStatus | 'Flagged' | "Deleted";
   q?: string;
   doctor?: mongoose.Types.ObjectId;
   lab?: mongoose.Types.ObjectId;
+  startDate?: Date;
+  endDate?: Date;
 }

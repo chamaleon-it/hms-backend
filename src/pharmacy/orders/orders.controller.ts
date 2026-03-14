@@ -137,7 +137,7 @@ export class OrdersController {
     };
   }
 
-  @Post("repeat_order/:id")
+  @Post('repeat_order/:id')
   async repeatOrder(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.ordersService.repeatOrder(id);
     return {
@@ -151,6 +151,15 @@ export class OrdersController {
     const data = await this.ordersService.updatePayment(dto);
     return {
       message: 'Payment updated successfully',
+      data,
+    };
+  }
+
+  @Post("recover/:id")
+  async recoverOrder(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.ordersService.recoverOrder(id);
+    return {
+      message: 'Order recovered successfully',
       data,
     };
   }

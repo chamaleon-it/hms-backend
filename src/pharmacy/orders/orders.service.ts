@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderPriority, OrderStatus } from './schemas/order.schema';
+import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
@@ -18,12 +18,14 @@ import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { Billing } from 'src/billing/schemas/billing.schema';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
@@ -47,7 +49,9 @@ export class OrdersService {
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
     const data = await this.orderModel.create(order);
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
+      configuration().in_house_pharmacy_id,
+    );
     if (autoGenerateBill) {
       const items = await Promise.all(
         order.items.map(async (item) => {
@@ -64,7 +68,7 @@ export class OrdersService {
             gst: 0,
             total: unitPrice * quantity,
           };
-        })
+        }),
       );
 
       const bill = await this.billingService.generateBill({
@@ -75,6 +79,12 @@ export class OrdersService {
       });
 
       data.billNo = bill.mrn;
+
+      if (order.allergies) {
+        await this.patientModel.findByIdAndUpdate(order.patient, {
+          allergies: order.allergies,
+        });
+      }
       await data.save();
     }
     return data;
@@ -87,11 +97,19 @@ export class OrdersService {
     const filter: {
       status?: Record<string, string> | string;
       priority?: string;
+      isDeleted?: boolean
+      createdAt?: Record<string, Date>
     } = {};
 
-    filter.status = {
-      $ne: OrderStatus.Deleted,
-    };
+    if (query.startDate && query.endDate) {
+      filter.createdAt = {
+        $gte: query.startDate,
+        $lte: query.endDate,
+      };
+    }
+
+
+    filter.isDeleted = false
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
@@ -101,6 +119,8 @@ export class OrdersService {
       filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
+    } else if (q === "Deleted") {
+      filter.isDeleted = true
     }
 
     const [data, total] = await Promise.all([
@@ -129,7 +149,7 @@ export class OrdersService {
       .findByIdAndUpdate(
         id,
         {
-          status: OrderStatus.Deleted,
+          isDeleted: true,
         },
         { new: true, runValidators: true },
       )
@@ -147,7 +167,7 @@ export class OrdersService {
     const searchRegex = { $regex: '^' + q, $options: 'i' };
 
     const filter = {
-      $or: [{ mrn: searchRegex }],
+      $or: [{ mrn: searchRegex }, { billNo: searchRegex }],
     };
 
     const data = await this.orderModel
@@ -266,7 +286,8 @@ export class OrdersService {
     }
 
     if (gender) {
-      patientFilter.gender = gender === "Other" ? { $nin: ["Male", "Female"] } : gender;
+      patientFilter.gender =
+        gender === 'Other' ? { $nin: ['Male', 'Female'] } : gender;
     }
 
     if (doctor && alreadyPurchase === 'false') {
@@ -295,7 +316,7 @@ export class OrdersService {
     let total = 0;
 
     const orderMatch: any = {
-      status: { $ne: OrderStatus.Deleted },
+      isDeleted: false,
       patient: { $exists: true, $ne: null },
     };
 
@@ -357,7 +378,10 @@ export class OrdersService {
           },
         });
         if (mongoose.isValidObjectId(q)) {
-          (aggregationPipeline[aggregationPipeline.length - 1].$match.$or as any[]).push({
+          (
+            aggregationPipeline[aggregationPipeline.length - 1].$match
+              .$or as any[]
+          ).push({
             'patientDetail._id': new mongoose.Types.ObjectId(q),
           });
         }
@@ -439,7 +463,7 @@ export class OrdersService {
 
     const orders: any[] = await this.orderModel
       .find({
-        status: { $ne: OrderStatus.Deleted },
+        isDeleted: false,
         patient: { $in: patients.map((e) => e._id) },
       })
       .select('patient items.quantity createdAt')
@@ -500,8 +524,6 @@ export class OrdersService {
     }
     const totalVisit = orders.length;
 
-
-
     const totalSpend: number = orders.reduce((orderAcc, order: any) => {
       const itemsTotal: number = (order.items || []).reduce(
         (
@@ -556,7 +578,6 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-
     return data;
   }
 
@@ -565,7 +586,7 @@ export class OrdersService {
     if (!existOrder) {
       throw new NotFoundException('Order not found');
     }
-    const newOrder: any = {}
+    const newOrder: any = {};
     const mrn = await this.generateUniqueMRN();
     newOrder.mrn = mrn;
     newOrder.patient = existOrder.patient;
@@ -581,7 +602,9 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(configuration().in_house_pharmacy_id);
+    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
+      configuration().in_house_pharmacy_id,
+    );
     if (autoGenerateBill) {
       const items = await Promise.all(
         data.items.map(async (item) => {
@@ -598,7 +621,7 @@ export class OrdersService {
             gst: 0,
             total: unitPrice * quantity,
           };
-        })
+        }),
       );
 
       await this.billingService.generateBill({
@@ -619,6 +642,25 @@ export class OrdersService {
       .populate('doctor', 'name phoneNumber specialization')
       .populate('items.name')
       .lean();
+
+    if (data?.billNo) {
+      await this.billingModel
+        .findOneAndUpdate(
+          { mrn: data?.billNo },
+          { cash: data.paidAmount },
+          { new: true, runValidators: true },
+        )
+        .lean();
+    }
+
+    if (!data) {
+      throw new NotFoundException('Order not found');
+    }
+    return data;
+  }
+
+  async recoverOrder(id: mongoose.Types.ObjectId) {
+    const data = await this.orderModel.findByIdAndUpdate(id, { isDeleted: false }, { new: true, runValidators: true }).lean();
     if (!data) {
       throw new NotFoundException('Order not found');
     }

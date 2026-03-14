@@ -19,16 +19,19 @@ export class ReturnService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async create(createReturnDto: CreateReturnDto) {
-    createReturnDto.billNo = `R-${createReturnDto.billNo}`
+    createReturnDto.billNo = `R-${createReturnDto.billNo}`;
+    const existingBilling = await this.billingModel.exists({
+      mrn: createReturnDto.billNo,
+    });
+    if (existingBilling) {
+      throw new BadRequestException(
+        'A return with this bill number already exists. Please use a unique bill number.',
+      );
+    }
     const data = await this.returnModel.create(createReturnDto);
-
-
-    const prefix = await this.usersService.getPharmacyBillingPrefix(
-      new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-    );
 
     await this.billingModel.create({
       patient: createReturnDto.patient,
@@ -44,11 +47,11 @@ export class ReturnService {
             unitPrice: e.unitPrice,
             total,
           };
-        })
+        }),
       ),
       mrn: createReturnDto.billNo,
-      transactionType: "Return",
-    })
+      transactionType: 'Return',
+    });
 
     const validReasonForQuantityAdd = [
       ReturnReason.AdverseReaction,

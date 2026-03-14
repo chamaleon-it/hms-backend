@@ -17,7 +17,6 @@ export enum OrderStatus {
   Failed = 'Failed',
   Canceled = 'Canceled',
   Completed = 'Completed',
-  Deleted = 'Deleted',
 }
 
 export enum PaymentStatus {
@@ -93,9 +92,7 @@ export class Order {
   @Prop({ default: null })
   assignedTo: string;
 
-
-
-  @Prop({ default: "-" })
+  @Prop({ default: '-' })
   pharmacist: string;
 
   @Prop({
@@ -113,6 +110,9 @@ export class Order {
 
   @Prop({ default: '-' })
   billNo: string;
+
+  @Prop({ default: false })
+  isDeleted: boolean
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

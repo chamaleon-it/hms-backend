@@ -8,6 +8,12 @@ export class BillingItem {
   @Prop({ required: true, trim: true })
   item: string;
 
+  @Prop({ required: true, trim: true })
+  code: string;
+
+  @Prop({ required: true })
+  price: number;
+
   @Prop({
     required: true,
     type: mongoose.Schema.Types.ObjectId,

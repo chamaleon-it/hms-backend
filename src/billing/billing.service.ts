@@ -14,12 +14,17 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import {
+  Order,
+  PaymentStatus,
+} from 'src/pharmacy/orders/schemas/order.schema';
 
 @Injectable()
 export class BillingService {
   constructor(
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
+    @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
   ) { }
 
@@ -45,6 +50,50 @@ export class BillingService {
     );
     createBill.mrn = await this.generateUniqueMRN(prefix);
     const data = await this.billingModel.create(createBill);
+    if (createBill.rxId) {
+      const order: any = await this.orderModel
+        .findOne({ mrn: createBill.rxId })
+        .populate('items.name');
+      if (order) {
+        order.billNo = data.mrn;
+        const paidAmount =
+          (createBill.cash ?? 0) +
+          (createBill.online ?? 0) +
+          (createBill.insurance ?? 0) +
+          (createBill.discount ?? 0);
+        order.paidAmount =
+          paidAmount >=
+            order.items.reduce(
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
+            ? order.items.reduce(
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
+            : paidAmount;
+        if (paidAmount === 0) {
+          order.paymentStatus = PaymentStatus.Pending;
+        } else if (
+          paidAmount <
+          order.items.reduce(
+            (total, item) => total + item.quantity * item.name.unitPrice,
+            0,
+          )
+        ) {
+          order.paymentStatus = PaymentStatus.Partial;
+        } else if (
+          paidAmount >=
+          order.items.reduce(
+            (total, item) => total + item.quantity * item.name.unitPrice,
+            0,
+          )
+        ) {
+          order.paymentStatus = PaymentStatus.Paid;
+        }
+        await order.save();
+      }
+    }
     return data;
   }
 
@@ -106,10 +155,7 @@ export class BillingService {
               $lte: [
                 '$itemsTotal',
                 {
-                  $add: [
-                    '$totalPaid',
-                    { $cond: ['$roundOff', 1, 0] },
-                  ],
+                  $add: ['$totalPaid', { $cond: ['$roundOff', 1, 0] }],
                 },
               ],
             },
@@ -124,10 +170,7 @@ export class BillingService {
                   $gt: [
                     '$itemsTotal',
                     {
-                      $add: [
-                        '$totalPaid',
-                        { $cond: ['$roundOff', 1, 0] },
-                      ],
+                      $add: ['$totalPaid', { $cond: ['$roundOff', 1, 0] }],
                     },
                   ],
                 },
@@ -200,7 +243,7 @@ export class BillingService {
   ) {
     const isExist = await this.billingItemModel.exists({
       user,
-      item: addBillingItemDto.item,
+      code: addBillingItemDto.code,
     });
 
     if (isExist) {
@@ -208,7 +251,7 @@ export class BillingService {
     }
     const data = await this.billingItemModel.create({
       user,
-      item: addBillingItemDto.item,
+      ...addBillingItemDto,
     });
     return data;
   }
@@ -217,12 +260,13 @@ export class BillingService {
     { item }: GetBillingItemDto,
     user: mongoose.Types.ObjectId,
   ) {
-    return this.billingItemModel
-      .find({ user, item: new RegExp(item, 'i') })
-      .limit(5)
-      .distinct('item')
-      .lean()
-      .exec();
+    const filter: any = { user };
+
+    if (item) {
+      filter.item = new RegExp(`^${item}`, 'i');
+    }
+
+    return this.billingItemModel.find(filter).lean().exec();
   }
 
   async deleteBillingItem(item: string, user: mongoose.Types.ObjectId) {
@@ -230,14 +274,32 @@ export class BillingService {
     return data;
   }
 
-  async addPayment(id: mongoose.Types.ObjectId, addPaymentDto: AddPaymentDto, user: mongoose.Types.ObjectId) {
-    const data = await this.billingModel.findOneAndUpdate({ _id: id }, { $set: { cash: addPaymentDto.cash, insurance: addPaymentDto.insurance, online: addPaymentDto.online } }, { new: true });
+  async addPayment(
+    id: mongoose.Types.ObjectId,
+    addPaymentDto: AddPaymentDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.billingModel.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          cash: addPaymentDto.cash,
+          insurance: addPaymentDto.insurance,
+          online: addPaymentDto.online,
+        },
+      },
+      { new: true },
+    );
     if (!data) throw new NotFoundException('Bill is not found.');
     return data;
   }
 
   async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto) {
-    const data = await this.billingModel.findOneAndUpdate({ _id: id }, { $inc: { cash: markAsPaidDto.amount } }, { new: true });
+    const data = await this.billingModel.findOneAndUpdate(
+      { _id: id },
+      { $inc: { cash: markAsPaidDto.amount } },
+      { new: true },
+    );
     if (!data) throw new NotFoundException('Bill is not found.');
     return data;
   }

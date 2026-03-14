@@ -12,7 +12,7 @@ export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
-  ) { }
+  ) {}
 
   async createPanel(createPanelDto: CreatePanelDto) {
     const isExist = await this.panelModel.findOne({

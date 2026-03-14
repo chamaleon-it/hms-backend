@@ -48,9 +48,15 @@ export class AppointmentsService {
     };
     if (query && query.trim())
       $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
-    if (status?.length) $match.status = { $in: status };
+    if (status?.length) {
+      if (status.includes("Deleted")) {
+        $match.isDeleted = true;
+      } else {
+        $match.isDeleted = false;
+        $match.status = { $in: status }
+      }
+    };
 
-    $match.isDeleted = false;
     return this.appointmentModel
       .aggregate([
         { $match },
@@ -376,6 +382,17 @@ export class AppointmentsService {
     return data;
   }
 
+  async recoverAppointment(id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentModel.findByIdAndUpdate(
+      id,
+      { isDeleted: false },
+      { new: true },
+    );
+    if (!data) {
+      throw new BadRequestException('No appointment found');
+    }
+    return data;
+  }
 }
 
 export function safeRegex(input: string) {

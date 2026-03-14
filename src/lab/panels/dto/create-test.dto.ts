@@ -4,6 +4,8 @@ import {
   IsNumber,
   IsArray,
   IsEmpty,
+  IsNotEmpty,
+  IsEnum,
 } from 'class-validator';
 import mongoose from 'mongoose';
 
@@ -23,6 +25,11 @@ export class CreateTestDto {
   @IsOptional()
   @IsNumber({}, { message: 'Estimated time must be a number' })
   estimatedTime?: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsEnum(['number', 'text', 'boolean'])
+  dataType: 'number' | 'text' | 'boolean';
 
   @IsOptional()
   @IsNumber({}, { message: 'Minimum value must be a number' })

@@ -43,9 +43,7 @@ export class AppointmentsController {
   async getAppointments(@Query() getListDto: GetListDto) {
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
-      status: getListDto.status
-        ? getListDto.status
-        : [],
+      status: getListDto.status ? getListDto.status : [],
       date: getListDto.date || new Date().toString(),
     });
     return {
@@ -174,6 +172,15 @@ export class AppointmentsController {
     return {
       data,
       message: 'Appointment deleted successfully.',
+    };
+  }
+
+  @Post("recover/:id")
+  async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentsService.recoverAppointment(id);
+    return {
+      data,
+      message: 'Appointment recovered successfully.',
     };
   }
 }

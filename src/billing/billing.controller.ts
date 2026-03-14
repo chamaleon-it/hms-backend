@@ -23,7 +23,7 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) { }
+  constructor(private readonly billingService: BillingService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -46,7 +46,10 @@ export class BillingController {
     @GetUser() user: JWTUserInterface,
     @Query() getBillisDto: GetBillisDto,
   ) {
-    const { data, total } = await this.billingService.getBills(user.id, getBillisDto);
+    const { data, total } = await this.billingService.getBills(
+      user.id,
+      getBillisDto,
+    );
     return {
       message: 'All bills were retrived successfully.',
       data,
@@ -111,23 +114,30 @@ export class BillingController {
     };
   }
 
-  @Patch("add_payment/:id")
+  @Patch('add_payment/:id')
   @UseGuards(JwtAuthGuard)
   async addPayment(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() addPaymentDto: AddPaymentDto,
     @GetUser() user: JWTUserInterface,
   ) {
-    const data = await this.billingService.addPayment(id, addPaymentDto, user.id);
+    const data = await this.billingService.addPayment(
+      id,
+      addPaymentDto,
+      user.id,
+    );
     return {
       data,
       message: 'Payment is added successfully.',
     };
   }
 
-  @Patch("mark_as_paid/:id")
+  @Patch('mark_as_paid/:id')
   @UseGuards(JwtAuthGuard)
-  async markAsPaid(@Param('id') id: mongoose.Types.ObjectId, @Body() markAsPaidDto: MarkAsPaidDto) {
+  async markAsPaid(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() markAsPaidDto: MarkAsPaidDto,
+  ) {
     const data = await this.billingService.markAsPaid(id, markAsPaidDto);
     return {
       data,

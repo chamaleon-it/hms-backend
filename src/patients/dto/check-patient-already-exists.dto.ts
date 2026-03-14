@@ -1,6 +1,5 @@
 export class CheckPatientAlreadyExistsDto {
-    name?: string;
-    phoneNumber?: string;
-    email?: string;
-
+  name?: string;
+  phoneNumber?: string;
+  email?: string;
 }

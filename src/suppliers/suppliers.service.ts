@@ -3,47 +3,63 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Supplier } from './schemas/supplier.schema';
 import { RegisterSupplierDto } from './dto/register-supplier.dto';
+import { UpdateSupplierDto } from './dto/update-suppllier.dto';
 
 @Injectable()
 export class SuppliersService {
+  constructor(
+    @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
+  ) { }
 
-    constructor(@InjectModel(Supplier.name) private supplierModel: Model<Supplier>) { }
+  async registerSupplier(dto: RegisterSupplierDto) {
+    const supplier = new this.supplierModel(dto);
+    return supplier.save();
+  }
 
-    async registerSupplier(dto: RegisterSupplierDto) {
-        const supplier = new this.supplierModel(dto);
-        return supplier.save();
-    }
-
-    async findAll() {
-        return await this.supplierModel.aggregate([
-            { $match: { isDeleted: false } },
-            {
-                $lookup: {
-                    from: 'purchaseentries',
-                    localField: '_id',
-                    foreignField: 'supplier',
-                    as: 'purchaseEntries',
-                },
+  async findAll() {
+    return await this.supplierModel
+      .aggregate([
+        { $match: { isDeleted: false } },
+        {
+          $lookup: {
+            from: 'purchaseentries',
+            localField: '_id',
+            foreignField: 'supplier',
+            as: 'purchaseEntries',
+          },
+        },
+        {
+          $addFields: {
+            totalPurchaseCount: { $size: '$purchaseEntries' },
+            totalPurchaseValue: { $sum: '$purchaseEntries.total' },
+            totalDue: {
+              $subtract: [
+                { $sum: '$purchaseEntries.total' },
+                { $sum: '$purchaseEntries.paidAmount' },
+              ],
             },
-            {
-                $addFields: {
-                    totalPurchaseCount: { $size: '$purchaseEntries' },
-                    totalPurchaseValue: { $sum: '$purchaseEntries.total' },
-                    totalDue: { $subtract: [{ $sum: '$purchaseEntries.total' }, { $sum: '$purchaseEntries.paidAmount' }] },
-                },
-            },
-            {
-                $project: {
-                    purchaseEntries: 0,
-                },
-            },
-        ]).exec();
-    }
+          },
+        },
+        {
+          $project: {
+            purchaseEntries: 0,
+          },
+        },
+      ])
+      .exec();
+  }
 
-    async findOne(id: string) {
-        return await this.supplierModel.findById(id).exec();
-    }
-    getIdAndName() {
-        return this.supplierModel.find({ isDeleted: false }).select({ name: 1, _id: 1 }).exec();
-    }
+  async findOne(id: string) {
+    return await this.supplierModel.findById(id).exec();
+  }
+  getIdAndName() {
+    return this.supplierModel
+      .find({ isDeleted: false })
+      .select({ name: 1, _id: 1 })
+      .exec();
+  }
+
+  async updateSupplier(id: string, dto: UpdateSupplierDto) {
+    return await this.supplierModel.findByIdAndUpdate(id, dto, { new: true }).exec();
+  }
 }

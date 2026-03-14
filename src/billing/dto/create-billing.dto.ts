@@ -109,4 +109,8 @@ export class CreateBillingDto {
   @IsString()
   @IsOptional()
   mrn?: string;
+
+  @IsString()
+  @IsOptional()
+  rxId?: string;
 }

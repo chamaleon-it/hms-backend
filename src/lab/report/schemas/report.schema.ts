@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, Model, Types } from 'mongoose';
 import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
@@ -11,11 +11,10 @@ export enum SampleType {
 }
 
 export enum ReportStatus {
-  PENDING = 'Pending',
-  IN_PROGRESS = 'In Progress',
+  UPCOMING = 'Upcoming',
+  SAMPLE_COLLECTED = 'Sample Collected',
+  WAITING_FOR_RESULT = 'Waiting For Result',
   COMPLETED = 'Completed',
-  FLAGGED = 'Flagged',
-  DELETED = 'Deleted',
 }
 
 @Schema({ versionKey: false, timestamps: true })
@@ -72,11 +71,54 @@ export class Report {
   sampleCollectedAt: Date | null;
 
   @Prop({
+    type: Date,
+    default: null,
+  })
+  testStartedAt: Date | null;
+
+  @Prop({
+    type: String,
+    default: null,
+  })
+  sampleId: string | null;
+
+  @Prop({
+    type: Number,
+    default: 0,
+  })
+  extraTime: number; // in minutes
+
+  @Prop({
     type: String,
     enum: Object.values(ReportStatus),
-    default: ReportStatus.PENDING,
+    default: ReportStatus.UPCOMING,
   })
   status: ReportStatus;
+
+  @Prop({ default: false })
+  isDeleted: boolean;
+
+  @Prop({ default: false })
+  isFlagged: boolean;
+
+  @Prop({ type: Number, unique: true })
+  mrn: number;
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+
+ReportSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    const model = this.constructor as Model<ReportDocument>;
+
+    const lastReport = await model
+      .findOne()
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean();
+
+    this.mrn = lastReport ? lastReport.mrn + 1 : 1;
+  }
+
+  next();
+});
