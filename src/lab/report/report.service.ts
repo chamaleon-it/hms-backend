@@ -21,10 +21,16 @@ export class ReportService {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
     }
+    const startOfDay = new Date(dto.date);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(dto.date);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
     const userReport = await this.reportModel.findOne({
       patient: dto.patient,
       status: ReportStatus.UPCOMING,
       lab: dto.lab,
+      date: { $gte: startOfDay, $lte: endOfDay },
       isDeleted: false,
     });
 
@@ -93,6 +99,10 @@ export class ReportService {
         path: 'test.name',
         populate: {
           path: 'panels',
+          populate: {
+            path: 'tests',
+            select: 'name'
+          }
         },
       })
       // .sort({ createdAt: -1 })
@@ -389,7 +399,7 @@ export class ReportService {
   }
 
   async getReportByDate(startDate: string, endDate: string, patient?: mongoose.Types.ObjectId, status?: string) {
-    const query: any = { createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }, isDeleted: false };
+    const query: any = { date: { $gte: new Date(startDate), $lte: new Date(endDate) }, isDeleted: false };
 
     if (patient) {
       query.patient = patient;
@@ -413,6 +423,10 @@ export class ReportService {
         path: 'test.name',
         populate: {
           path: 'panels',
+          populate: {
+            path: 'tests',
+            select: 'name'
+          }
         },
       })
       .lean()
