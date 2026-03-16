@@ -52,6 +52,19 @@ export class PanelsController {
     };
   }
 
+  @Patch(':name')
+  @UseGuards(JwtAuthGuard)
+  async updatePanel(
+    @Param('name') name: string,
+    @Body() updatePanelDto: CreatePanelDto,
+  ) {
+    const data = await this.panelsService.updatePanel(name, updatePanelDto);
+    return {
+      message: 'Panel updated successfully',
+      data,
+    };
+  }
+
   @Post('create_test')
   @UseGuards(JwtAuthGuard)
   async createTest(

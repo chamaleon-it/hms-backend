@@ -26,6 +26,12 @@ export class Panel {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   user: mongoose.Types.ObjectId;
+
+  @Prop({ default: 0 })
+  estimatedTime: number;
+
+  @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Test', default: [] })
+  tests: mongoose.Types.ObjectId[];
 }
 
 export const PanelSchema = SchemaFactory.createForClass(Panel);
