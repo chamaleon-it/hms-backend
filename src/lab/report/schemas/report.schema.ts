@@ -103,6 +103,10 @@ export class Report {
 
   @Prop({ type: Number, unique: true })
   mrn: number;
+
+  @Prop({ type: String, default: null })
+  technician: string
+
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
