@@ -14,6 +14,7 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import {
   Order,
   PaymentStatus,
@@ -253,6 +254,40 @@ export class BillingService {
       user,
       ...addBillingItemDto,
     });
+    return data;
+  }
+
+  async updateBillingItem(
+    id: mongoose.Types.ObjectId,
+    updateBillingItemDto: UpdateBillingItemDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid billing item ID');
+    }
+
+    if (updateBillingItemDto.code) {
+      const isExist = await this.billingItemModel.exists({
+        user,
+        code: updateBillingItemDto.code,
+        _id: { $ne: id },
+      });
+
+      if (isExist) {
+        throw new BadRequestException('Item code already exists in billing.');
+      }
+    }
+
+    const data = await this.billingItemModel.findOneAndUpdate(
+      { _id: id, user },
+      updateBillingItemDto,
+      { new: true },
+    );
+
+    if (!data) {
+      throw new NotFoundException('Billing item not found');
+    }
+
     return data;
   }
 
