@@ -13,4 +13,4 @@ import { Technician, TechnicianSchema } from './schemas/technician.schema';
   controllers: [TechnicianController],
   providers: [TechnicianService],
 })
-export class TechnicianModule { }
+export class TechnicianModule {}

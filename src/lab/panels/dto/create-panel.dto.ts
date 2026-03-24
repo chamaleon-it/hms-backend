@@ -1,5 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsEmpty, IsNotEmpty, IsNumber, IsString, Min, IsOptional, IsArray } from 'class-validator';
+import {
+  IsEmpty,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  Min,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 import mongoose from 'mongoose';
 
 export class CreatePanelDto {

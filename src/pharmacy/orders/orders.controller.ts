@@ -25,7 +25,7 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
@@ -155,7 +155,7 @@ export class OrdersController {
     };
   }
 
-  @Post("recover/:id")
+  @Post('recover/:id')
   async recoverOrder(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.ordersService.recoverOrder(id);
     return {

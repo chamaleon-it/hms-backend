@@ -55,4 +55,4 @@ import { TechnicianModule } from './lab/technician/technician.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
