@@ -20,6 +20,7 @@ import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -88,6 +89,24 @@ export class BillingController {
     return {
       data,
       message: 'billing item retrived successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('billing_item/:id')
+  async updateBillingItem(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateBillingItemDto: UpdateBillingItemDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.updateBillingItem(
+      id,
+      updateBillingItemDto,
+      user.id,
+    );
+    return {
+      data,
+      message: 'Item is updated successfully.',
     };
   }
 
