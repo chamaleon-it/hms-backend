@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePanelDto } from './dto/create-panel.dto';
 import { Panel, PanelStatus } from './schemas/panel.schema';
 import mongoose, { Model } from 'mongoose';
@@ -167,5 +167,21 @@ export class PanelsService {
       }
     }
     return panel;
+  }
+
+  async deleteTest(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid ID provided.');
+    }
+    const test = await this.testModel.findByIdAndDelete(id);
+    if (!test) {
+      throw new NotFoundException('Test not found.');
+    }
+    // Remove test from all panels
+    await this.panelModel.updateMany(
+      { tests: id },
+      { $pull: { tests: id } },
+    );
+    return test;
   }
 }

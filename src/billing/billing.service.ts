@@ -15,6 +15,7 @@ import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
+import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 
 @Injectable()
 export class BillingService {
@@ -23,7 +24,7 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     let mrn: string;
@@ -60,14 +61,14 @@ export class BillingService {
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
+            order.items.reduce(
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
             ? order.items.reduce(
-                (total, item) => total + item.quantity * item.name.unitPrice,
-                0,
-              )
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
             : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
@@ -250,6 +251,40 @@ export class BillingService {
       user,
       ...addBillingItemDto,
     });
+    return data;
+  }
+
+  async updateBillingItem(
+    id: mongoose.Types.ObjectId,
+    updateBillingItemDto: UpdateBillingItemDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid billing item ID');
+    }
+
+    if (updateBillingItemDto.code) {
+      const isExist = await this.billingItemModel.exists({
+        user,
+        code: updateBillingItemDto.code,
+        _id: { $ne: id },
+      });
+
+      if (isExist) {
+        throw new BadRequestException('Item code already exists in billing.');
+      }
+    }
+
+    const data = await this.billingItemModel.findOneAndUpdate(
+      { _id: id, user },
+      updateBillingItemDto,
+      { new: true },
+    );
+
+    if (!data) {
+      throw new NotFoundException('Billing item not found');
+    }
+
     return data;
   }
 
