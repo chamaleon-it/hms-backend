@@ -14,11 +14,8 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
-import {
-  Order,
-  PaymentStatus,
-} from 'src/pharmacy/orders/schemas/order.schema';
 
 @Injectable()
 export class BillingService {

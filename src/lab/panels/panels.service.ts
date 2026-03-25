@@ -33,50 +33,60 @@ export class PanelsService {
       .sort({ _id: 1 })
       .lean()
       .exec();
-    return panels.map((panel) => ({ name: panel.name, price: panel.price, estimatedTime: panel.estimatedTime, tests: panel.tests }));
+    return panels.map((panel) => ({
+      name: panel.name,
+      price: panel.price,
+      estimatedTime: panel.estimatedTime,
+      tests: panel.tests,
+    }));
   }
 
   async updatePanel(name: string, updatePanelDto: CreatePanelDto) {
     const isExist = await this.panelModel.findOne({ name });
     if (!isExist) {
-        throw new BadRequestException('Panel not found');
+      throw new BadRequestException('Panel not found');
     }
 
     const { tests, ...rest } = updatePanelDto;
-    
+
     // First update panel document mapping
     const panel = await this.panelModel.findOneAndUpdate(
-        { name },
-        { ...rest, tests: tests || [] },
-        { new: true }
+      { name },
+      { ...rest, tests: tests || [] },
+      { new: true },
     );
 
     if (!panel) {
-        throw new BadRequestException('Panel not found');
+      throw new BadRequestException('Panel not found');
     }
 
     // Update reverse mapping of tests to ensure synchronization
     if (tests) {
-        // Find existing tests with this panel
-        const testDocs = await this.testModel.find({ panels: panel._id });
-        
-        // Remove panel from tests that are no longer in the payload
-        for (const t of testDocs) {
-            if (!tests.includes(t._id.toString())) {
-                t.panels = t.panels.filter(pId => pId.toString() !== panel._id.toString());
-                await t.save();
-            }
+      // Find existing tests with this panel
+      const testDocs = await this.testModel.find({ panels: panel._id });
+
+      // Remove panel from tests that are no longer in the payload
+      for (const t of testDocs) {
+        if (!tests.includes(t._id.toString())) {
+          t.panels = t.panels.filter(
+            (pId) => pId.toString() !== panel._id.toString(),
+          );
+          await t.save();
         }
-    
-        // Add panel to tests that are in the payload but don't have the panel
-        for (const testId of tests) {
-            const testDoc = await this.testModel.findById(testId);
-            if (testDoc && (!testDoc.panels || !testDoc.panels.includes(panel._id))) {
-                if (!testDoc.panels) testDoc.panels = [];
-                testDoc.panels.push(panel._id);
-                await testDoc.save();
-            }
+      }
+
+      // Add panel to tests that are in the payload but don't have the panel
+      for (const testId of tests) {
+        const testDoc = await this.testModel.findById(testId);
+        if (
+          testDoc &&
+          (!testDoc.panels || !testDoc.panels.includes(panel._id))
+        ) {
+          if (!testDoc.panels) testDoc.panels = [];
+          testDoc.panels.push(panel._id);
+          await testDoc.save();
         }
+      }
     }
 
     return panel;

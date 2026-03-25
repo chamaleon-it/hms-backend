@@ -15,7 +15,7 @@ export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
@@ -49,13 +49,13 @@ export class AppointmentsService {
     if (query && query.trim())
       $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
     if (status?.length) {
-      if (status.includes("Deleted")) {
+      if (status.includes('Deleted')) {
         $match.isDeleted = true;
       } else {
         $match.isDeleted = false;
-        $match.status = { $in: status }
+        $match.status = { $in: status };
       }
-    };
+    }
 
     return this.appointmentModel
       .aggregate([
@@ -317,12 +317,12 @@ export class AppointmentsService {
       endTime?: string | null | undefined;
       days?: string[] | undefined;
       rounds?:
-      | {
-        label?: string | undefined;
-        start?: string | undefined;
-        end?: string | undefined;
-      }[]
-      | undefined;
+        | {
+            label?: string | undefined;
+            start?: string | undefined;
+            end?: string | undefined;
+          }[]
+        | undefined;
     }> = await this.usersService.getDoctorAvailability(doctor);
 
     const isAvailable = availability.days

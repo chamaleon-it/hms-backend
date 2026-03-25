@@ -29,7 +29,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -97,8 +97,8 @@ export class OrdersService {
     const filter: {
       status?: Record<string, string> | string;
       priority?: string;
-      isDeleted?: boolean
-      createdAt?: Record<string, Date>
+      isDeleted?: boolean;
+      createdAt?: Record<string, Date>;
     } = {};
 
     if (query.startDate && query.endDate) {
@@ -108,8 +108,7 @@ export class OrdersService {
       };
     }
 
-
-    filter.isDeleted = false
+    filter.isDeleted = false;
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
@@ -119,8 +118,8 @@ export class OrdersService {
       filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
-    } else if (q === "Deleted") {
-      filter.isDeleted = true
+    } else if (q === 'Deleted') {
+      filter.isDeleted = true;
     }
 
     const [data, total] = await Promise.all([
@@ -660,7 +659,13 @@ export class OrdersService {
   }
 
   async recoverOrder(id: mongoose.Types.ObjectId) {
-    const data = await this.orderModel.findByIdAndUpdate(id, { isDeleted: false }, { new: true, runValidators: true }).lean();
+    const data = await this.orderModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false },
+        { new: true, runValidators: true },
+      )
+      .lean();
     if (!data) {
       throw new NotFoundException('Order not found');
     }

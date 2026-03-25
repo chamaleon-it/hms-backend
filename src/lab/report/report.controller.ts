@@ -22,7 +22,7 @@ import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) { }
+  constructor(private readonly reportService: ReportService) {}
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -152,8 +152,8 @@ export class ReportController {
     };
   }
 
-  @Post("recover/:id")
-  async recoverReport(@Param("id") id: mongoose.Types.ObjectId) {
+  @Post('recover/:id')
+  async recoverReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.recoverReport(id);
     return {
       message: 'Report is recovered',
@@ -161,8 +161,8 @@ export class ReportController {
     };
   }
 
-  @Post("repeat/:id")
-  async repeatReport(@Param("id") id: mongoose.Types.ObjectId) {
+  @Post('repeat/:id')
+  async repeatReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.repeatReport(id);
     return {
       message: 'Report is repeated',

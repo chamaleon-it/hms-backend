@@ -9,7 +9,7 @@ export class TechnicianService {
   constructor(
     @InjectModel(Technician.name)
     private readonly technicianModel: Model<Technician>,
-  ) { }
+  ) {}
 
   async registerTechnician(registerTechnicianDto: RegisterTechnicianDto) {
     const technician = new this.technicianModel(registerTechnicianDto);

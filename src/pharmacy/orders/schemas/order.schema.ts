@@ -112,7 +112,7 @@ export class Order {
   billNo: string;
 
   @Prop({ default: false })
-  isDeleted: boolean
+  isDeleted: boolean;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -318,7 +318,7 @@ export class PatientsService {
   async checkPatientAlreadyExists(
     checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto,
   ) {
-    const orConditions: any = [];
+    const orConditions: any[] = [];
 
     if (checkPatientAlreadyExistsDto?.name) {
       orConditions.push({

@@ -81,10 +81,9 @@ export class ReportService {
     if (dto.status) {
       if (dto.status === 'Flagged') {
         match.isFlagged = true;
-      } else if (dto.status === "Deleted") {
+      } else if (dto.status === 'Deleted') {
         match.isDeleted = true;
-      }
-      else {
+      } else {
         match.status = dto.status;
       }
     }
@@ -93,9 +92,8 @@ export class ReportService {
       match.createdAt = {
         $gte: dto.startDate,
         $lte: dto.endDate,
-      }
+      };
     }
-
 
     const data = await this.reportModel
       .find(match)
@@ -108,8 +106,8 @@ export class ReportService {
           path: 'panels',
           populate: {
             path: 'tests',
-            select: 'name'
-          }
+            select: 'name',
+          },
         },
       })
       // .sort({ createdAt: -1 })
@@ -411,7 +409,7 @@ export class ReportService {
   }
 
   async getStatistics() {
-    const data = await this.reportModel.aggregate([
+    const data: any[] = await this.reportModel.aggregate([
       {
         $match: {
           isDeleted: false,
@@ -499,7 +497,10 @@ export class ReportService {
     }
 
     if (dto.test) {
-      data.test = dto.test.map((t) => ({ name: t.name, value: t.value ?? '' })) as any;
+      data.test = dto.test.map((t) => ({
+        name: t.name,
+        value: t.value ?? '',
+      })) as any;
     }
     if (dto.panels) {
       data.panels = dto.panels;
@@ -520,7 +521,17 @@ export class ReportService {
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    const newReport = await this.createReport({ date: new Date(), doctor: data.doctor, panels: data.panels, test: data.test, patient: data.patient, priority: data.priority, sampleType: data.sampleType, status: ReportStatus.UPCOMING, lab: data.lab })
+    const newReport = await this.createReport({
+      date: new Date(),
+      doctor: data.doctor,
+      panels: data.panels,
+      test: data.test,
+      patient: data.patient,
+      priority: data.priority,
+      sampleType: data.sampleType,
+      status: ReportStatus.UPCOMING,
+      lab: data.lab,
+    });
     return newReport;
   }
 }

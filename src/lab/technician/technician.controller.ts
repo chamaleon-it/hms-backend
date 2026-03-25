@@ -12,7 +12,7 @@ import { RegisterTechnicianDto } from './dto/register-technician.dto';
 
 @Controller('technician')
 export class TechnicianController {
-  constructor(private readonly technicianService: TechnicianService) { }
+  constructor(private readonly technicianService: TechnicianService) {}
 
   @Post('register')
   async registerTechnician(
