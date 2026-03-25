@@ -1,0 +1,150 @@
+{
+  "timestamp": "2026-03-25T10:33:32.912Z",
+  "sampleId": "80",
+  "patient": {
+    "id": "P1585106",
+    "name": "Unknown"
+  },
+  "results": {
+    "Take Mode": {
+      "value": "O",
+      "unit": "",
+      "range": ""
+    },
+    "Blood Mode": {
+      "value": "W",
+      "unit": "",
+      "range": ""
+    },
+    "Test Mode": {
+      "value": "CBC+3DIFF",
+      "unit": "",
+      "range": ""
+    },
+    "Ref Group": {
+      "value": "General",
+      "unit": "",
+      "range": ""
+    },
+    "WBC": {
+      "value": "5.03",
+      "unit": "10*3/uL",
+      "range": "3.50-9.50"
+    },
+    "LYM%": {
+      "value": "36.8",
+      "unit": "%",
+      "range": "20.0-50.0"
+    },
+    "GRAN%": {
+      "value": "55.3",
+      "unit": "%",
+      "range": "50.0-70.0"
+    },
+    "MID%": {
+      "value": "7.9",
+      "unit": "%",
+      "range": "3.0-9.0"
+    },
+    "LYM#": {
+      "value": "1.85",
+      "unit": "10*3/uL",
+      "range": "1.10-3.20"
+    },
+    "GRAN#": {
+      "value": "2.78",
+      "unit": "10*3/uL",
+      "range": "2.00-7.00"
+    },
+    "MID#": {
+      "value": "0.40",
+      "unit": "10*3/uL",
+      "range": "0.10-0.90"
+    },
+    "RBC": {
+      "value": "4.52",
+      "unit": "10*6/uL",
+      "range": "3.80-5.80"
+    },
+    "HGB": {
+      "value": "11.1",
+      "unit": "g/dL",
+      "range": "11.5-17.5"
+    },
+    "HCT": {
+      "value": "35.5",
+      "unit": "%",
+      "range": "35.0-50.0"
+    },
+    "MCV": {
+      "value": "78.6",
+      "unit": "fL",
+      "range": "82.0-100.0"
+    },
+    "MCH": {
+      "value": "24.6",
+      "unit": "pg",
+      "range": "27.0-34.0"
+    },
+    "MCHC": {
+      "value": "31.3",
+      "unit": "g/dL",
+      "range": "31.6-35.4"
+    },
+    "RDW-CV": {
+      "value": "16.5",
+      "unit": "%",
+      "range": "11.5-14.5"
+    },
+    "RDW-SD": {
+      "value": "47.9",
+      "unit": "fL",
+      "range": "35.0-56.0"
+    },
+    "*Mentzr": {
+      "value": "17.37",
+      "unit": "",
+      "range": ""
+    },
+    "*RDWI": {
+      "value": "286.21",
+      "unit": "",
+      "range": ""
+    },
+    "PLT": {
+      "value": "254",
+      "unit": "10*3/uL",
+      "range": "125-350"
+    },
+    "MPV": {
+      "value": "9.7",
+      "unit": "fL",
+      "range": "7.0-11.0"
+    },
+    "PDW-SD": {
+      "value": "11.8",
+      "unit": "fL",
+      "range": "9.0-17.0"
+    },
+    "PDW-CV": {
+      "value": "14.9",
+      "unit": "%",
+      "range": "10.0-17.9"
+    },
+    "PCT": {
+      "value": "0.248",
+      "unit": "%",
+      "range": "0.108-0.282"
+    },
+    "P-LCR": {
+      "value": "26.0",
+      "unit": "%",
+      "range": "11.0-45.0"
+    },
+    "P-LCC": {
+      "value": "66",
+      "unit": "10*3/uL",
+      "range": "30-90"
+    }
+  }
+},
