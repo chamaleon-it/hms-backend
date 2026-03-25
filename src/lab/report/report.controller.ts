@@ -18,6 +18,7 @@ import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
 export class ReportController {
@@ -81,6 +82,16 @@ export class ReportController {
     const data = await this.reportService.updateResult(dto);
     return {
       message: 'Result updated.  ',
+      data,
+    };
+  }
+
+  @Post('lis-result')
+  // No JwtAuthGuard here to allow local scripts to call it automatically
+  async receiveLisResult(@Body() dto: LisResultDto) {
+    const data = await this.reportService.updateFromLis(dto);
+    return {
+      message: 'LIS Result Received',
       data,
     };
   }
