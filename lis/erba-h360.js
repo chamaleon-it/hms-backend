@@ -43,7 +43,7 @@ const server = net.createServer((socket) => {
                 console.log(`📊 JSON Saved locally for Patient: ${resultJson.patient.name} (Sample ID: ${resultJson.sampleId}, Patient ID: ${resultJson.patient.id})`);
                 
                 // Send to DB Backend
-                sendToBackend(resultJson.sampleId, resultJson.patient?.id || "Unknown", "Erba H360", resultJson.results);
+                sendToBackend(resultJson.sampleId, resultJson.patient?.id || "Unknown", "Erba H360", resultJson.results, resultJson.graphs);
 
             } catch (err) {
                 console.error('❌ JSON Conversion Error:', err.message);
@@ -70,7 +70,7 @@ const server = net.createServer((socket) => {
 // Helper Function: HL7 to JSON
 function parseHl7ToJson(hl7) {
     const lines = hl7.split(/[\r\n]/).filter(l => l.length > 0);
-    let obj = { timestamp: new Date().toISOString(), sampleId: "Unknown", patient: {}, results: {} };
+    let obj = { timestamp: new Date().toISOString(), sampleId: "Unknown", patient: {}, results: {}, graphs: {} };
 
     lines.forEach(line => {
         const f = line.split('|');
@@ -85,19 +85,26 @@ function parseHl7ToJson(hl7) {
         if (f[0] === 'OBX') {
             const testName = f[3].split('^')[1] || f[3].split('^')[0];
             if (f[5]) {
-                obj.results[testName] = {
-                    value: f[5],
-                    unit: f[6],
-                    range: f[7]
-                };
+                if (f[5].includes('^Image^PNG^Base64^') || f[5].includes('^Image^BMP^Base64^')) {
+                    const parts = f[5].split('^Base64^');
+                    if (parts.length > 1) {
+                        obj.graphs[testName] = parts[1];
+                    }
+                } else {
+                    obj.results[testName] = {
+                        value: f[5],
+                        unit: f[6],
+                        range: f[7]
+                    };
+                }
             }
         }
     });
     return obj;
 }
 
-function sendToBackend(sampleId, patientId, machine, results) {
-    const postData = JSON.stringify({ sampleId, patientId, machine, results });
+function sendToBackend(sampleId, patientId, machine, results, graphs) {
+    const postData = JSON.stringify({ sampleId, patientId, machine, results, graphs });
     const options = {
         hostname: 'localhost',
         port: 3001, // NestJS Backend port

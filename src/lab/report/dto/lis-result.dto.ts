@@ -16,4 +16,8 @@ export class LisResultDto {
   @IsObject()
   @IsNotEmpty()
   results: Record<string, { value: any; unit?: string }>;
+
+  @IsOptional()
+  @IsObject()
+  graphs?: Record<string, string>;
 }

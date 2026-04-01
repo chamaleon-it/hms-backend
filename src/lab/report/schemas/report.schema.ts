@@ -106,6 +106,9 @@ export class Report {
 
   @Prop({ type: String, default: null })
   technician: string;
+
+  @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
+  graphs: Record<string, string>;
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);

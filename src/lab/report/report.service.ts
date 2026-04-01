@@ -150,7 +150,7 @@ export class ReportService {
   }
 
   async updateFromLis(dto: LisResultDto) {
-    const { sampleId, patientId, machine, results } = dto;
+    const { sampleId, patientId, machine, results, graphs } = dto;
 
     // Use a regex to allow matching "004" to "004 (Blood)" safely in Mongoose
     let report = await this.reportModel.findOne({ 
@@ -262,6 +262,12 @@ export class ReportService {
     report.status = allFilled
       ? ReportStatus.COMPLETED
       : ReportStatus.WAITING_FOR_RESULT;
+
+    if (graphs && Object.keys(graphs).length > 0) {
+      if (!report.graphs) report.graphs = {};
+      Object.assign(report.graphs, graphs);
+      report.markModified('graphs');
+    }
 
     await report.save();
 
