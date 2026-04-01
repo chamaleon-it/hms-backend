@@ -28,8 +28,8 @@ export class CreateTestDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsEnum(['number', 'text', 'boolean'])
-  dataType: 'number' | 'text' | 'boolean';
+  @IsEnum(['number', 'text', 'boolean', 'options'])
+  dataType: 'number' | 'text' | 'boolean' | 'options';
 
   @IsOptional()
   @IsNumber({}, { message: 'Minimum value must be a number' })
@@ -73,4 +73,9 @@ export class CreateTestDto {
 
   @IsEmpty()
   user: mongoose.Types.ObjectId;
+
+  @IsOptional()
+  @IsArray({ message: 'Options must be array' })
+  @IsString({ each: true, message: 'Each option must be a string' })
+  options?: string[];
 }

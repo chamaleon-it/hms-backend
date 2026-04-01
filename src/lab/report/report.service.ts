@@ -13,10 +13,17 @@ import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { LisResultDto } from './dto/lis-result.dto';
+import { Test } from '../panels/schemas/test.schema';
+import { Patient } from '../../patients/schemas/patient.schema';
 
 @Injectable()
 export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
+  constructor(
+    @InjectModel(Report.name) private reportModel: Model<Report>,
+    @InjectModel(Test.name) private testModel: Model<Test>,
+    @InjectModel(Patient.name) private patientModel: Model<Patient>
+  ) { }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -140,6 +147,131 @@ export class ReportService {
     await report.save();
 
     return { message: 'Updated successfully' };
+  }
+
+  async updateFromLis(dto: LisResultDto) {
+    const { sampleId, patientId, machine, results, graphs } = dto;
+
+    // Use a regex to allow matching "004" to "004 (Blood)" safely in Mongoose
+    let report = await this.reportModel.findOne({ 
+      sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' }, 
+      isDeleted: false, 
+      status: { $ne: ReportStatus.COMPLETED } 
+    });
+    
+    // Fallback: If Sample ID fails, try to find the patient's most recent active report using MRN
+    if (!report && patientId && patientId !== "Unknown") {
+      const patient = await this.patientModel.findOne({ mrn: patientId });
+      if (patient) {
+        report = await this.reportModel.findOne({ 
+          patient: patient._id, 
+          isDeleted: false, 
+          status: { $ne: ReportStatus.COMPLETED } 
+        }).sort({ createdAt: -1 });
+      }
+    }
+
+    if (!report) {
+      throw new NotFoundException(`Active Report for sampleId ${sampleId} or patientId ${patientId} not found`);
+    }
+
+    // Only load tests that are actually in this report
+    const testIdsInReport = report.test.map((t) => t.name);
+    const tests = await this.testModel.find({ _id: { $in: testIdsInReport } });
+
+    let updatedCount = 0;
+    tests.forEach(testDoc => {
+      // Find the value in results by matching keys safely
+      let matchedKey: string | null = null;
+      for (const key of Object.keys(results)) {
+         const k = key.toLowerCase();
+         const cleanK = k.replace(/[^a-z0-9]/g, ''); // "lym%", "*mentzr" -> "lym", "mentzr"
+         const baseK = k.replace(/[^a-z0-9\-\+]/g, ''); // "lym%" -> "lym"
+         const tCode = (testDoc.code || "").toLowerCase();
+         const tName = (testDoc.name || "").toLowerCase();
+
+         // Strict check for exactly same strings or codes
+         if (tCode === k || tName === k) {
+            matchedKey = key;
+            break;
+         }
+
+         // Specific handling for % vs # (Absolute vs Percentage)
+         const isPercentTest = tName.includes('%') || tName.includes('percentage');
+         const isAbsoluteTest = tName.includes('#') || tName.includes('abs') || tName.includes('absolute');
+         
+         const isMachinePercent = k.includes('%');
+         const isMachineAbsolute = k.includes('#');
+         
+         // If one is explicitly percent and the other is absolute, DO NOT MATCH.
+         if ((isPercentTest && isMachineAbsolute) || (isAbsoluteTest && isMachinePercent)) {
+            continue;
+         }
+
+         if (
+           tName.includes(`(${k})`) ||
+           tName.includes(`(${k}+)`) ||
+           tName.includes(`(${k}-)`) ||
+           // Match stripped names cleanly only if isolated (boundaries)
+           (cleanK.length >= 3 && new RegExp(`\\b${cleanK}\\b`).test(tName)) ||
+           // Common Electrolyte Fallbacks
+           (k === 'na' && tName.includes('sodium')) ||
+           (k === 'k' && tName.includes('potassium')) ||
+           (k === 'cl' && tName.includes('chloride')) ||
+           // Common CBC Fallbacks (Erba H360)
+           (k === 'wbc' && (tName.includes('white blood') || tName.includes('total count') || new RegExp(`\\btc\\b`).test(tName))) ||
+           (k === 'rbc' && tName.includes('red blood')) ||
+           (k === 'hgb' && (tName.includes('hemoglobin') || tName.includes('(hb)') || tName === 'hb' || tName.includes('haemoglobin'))) ||
+           (k === 'hct' && (tName.includes('hematocrit') || new RegExp(`\\bpcv\\b`).test(tName))) ||
+           (baseK === 'lym' && tName.includes('lymphocyte')) ||
+           (baseK === 'gran' && (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
+           (baseK === 'mid' && (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
+           (k === 'plt' && (new RegExp(`\\bplatelet\\b`).test(tName) || new RegExp(`\\bplatelets\\b`).test(tName))) ||
+           (k === 'pct' && tName.includes('plateletcrit')) ||
+           (baseK === 'mentzr' && tName.includes('mentzer')) ||
+           (baseK === 'rdwi' && tName.includes('rdwi'))
+         ) {
+            matchedKey = key;
+            break;
+         }
+      }
+
+      if (matchedKey && results[matchedKey] && results[matchedKey].value !== undefined) {
+        // Find this test in the report.test array
+        const index = report.test.findIndex(
+          (x) => x?.name?.toString() === testDoc._id.toString()
+        );
+        if (index !== -1) {
+          report.test[index].value = results[matchedKey].value;
+          updatedCount++;
+        }
+      }
+    });
+
+    const allFilled = report.test.every((item) => {
+      return (
+        item.value !== null && item.value !== '' && item.value !== undefined
+      );
+    });
+
+    // Update time test actually started/received
+    if (!report.testStartedAt && updatedCount > 0) {
+      report.testStartedAt = new Date();
+    }
+
+    report.status = allFilled
+      ? ReportStatus.COMPLETED
+      : ReportStatus.WAITING_FOR_RESULT;
+
+    if (graphs && Object.keys(graphs).length > 0) {
+      if (!report.graphs) report.graphs = {};
+      Object.assign(report.graphs, graphs);
+      report.markModified('graphs');
+    }
+
+    await report.save();
+
+    return { message: `LIS Result processed from ${machine}. Updated ${updatedCount} parameters.`, reportId: report._id };
   }
 
   async getPatientReports(patient: mongoose.Types.ObjectId) {
