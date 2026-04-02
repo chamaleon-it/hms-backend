@@ -96,7 +96,7 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { page = 1, limit = 10, q, method, status, date } = getBillisDto;
+    const { page = 1, limit = 10, q, method, status, startDate, endDate, activeDate } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
@@ -107,13 +107,8 @@ export class BillingService {
       match.mrn = { $regex: '^' + q, $options: 'i' };
     }
 
-    if (date) {
-      const from = new Date(date);
-      if (isNaN(from.getTime())) {
-        throw new BadRequestException('Invalid date');
-      }
-      const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
-      match.createdAt = { $gte: from, $lt: to };
+    if (startDate && endDate) {
+      match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
     if (method) {
@@ -185,8 +180,7 @@ export class BillingService {
         metadata: [{ $count: 'total' }],
         data: [
           { $sort: { createdAt: -1 } },
-          { $skip: skip },
-          { $limit: limit },
+          ...(activeDate === 'Today' ? [] : [{ $skip: skip }, { $limit: limit }]),
           {
             $lookup: {
               from: 'patients',
