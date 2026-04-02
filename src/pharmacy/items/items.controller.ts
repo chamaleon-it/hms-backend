@@ -21,7 +21,7 @@ import type { Response } from 'express';
 
 @Controller('pharmacy/items')
 export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
+  constructor(private readonly itemsService: ItemsService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -110,6 +110,15 @@ export class ItemsController {
     return {
       data,
       message: 'Batch items added successfully',
+    };
+  }
+
+  @Get("addmrp")
+  async addMrp() {
+    const data = await this.itemsService.addMRP();
+    return {
+      data,
+      message: 'Mrp added successfully',
     };
   }
 }

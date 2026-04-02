@@ -53,6 +53,13 @@ export class Item {
   @Prop({
     required: true,
     type: Number,
+    min: [0, 'MRP cannot be negative'],
+  })
+  mrp: number;
+
+  @Prop({
+    required: true,
+    type: Number,
     min: [0, 'Unit price cannot be negative'],
   })
   purchasePrice: number;
