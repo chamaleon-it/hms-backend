@@ -27,19 +27,23 @@ export class BillingService {
   ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
-    let mrn: string;
-    let exists = true;
+    const lastRecord = await this.billingModel
+      .findOne({ mrn: { $regex: `^${prefix}` } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
 
-    do {
-      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `${prefix}${randomNum}`;
+    if (lastRecord && lastRecord.mrn) {
+      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match && match[1]) {
+        const nextNumber = parseInt(match[1], 10) + 1;
+        return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+      }
+    }
 
-      // Check if MRN already exists
-      const existing = await this.billingModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+    return `${prefix}0001`;
   }
 
   async generateBill(createBill: CreateBillingDto) {
