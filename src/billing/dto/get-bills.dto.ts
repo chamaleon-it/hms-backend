@@ -19,6 +19,10 @@ export class GetBillisDto {
   q?: string;
 
   @IsOptional()
+  @IsString()
+  qEnd?: string;
+
+  @IsOptional()
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEnum(['Cash', 'Online', 'Insurance'])
   method?: 'Cash' | 'Online' | 'Insurance';

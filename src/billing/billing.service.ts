@@ -100,14 +100,16 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { page = 1, limit = 10, q, method, status, startDate, endDate, activeDate } = getBillisDto;
+    const { page = 1, limit = 10, q, qEnd, method, status, startDate, endDate, activeDate } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
 
-    if (q) {
+    if (q && qEnd) {
+      match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
+    } else if (q) {
       match.mrn = { $regex: '^' + q, $options: 'i' };
     }
 
