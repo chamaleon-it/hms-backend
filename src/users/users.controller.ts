@@ -19,7 +19,7 @@ import mongoose from 'mongoose';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   //create
   @Post()
@@ -53,7 +53,7 @@ export class UsersController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('doctors')
   async getAllDoctors() {
     const data = await this.usersService.getAllDoctors();

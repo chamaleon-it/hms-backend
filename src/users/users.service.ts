@@ -20,7 +20,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
@@ -101,6 +101,7 @@ export class UsersService {
     const data = await this.userModel
       .find({ role: UserRole.DOCTOR })
       .select('name email phoneNumber address profilePic')
+      .sort({ name: 1 })
       .lean();
     return data;
   }

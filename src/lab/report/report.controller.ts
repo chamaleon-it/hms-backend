@@ -22,7 +22,7 @@ import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {

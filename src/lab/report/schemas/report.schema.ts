@@ -26,7 +26,7 @@ export class Report {
   })
   patient: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   doctor: Types.ObjectId;
 
   @Prop({
