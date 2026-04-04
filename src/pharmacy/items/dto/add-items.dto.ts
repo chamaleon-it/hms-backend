@@ -70,6 +70,14 @@ export class AddItemDto {
   @Type(() => Number)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
+    { message: 'MRP must be a number (max 2 decimals).' },
+  )
+  @Min(0, { message: 'MRP cannot be negative.' })
+  mrp!: number;
+
+  @Type(() => Number)
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Unit price must be a number (max 2 decimals).' },
   )
   @Min(0, { message: 'Purchase price cannot be negative.' })
