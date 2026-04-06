@@ -23,7 +23,7 @@ export class Patient {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: false, trim: true })
   phoneNumber: string;
 
   @Prop({ trim: true, lowercase: true, default: '' })
