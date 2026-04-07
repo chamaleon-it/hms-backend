@@ -12,7 +12,7 @@ import mongoose from 'mongoose';
 export class CreateTestDto {
   @IsOptional()
   @IsString({ message: 'Code must be a string' })
-  code: string;
+  code: string | null;
 
   @IsString({ message: 'Name must be a string' })
   name: string;

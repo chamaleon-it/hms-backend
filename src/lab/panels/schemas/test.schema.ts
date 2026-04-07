@@ -11,8 +11,8 @@ export enum TestType {
 
 @Schema({ versionKey: false })
 export class Test {
-  @Prop({ required: false, trim: true })
-  code: string;
+  @Prop({ required: false, trim: true, default: null, type: String || null })
+  code: string | null;
 
   @Prop({ required: true, trim: true })
   name: string;
