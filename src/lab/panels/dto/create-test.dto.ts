@@ -10,6 +10,7 @@ import {
 import mongoose from 'mongoose';
 
 export class CreateTestDto {
+  @IsOptional()
   @IsString({ message: 'Code must be a string' })
   code: string;
 

@@ -11,7 +11,7 @@ export enum TestType {
 
 @Schema({ versionKey: false })
 export class Test {
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({ required: false, trim: true })
   code: string;
 
   @Prop({ required: true, trim: true })
@@ -61,7 +61,7 @@ export class Test {
 
   @Prop({ type: [String], default: [] })
   options: string[];
-  
+
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);
