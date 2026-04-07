@@ -106,12 +106,14 @@ export class BillingService {
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
+    const qEndFound = await this.billingModel.exists({ mrn: qEnd?.toUpperCase() });
 
-    if (q && qEnd) {
+    if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
-    } else if (q) {
-      match.mrn = { $regex: '^' + q, $options: 'i' };
     }
+    // else if (q) {
+    //   match.mrn = { $regex: '^' + q, $options: 'i' };
+    // }
 
     if (!q && startDate && endDate) {
       match.createdAt = { $gte: startDate, $lte: endDate };
