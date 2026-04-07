@@ -113,7 +113,7 @@ export class BillingService {
       match.mrn = { $regex: '^' + q, $options: 'i' };
     }
 
-    if (startDate && endDate) {
+    if (!q && startDate && endDate) {
       match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
