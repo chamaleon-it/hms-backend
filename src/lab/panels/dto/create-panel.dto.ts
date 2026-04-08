@@ -31,6 +31,9 @@ export class CreatePanelDto {
   @IsString({ each: true })
   tests?: string[];
 
+  @IsOptional()
+  mainHeading?: string;
+
   @IsEmpty()
   user: mongoose.Types.ObjectId;
 }

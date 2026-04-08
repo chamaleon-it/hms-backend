@@ -28,7 +28,7 @@ export class PanelsService {
   async getPanels() {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name price estimatedTime tests')
+      .select('name price estimatedTime tests mainHeading')
       .populate('tests', 'name')
       .sort({ _id: 1 })
       .lean()
@@ -38,6 +38,7 @@ export class PanelsService {
       price: panel.price,
       estimatedTime: panel.estimatedTime,
       tests: panel.tests,
+      mainHeading: panel.mainHeading,
     }));
   }
 
