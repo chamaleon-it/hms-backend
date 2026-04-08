@@ -12,7 +12,7 @@ export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
-  ) {}
+  ) { }
 
   async createPanel(createPanelDto: CreatePanelDto) {
     const isExist = await this.panelModel.findOne({
@@ -102,7 +102,7 @@ export class PanelsService {
 
   async createTest(dto: CreateTestDto) {
     const isExist = await this.testModel.exists({ code: dto.code });
-    if (isExist) {
+    if (isExist && dto.code !== null) {
       throw new BadRequestException('Test with this code already exists');
     }
     const test = await this.testModel.create(dto);
@@ -119,6 +119,10 @@ export class PanelsService {
   }
 
   async updateTest(id: mongoose.Types.ObjectId, dto: CreateTestDto) {
+    const isExist = await this.testModel.exists({ code: dto.code, _id: { $ne: id } });
+    if (isExist && dto.code !== null) {
+      throw new BadRequestException('Test with this code already exists');
+    }
     const test = await this.testModel.findByIdAndUpdate(id, dto, { new: true });
     return test;
   }

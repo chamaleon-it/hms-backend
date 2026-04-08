@@ -161,20 +161,20 @@ export class ReportService {
     const { sampleId, patientId, machine, results, graphs } = dto;
 
     // Use a regex to allow matching "004" to "004 (Blood)" safely in Mongoose
-    let report = await this.reportModel.findOne({ 
-      sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' }, 
-      isDeleted: false, 
-      status: { $ne: ReportStatus.COMPLETED } 
+    let report = await this.reportModel.findOne({
+      sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' },
+      isDeleted: false,
+      status: { $ne: ReportStatus.COMPLETED }
     });
-    
+
     // Fallback: If Sample ID fails, try to find the patient's most recent active report using MRN
     if (!report && patientId && patientId !== "Unknown") {
       const patient = await this.patientModel.findOne({ mrn: patientId });
       if (patient) {
-        report = await this.reportModel.findOne({ 
-          patient: patient._id, 
-          isDeleted: false, 
-          status: { $ne: ReportStatus.COMPLETED } 
+        report = await this.reportModel.findOne({
+          patient: patient._id,
+          isDeleted: false,
+          status: { $ne: ReportStatus.COMPLETED }
         }).sort({ createdAt: -1 });
       }
     }
@@ -192,56 +192,56 @@ export class ReportService {
       // Find the value in results by matching keys safely
       let matchedKey: string | null = null;
       for (const key of Object.keys(results)) {
-         const k = key.toLowerCase();
-         const cleanK = k.replace(/[^a-z0-9]/g, ''); // "lym%", "*mentzr" -> "lym", "mentzr"
-         const baseK = k.replace(/[^a-z0-9\-\+]/g, ''); // "lym%" -> "lym"
-         const tCode = (testDoc.code || "").toLowerCase();
-         const tName = (testDoc.name || "").toLowerCase();
+        const k = key.toLowerCase();
+        const cleanK = k.replace(/[^a-z0-9]/g, ''); // "lym%", "*mentzr" -> "lym", "mentzr"
+        const baseK = k.replace(/[^a-z0-9\-\+]/g, ''); // "lym%" -> "lym"
+        const tCode = (testDoc.code || "").toLowerCase();
+        const tName = (testDoc.name || "").toLowerCase();
 
-         // Strict check for exactly same strings or codes
-         if (tCode === k || tName === k) {
-            matchedKey = key;
-            break;
-         }
+        // Strict check for exactly same strings or codes
+        if (tCode === k || tName === k) {
+          matchedKey = key;
+          break;
+        }
 
-         // Specific handling for % vs # (Absolute vs Percentage)
-         const isPercentTest = tName.includes('%') || tName.includes('percentage');
-         const isAbsoluteTest = tName.includes('#') || tName.includes('abs') || tName.includes('absolute');
-         
-         const isMachinePercent = k.includes('%');
-         const isMachineAbsolute = k.includes('#');
-         
-         // If one is explicitly percent and the other is absolute, DO NOT MATCH.
-         if ((isPercentTest && isMachineAbsolute) || (isAbsoluteTest && isMachinePercent)) {
-            continue;
-         }
+        // Specific handling for % vs # (Absolute vs Percentage)
+        const isPercentTest = tName.includes('%') || tName.includes('percentage');
+        const isAbsoluteTest = tName.includes('#') || tName.includes('abs') || tName.includes('absolute');
 
-         if (
-           tName.includes(`(${k})`) ||
-           tName.includes(`(${k}+)`) ||
-           tName.includes(`(${k}-)`) ||
-           // Match stripped names cleanly only if isolated (boundaries)
-           (cleanK.length >= 3 && new RegExp(`\\b${cleanK}\\b`).test(tName)) ||
-           // Common Electrolyte Fallbacks
-           (k === 'na' && tName.includes('sodium')) ||
-           (k === 'k' && tName.includes('potassium')) ||
-           (k === 'cl' && tName.includes('chloride')) ||
-           // Common CBC Fallbacks (Erba H360)
-           (k === 'wbc' && (tName.includes('white blood') || tName.includes('total count') || new RegExp(`\\btc\\b`).test(tName))) ||
-           (k === 'rbc' && tName.includes('red blood')) ||
-           (k === 'hgb' && (tName.includes('hemoglobin') || tName.includes('(hb)') || tName === 'hb' || tName.includes('haemoglobin'))) ||
-           (k === 'hct' && (tName.includes('hematocrit') || new RegExp(`\\bpcv\\b`).test(tName))) ||
-           (baseK === 'lym' && tName.includes('lymphocyte')) ||
-           (baseK === 'gran' && (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
-           (baseK === 'mid' && (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
-           (k === 'plt' && (new RegExp(`\\bplatelet\\b`).test(tName) || new RegExp(`\\bplatelets\\b`).test(tName))) ||
-           (k === 'pct' && tName.includes('plateletcrit')) ||
-           (baseK === 'mentzr' && tName.includes('mentzer')) ||
-           (baseK === 'rdwi' && tName.includes('rdwi'))
-         ) {
-            matchedKey = key;
-            break;
-         }
+        const isMachinePercent = k.includes('%');
+        const isMachineAbsolute = k.includes('#');
+
+        // If one is explicitly percent and the other is absolute, DO NOT MATCH.
+        if ((isPercentTest && isMachineAbsolute) || (isAbsoluteTest && isMachinePercent)) {
+          continue;
+        }
+
+        if (
+          tName.includes(`(${k})`) ||
+          tName.includes(`(${k}+)`) ||
+          tName.includes(`(${k}-)`) ||
+          // Match stripped names cleanly only if isolated (boundaries)
+          (cleanK.length >= 3 && new RegExp(`\\b${cleanK}\\b`).test(tName)) ||
+          // Common Electrolyte Fallbacks
+          (k === 'na' && tName.includes('sodium')) ||
+          (k === 'k' && tName.includes('potassium')) ||
+          (k === 'cl' && tName.includes('chloride')) ||
+          // Common CBC Fallbacks (Erba H360)
+          (k === 'wbc' && (tName.includes('white blood') || tName.includes('total count') || new RegExp(`\\btc\\b`).test(tName))) ||
+          (k === 'rbc' && tName.includes('red blood')) ||
+          (k === 'hgb' && (tName.includes('hemoglobin') || tName.includes('(hb)') || tName === 'hb' || tName.includes('haemoglobin'))) ||
+          (k === 'hct' && (tName.includes('hematocrit') || new RegExp(`\\bpcv\\b`).test(tName))) ||
+          (baseK === 'lym' && tName.includes('lymphocyte')) ||
+          (baseK === 'gran' && (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
+          (baseK === 'mid' && (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
+          (k === 'plt' && (new RegExp(`\\bplatelet\\b`).test(tName) || new RegExp(`\\bplatelets\\b`).test(tName))) ||
+          (k === 'pct' && tName.includes('plateletcrit')) ||
+          (baseK === 'mentzr' && tName.includes('mentzer')) ||
+          (baseK === 'rdwi' && tName.includes('rdwi'))
+        ) {
+          matchedKey = key;
+          break;
+        }
       }
 
       if (matchedKey && results[matchedKey] && results[matchedKey].value !== undefined) {
@@ -537,7 +537,7 @@ export class ReportService {
     }
     const newReport = await this.createReport({
       date: new Date(),
-      doctor: data.doctor,
+      doctor: data.doctor || null,
       panels: data.panels,
       test: data.test,
       patient: data.patient,
