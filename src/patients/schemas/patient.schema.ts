@@ -32,7 +32,7 @@ export class Patient {
   @Prop({ enum: Object.values(Gender) })
   gender: Gender;
 
-  @Prop({ required: true })
+  @Prop({ default: new Date() })
   dateOfBirth: Date;
 
   @Prop({ default: [], type: [String] })
