@@ -7,6 +7,7 @@ import {
   Min,
   IsOptional,
   IsArray,
+  IsObject,
 } from 'class-validator';
 import mongoose from 'mongoose';
 
@@ -33,6 +34,15 @@ export class CreatePanelDto {
 
   @IsOptional()
   mainHeading?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subheadings?: string[];
+
+  @IsOptional()
+  @IsObject()
+  testSubheadings?: Record<string, string>;
 
   @IsEmpty()
   user: mongoose.Types.ObjectId;

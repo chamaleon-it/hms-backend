@@ -35,6 +35,12 @@ export class Panel {
   
   @Prop({ required: false })
   mainHeading: string;
+
+  @Prop({ type: [String], default: [] })
+  subheadings: string[];
+
+  @Prop({ type: Object, default: {} })
+  testSubheadings: Record<string, string>;
 }
 
 export const PanelSchema = SchemaFactory.createForClass(Panel);
