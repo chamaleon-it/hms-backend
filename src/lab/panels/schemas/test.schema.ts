@@ -9,6 +9,30 @@ export enum TestType {
   OTHER = 'Other',
 }
 
+@Schema()
+export class RangeItem {
+  @Prop()
+  name: string;
+
+  @Prop({ default: null })
+  min?: number;
+
+  @Prop({ default: null })
+  max?: number;
+
+  @Prop({ default: null })
+  fromAge?: number;
+
+  @Prop({ default: null })
+  toAge?: number;
+
+  @Prop({ enum: ['Both', 'Male', 'Female'] })
+  gender: string;
+
+  @Prop({ enum: ['Year', 'Month', 'Day'] })
+  dateType: string;
+}
+
 @Schema({ versionKey: false })
 export class Test {
   @Prop({ required: false, trim: true, default: null, type: String || null })
@@ -29,29 +53,8 @@ export class Test {
   @Prop({ default: 'number', enum: ['number', 'text', 'boolean', 'options'] })
   dataType: 'number' | 'text' | 'boolean' | 'options';
 
-  @Prop({ default: null })
-  min: number;
-
-  @Prop({ default: null })
-  max: number;
-
-  @Prop({ default: null })
-  womenMin?: number;
-
-  @Prop({ default: null })
-  womenMax?: number;
-
-  @Prop({ default: null })
-  childMin?: number;
-
-  @Prop({ default: null })
-  childMax?: number;
-
-  @Prop({ default: null })
-  nbMin?: number;
-
-  @Prop({ default: null })
-  nbMax?: number;
+  @Prop({ type: [RangeItem], default: [] })
+  range: RangeItem[];
 
   @Prop({ default: null, trim: true })
   unit: string;
@@ -61,6 +64,9 @@ export class Test {
 
   @Prop({ type: [String], default: [] })
   options: string[];
+
+  @Prop({ default: null })
+  note: string
 
 }
 

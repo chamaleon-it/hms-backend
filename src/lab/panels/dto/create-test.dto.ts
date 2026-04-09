@@ -6,15 +6,70 @@ import {
   IsEmpty,
   IsNotEmpty,
   IsEnum,
+  ValidateNested,
+  ArrayNotEmpty,
+  ValidateIf,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import mongoose from 'mongoose';
 
+// Enums
+export enum DataTypeEnum {
+  NUMBER = 'number',
+  TEXT = 'text',
+  BOOLEAN = 'boolean',
+  OPTIONS = 'options',
+}
+
+export enum GenderEnum {
+  BOTH = 'Both',
+  MALE = 'Male',
+  FEMALE = 'Female',
+}
+
+export enum DateTypeEnum {
+  YEAR = 'Year',
+  MONTH = 'Month',
+  DAY = 'Day',
+}
+
+// Range DTO
+export class RangeItemDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsOptional()
+  @IsNumber()
+  min?: number;
+
+  @IsOptional()
+  @IsNumber()
+  max?: number;
+
+  @IsOptional()
+  @IsNumber()
+  fromAge?: number;
+
+  @IsOptional()
+  @IsNumber()
+  toAge?: number;
+
+  @IsEnum(GenderEnum)
+  gender: GenderEnum;
+
+  @IsEnum(DateTypeEnum)
+  dateType: DateTypeEnum;
+}
+
+// Main DTO
 export class CreateTestDto {
   @IsOptional()
   @IsString({ message: 'Code must be a string' })
-  code: string | null;
+  code?: string;
 
   @IsString({ message: 'Name must be a string' })
+  @IsNotEmpty({ message: 'Name is required' })
   name: string;
 
   @IsNumber({}, { message: 'Price must be a number' })
@@ -27,42 +82,8 @@ export class CreateTestDto {
   @IsNumber({}, { message: 'Estimated time must be a number' })
   estimatedTime?: number;
 
-  @IsString()
-  @IsNotEmpty()
-  @IsEnum(['number', 'text', 'boolean', 'options'])
-  dataType: 'number' | 'text' | 'boolean' | 'options';
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Minimum value must be a number' })
-  min?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Maximum value must be a number' })
-  max?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Women minimum value must be a number' })
-  womenMin?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Women maximum value must be a number' })
-  womenMax?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Child minimum value must be a number' })
-  childMin?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Child maximum value must be a number' })
-  childMax?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Non-binary minimum value must be a number' })
-  nbMin?: number;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Non-binary maximum value must be a number' })
-  nbMax?: number;
+  @IsEnum(DataTypeEnum, { message: 'Invalid dataType' })
+  dataType: DataTypeEnum;
 
   @IsOptional()
   @IsString({ message: 'Unit must be a string' })
@@ -70,13 +91,25 @@ export class CreateTestDto {
 
   @IsOptional()
   @IsArray({ message: 'Panels must be an array' })
+  @IsString({ each: true, message: 'Each panel must be a string' })
   panels?: string[];
 
-  @IsEmpty()
+  @IsEmpty({ message: 'User should not be provided' })
   user: mongoose.Types.ObjectId;
 
-  @IsOptional()
-  @IsArray({ message: 'Options must be array' })
+  @ValidateIf(o => o.dataType === DataTypeEnum.OPTIONS)
+  @IsArray({ message: 'Options must be an array' })
+  @ArrayNotEmpty({ message: 'Options cannot be empty' })
   @IsString({ each: true, message: 'Each option must be a string' })
   options?: string[];
+
+  @IsOptional()
+  @IsArray({ message: 'Range must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => RangeItemDto)
+  range?: RangeItemDto[];
+
+  @IsOptional()
+  @IsString({ message: 'Note must be a string' })
+  note?: string;
 }
