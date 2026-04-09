@@ -32,6 +32,15 @@ export class Panel {
 
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Test', default: [] })
   tests: mongoose.Types.ObjectId[];
+  
+  @Prop({ required: false })
+  mainHeading: string;
+
+  @Prop({ type: [String], default: [] })
+  subheadings: string[];
+
+  @Prop({ type: Object, default: {} })
+  testSubheadings: Record<string, string>;
 }
 
 export const PanelSchema = SchemaFactory.createForClass(Panel);

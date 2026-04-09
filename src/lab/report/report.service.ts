@@ -118,7 +118,7 @@ export class ReportService {
   }
 
   async updateResult(dto: ResultDto) {
-    const { _id, test } = dto;
+    const { _id, test, collectedDate, reportedDate } = dto;
 
     const report = await this.reportModel.findById(_id);
     if (!report) throw new NotFoundException('Report not found');
@@ -145,6 +145,14 @@ export class ReportService {
       : ReportStatus.WAITING_FOR_RESULT;
 
     await report.save();
+
+    // Forcefully override locked timestamp behavior directly in Mongo
+    if (collectedDate || reportedDate) {
+      const updateData: any = {};
+      if (collectedDate) updateData.sampleCollectedAt = new Date(collectedDate);
+      if (reportedDate) updateData.testStartedAt = new Date(reportedDate);
+      await this.reportModel.updateOne({ _id: report._id }, { $set: updateData }, { timestamps: false, strict: false });
+    }
 
     return { message: 'Updated successfully' };
   }
