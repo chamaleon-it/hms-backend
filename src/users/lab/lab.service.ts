@@ -6,10 +6,11 @@ import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
+import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 
 @Injectable()
 export class LabService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
 
   async updateGeneral(userId: mongoose.Types.ObjectId, dto: UpdateGeneralDto) {
     const pharmacy = await this.userModel.findByIdAndUpdate(
@@ -117,6 +118,26 @@ export class LabService {
     if (!updated) {
       throw new NotFoundException('Lab Not found');
     }
+
+    return updated;
+  }
+
+  async updateReportLayout(user: mongoose.Types.ObjectId, dto: UpdateReportLayoutDto) {
+    const updated = await this.userModel.findByIdAndUpdate(
+      user,
+      {
+        $set: {
+          'lab.reportLayout': dto.reportLayout,
+        },
+      },
+      { new: true, runValidators: true, context: 'query' },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Lab Not found');
+    }
+
+
 
     return updated;
   }

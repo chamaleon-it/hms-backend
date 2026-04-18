@@ -199,6 +199,7 @@ export class User {
         inApp: { type: Boolean, default: false },
         note: { type: String, default: null, trim: true },
       },
+      reportLayout: { type: String, default: "Classic", enum: ["Classic", "Modern"] }
     },
   })
   lab: {
@@ -222,6 +223,7 @@ export class User {
       inApp: boolean;
       note: string;
     };
+    reportLayout: string;
   };
 
   @Prop({
@@ -252,6 +254,7 @@ export class User {
       },
     },
   })
+
   pharmacyWholesaler: {
     general: {
       contactPerson: string | null;

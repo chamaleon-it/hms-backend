@@ -7,9 +7,10 @@ import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
+import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 @Controller('users/lab')
 export class LabController {
-  constructor(private readonly labService: LabService) {}
+  constructor(private readonly labService: LabService) { }
 
   @Patch('general')
   @UseGuards(JwtAuthGuard)
@@ -70,6 +71,19 @@ export class LabController {
     return {
       data,
       message: 'Lab notifications settings updated successfully',
+    };
+  }
+
+  @Patch("update_report_layout")
+  @UseGuards(JwtAuthGuard)
+  async updateReportLayout(
+    @GetUser() user: JWTUserInterface,
+    @Body() dto: UpdateReportLayoutDto,
+  ) {
+    const data = await this.labService.updateReportLayout(user.id, dto);
+    return {
+      data,
+      message: 'Lab report layout updated successfully',
     };
   }
 }
