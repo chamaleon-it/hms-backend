@@ -7,4 +7,6 @@ export class GetListDto {
   status?: string[];
 
   date?: string;
+
+  activeDate: "Today" | "7 days" | "30 days" | "Custom"
 }
