@@ -79,6 +79,10 @@ export class CreateTestDto {
   @IsOptional()
   method?: string;
 
+  @IsString()
+  @IsOptional()
+  specimen?: string;
+
   @IsString({ message: 'Type must be a string' })
   type: string;
 

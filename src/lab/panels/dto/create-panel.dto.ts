@@ -28,6 +28,10 @@ export class CreatePanelDto {
   estimatedTime?: number;
 
   @IsOptional()
+  @IsString({ message: 'Method must be a string' })
+  method?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tests?: string[];

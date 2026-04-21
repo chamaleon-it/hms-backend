@@ -30,9 +30,12 @@ export class Panel {
   @Prop({ default: 0 })
   estimatedTime: number;
 
+  @Prop({ type: String, required: false })
+  method: string;
+
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Test', default: [] })
   tests: mongoose.Types.ObjectId[];
-  
+
   @Prop({ required: false })
   mainHeading: string;
 

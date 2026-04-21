@@ -28,8 +28,8 @@ export class PanelsService {
   async getPanels() {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name price estimatedTime tests mainHeading subheadings testSubheadings')
-      .populate('tests', 'name')
+      .select('name price estimatedTime tests mainHeading subheadings testSubheadings method')
+      .populate('tests', 'name unit range code')
       .sort({ _id: 1 })
       .lean()
       .exec();
@@ -41,6 +41,7 @@ export class PanelsService {
       mainHeading: panel.mainHeading,
       subheadings: panel.subheadings || [],
       testSubheadings: panel.testSubheadings || {},
+      method: panel.method,
     }));
   }
 
