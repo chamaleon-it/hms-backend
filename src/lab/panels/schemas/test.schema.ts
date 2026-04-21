@@ -44,6 +44,9 @@ export class Test {
   @Prop({ required: false, default: 0 })
   price: number;
 
+  @Prop({ required: false, default: null, trim: true, type: String || null })
+  method: string | null;
+
   @Prop({ enum: Object.values(TestType), default: TestType.LAB })
   type: TestType;
 

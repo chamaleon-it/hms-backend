@@ -75,6 +75,10 @@ export class CreateTestDto {
   @IsNumber({}, { message: 'Price must be a number' })
   price: number;
 
+  @IsString()
+  @IsOptional()
+  method?: string;
+
   @IsString({ message: 'Type must be a string' })
   type: string;
 

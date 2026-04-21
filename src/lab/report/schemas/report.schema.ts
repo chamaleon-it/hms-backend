@@ -4,11 +4,7 @@ import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
-export enum SampleType {
-  BLOOD = 'Blood',
-  URINE = 'Urine',
-  OTHER = 'Other',
-}
+
 
 export enum ReportStatus {
   UPCOMING = 'Upcoming',
@@ -59,10 +55,9 @@ export class Report {
 
   @Prop({
     type: String,
-    enum: Object.values(SampleType),
-    default: SampleType.OTHER,
+    default: null,
   })
-  sampleType: SampleType;
+  sampleType: string | null;
 
   @Prop({
     type: Date,

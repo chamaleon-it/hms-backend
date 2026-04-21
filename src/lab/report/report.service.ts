@@ -377,6 +377,7 @@ export class ReportService {
     data.status = ReportStatus.SAMPLE_COLLECTED;
     data.sampleCollectedAt = new Date();
     data.sampleId = dto.sampleId;
+    data.sampleType = dto?.sampleType || "";
     await data.save();
     return data;
   }
@@ -542,7 +543,7 @@ export class ReportService {
       test: data.test,
       patient: data.patient,
       priority: data.priority,
-      sampleType: data.sampleType,
+      sampleType: data.sampleType || "",
       status: ReportStatus.UPCOMING,
       lab: data.lab,
     });

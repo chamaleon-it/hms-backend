@@ -1,5 +1,5 @@
 import mongoose, { Types } from 'mongoose';
-import { ReportStatus, SampleType } from 'src/lab/report/schemas/report.schema';
+import { ReportStatus, } from 'src/lab/report/schemas/report.schema';
 
 export class CreateReportDto {
   patient: Types.ObjectId;
@@ -12,7 +12,7 @@ export class CreateReportDto {
     name: mongoose.Types.ObjectId;
     value?: string | number;
   }[];
-  sampleType: SampleType;
+  sampleType: string;
   status: ReportStatus;
   technician?: string;
 }

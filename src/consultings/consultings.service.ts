@@ -9,7 +9,7 @@ import {
   OrderStatus,
 } from 'src/pharmacy/orders/schemas/order.schema';
 import { ReportService } from 'src/lab/report/report.service';
-import { ReportStatus, SampleType } from 'src/lab/report/schemas/report.schema';
+import { ReportStatus } from 'src/lab/report/schemas/report.schema';
 import configuration from 'src/config/configuration';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class ConsultingsService {
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
-  ) {}
+  ) { }
 
   async create(
     consultingDto: ConsultingDto,
@@ -50,7 +50,7 @@ export class ConsultingsService {
         name: mongoose.Types.ObjectId;
         value?: string | number;
       }[];
-      sampleType: SampleType;
+      sampleType: string;
       status: ReportStatus;
     }[] = consultingDto.test.map((t) => ({
       patient: consultingDto.patient,
@@ -61,7 +61,7 @@ export class ConsultingsService {
       test: t.name.map((n) => ({ name: n })),
       priority: t.priority,
       panels: t.panels,
-      sampleType: SampleType.OTHER,
+      sampleType: "",
       status: ReportStatus.UPCOMING,
     }));
 
