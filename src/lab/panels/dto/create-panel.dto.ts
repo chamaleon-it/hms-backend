@@ -32,6 +32,10 @@ export class CreatePanelDto {
   method?: string;
 
   @IsOptional()
+  @IsString({ message: 'Specimen must be a string' })
+  specimen?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   tests?: string[];
