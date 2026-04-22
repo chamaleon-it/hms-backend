@@ -22,13 +22,15 @@ import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import configuration from 'src/config/configuration';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
+    if (!dto.doctor) dto.doctor = new mongoose.Types.ObjectId(configuration().in_doctor_id as string);
     const data = await this.ordersService.createOrder(dto);
     return {
       message: 'Order created successfully',

@@ -29,7 +29,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
