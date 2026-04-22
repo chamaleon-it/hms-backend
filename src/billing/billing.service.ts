@@ -247,7 +247,7 @@ export class BillingService {
     });
 
     if (isExist) {
-      throw new BadRequestException('Already added to billing.');
+      throw new BadRequestException('Item code already exists in billing items.');
     }
     const data = await this.billingItemModel.create({
       user,
@@ -297,7 +297,11 @@ export class BillingService {
     const filter: any = { user };
 
     if (item) {
-      filter.item = new RegExp(`^${item}`, 'i');
+
+      filter.$or = [
+        { item: new RegExp(`^${item}`, 'i') },
+        { code: new RegExp(`^${item}`, 'i') },
+      ];
     }
 
     return this.billingItemModel.find(filter).lean().exec();
