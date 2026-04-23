@@ -128,6 +128,7 @@ export class LabService {
       {
         $set: {
           'lab.reportLayout': dto.reportLayout,
+          'lab.panelPerPage': dto.panelPerPage,
         },
       },
       { new: true, runValidators: true, context: 'query' },
