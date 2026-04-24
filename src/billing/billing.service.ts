@@ -188,7 +188,7 @@ export class BillingService {
         metadata: [{ $count: 'total' }],
         data: [
           { $sort: { createdAt: -1 } },
-          ...(activeDate === 'Today' ? [] : [{ $skip: skip }, { $limit: limit }]),
+          ...((activeDate === 'Today' || activeDate === 'Custom' || true) ? [] : [{ $skip: skip }, { $limit: limit }]),
           {
             $lookup: {
               from: 'patients',
