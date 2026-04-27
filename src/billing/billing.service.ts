@@ -24,7 +24,7 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const lastRecord = await this.billingModel
@@ -65,14 +65,14 @@ export class BillingService {
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
-            order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
+          order.items.reduce(
+            (total, item) => total + item.quantity * item.name.unitPrice,
+            0,
+          )
             ? order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
+                (total, item) => total + item.quantity * item.name.unitPrice,
+                0,
+              )
             : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
@@ -100,13 +100,25 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { page = 1, limit = 10, q, qEnd, method, status, startDate, endDate, activeDate } = getBillisDto;
+    const {
+      page = 1,
+      limit = 10,
+      q,
+      qEnd,
+      method,
+      status,
+      startDate,
+      endDate,
+      activeDate,
+    } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
-    const qEndFound = await this.billingModel.exists({ mrn: qEnd?.toUpperCase() });
+    const qEndFound = await this.billingModel.exists({
+      mrn: qEnd?.toUpperCase(),
+    });
 
     if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
@@ -188,7 +200,9 @@ export class BillingService {
         metadata: [{ $count: 'total' }],
         data: [
           { $sort: { createdAt: -1 } },
-          ...((activeDate === 'Today' || activeDate === 'Custom' || true) ? [] : [{ $skip: skip }, { $limit: limit }]),
+          ...(activeDate === 'Today' || activeDate === 'Custom' || true
+            ? []
+            : [{ $skip: skip }, { $limit: limit }]),
           {
             $lookup: {
               from: 'patients',
@@ -247,7 +261,9 @@ export class BillingService {
     });
 
     if (isExist) {
-      throw new BadRequestException('Item code already exists in billing items.');
+      throw new BadRequestException(
+        'Item code already exists in billing items.',
+      );
     }
     const data = await this.billingItemModel.create({
       user,
@@ -297,7 +313,6 @@ export class BillingService {
     const filter: any = { user };
 
     if (item) {
-
       filter.$or = [
         { item: new RegExp(`^${item}`, 'i') },
         { code: new RegExp(`^${item}`, 'i') },

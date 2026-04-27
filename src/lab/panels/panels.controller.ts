@@ -122,15 +122,13 @@ export class PanelsController {
     };
   }
 
-    @Delete('test/:id')
-    @UseGuards(JwtAuthGuard)
-    async deleteTest(
-      @Param('id') id: mongoose.Types.ObjectId,
-    ) {
-      const data = await this.panelsService.deleteTest(id);
-      return {
-        message: 'Test is deleted',
-        data,
-      };
-    }
+  @Delete('test/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteTest(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.panelsService.deleteTest(id);
+    return {
+      message: 'Test is deleted',
+      data,
+    };
+  }
 }

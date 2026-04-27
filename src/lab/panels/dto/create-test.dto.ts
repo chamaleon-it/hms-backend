@@ -105,7 +105,7 @@ export class CreateTestDto {
   @IsEmpty({ message: 'User should not be provided' })
   user: mongoose.Types.ObjectId;
 
-  @ValidateIf(o => o.dataType === DataTypeEnum.OPTIONS)
+  @ValidateIf((o) => o.dataType === DataTypeEnum.OPTIONS)
   @IsArray({ message: 'Options must be an array' })
   @ArrayNotEmpty({ message: 'Options cannot be empty' })
   @IsString({ each: true, message: 'Each option must be a string' })

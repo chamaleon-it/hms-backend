@@ -10,7 +10,7 @@ import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 
 @Injectable()
 export class LabService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
+  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
   async updateGeneral(userId: mongoose.Types.ObjectId, dto: UpdateGeneralDto) {
     const pharmacy = await this.userModel.findByIdAndUpdate(
@@ -122,7 +122,10 @@ export class LabService {
     return updated;
   }
 
-  async updateReportLayout(user: mongoose.Types.ObjectId, dto: UpdateReportLayoutDto) {
+  async updateReportLayout(
+    user: mongoose.Types.ObjectId,
+    dto: UpdateReportLayoutDto,
+  ) {
     const updated = await this.userModel.findByIdAndUpdate(
       user,
       {
@@ -137,8 +140,6 @@ export class LabService {
     if (!updated) {
       throw new NotFoundException('Lab Not found');
     }
-
-
 
     return updated;
   }

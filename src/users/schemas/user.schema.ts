@@ -199,8 +199,12 @@ export class User {
         inApp: { type: Boolean, default: false },
         note: { type: String, default: null, trim: true },
       },
-      reportLayout: { type: String, default: "Classic", enum: ["Classic", "Modern"] },
-      panelPerPage: { type: Boolean, default: false }
+      reportLayout: {
+        type: String,
+        default: 'Classic',
+        enum: ['Classic', 'Modern'],
+      },
+      panelPerPage: { type: Boolean, default: false },
     },
   })
   lab: {
@@ -256,7 +260,6 @@ export class User {
       },
     },
   })
-
   pharmacyWholesaler: {
     general: {
       contactPerson: string | null;

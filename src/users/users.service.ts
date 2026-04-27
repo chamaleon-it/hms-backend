@@ -20,7 +20,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-  ) { }
+  ) {}
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({

@@ -10,7 +10,7 @@ import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 @Controller('users/lab')
 export class LabController {
-  constructor(private readonly labService: LabService) { }
+  constructor(private readonly labService: LabService) {}
 
   @Patch('general')
   @UseGuards(JwtAuthGuard)
@@ -74,7 +74,7 @@ export class LabController {
     };
   }
 
-  @Patch("update_report_layout")
+  @Patch('update_report_layout')
   @UseGuards(JwtAuthGuard)
   async updateReportLayout(
     @GetUser() user: JWTUserInterface,

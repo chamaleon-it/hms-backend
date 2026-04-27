@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePanelDto } from './dto/create-panel.dto';
 import { Panel, PanelStatus } from './schemas/panel.schema';
 import mongoose, { Model } from 'mongoose';
@@ -12,7 +16,7 @@ export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
-  ) { }
+  ) {}
 
   async createPanel(createPanelDto: CreatePanelDto) {
     const isExist = await this.panelModel.findOne({
@@ -28,7 +32,9 @@ export class PanelsService {
   async getPanels() {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name price estimatedTime tests mainHeading subheadings testSubheadings method specimen')
+      .select(
+        'name price estimatedTime tests mainHeading subheadings testSubheadings method specimen',
+      )
       .populate('tests', 'name unit range code')
       .sort({ _id: 1 })
       .lean()
@@ -123,7 +129,10 @@ export class PanelsService {
   }
 
   async updateTest(id: mongoose.Types.ObjectId, dto: CreateTestDto) {
-    const isExist = await this.testModel.exists({ code: dto.code, _id: { $ne: id } });
+    const isExist = await this.testModel.exists({
+      code: dto.code,
+      _id: { $ne: id },
+    });
     if (isExist && dto.code !== null) {
       throw new BadRequestException('Test with this code already exists');
     }
@@ -187,10 +196,7 @@ export class PanelsService {
       throw new NotFoundException('Test not found.');
     }
     // Remove test from all panels
-    await this.panelModel.updateMany(
-      { tests: id },
-      { $pull: { tests: id } },
-    );
+    await this.panelModel.updateMany({ tests: id }, { $pull: { tests: id } });
     return test;
   }
 }

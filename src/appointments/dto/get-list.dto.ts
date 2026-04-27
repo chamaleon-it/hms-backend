@@ -8,5 +8,5 @@ export class GetListDto {
 
   date?: string;
 
-  activeDate: "Today" | "7 days" | "30 days" | "Custom"
+  activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
 }

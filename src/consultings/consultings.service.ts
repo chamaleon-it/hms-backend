@@ -18,7 +18,7 @@ export class ConsultingsService {
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
-  ) { }
+  ) {}
 
   async create(
     consultingDto: ConsultingDto,
@@ -61,7 +61,7 @@ export class ConsultingsService {
       test: t.name.map((n) => ({ name: n })),
       priority: t.priority,
       panels: t.panels,
-      sampleType: "",
+      sampleType: '',
       status: ReportStatus.UPCOMING,
     }));
 

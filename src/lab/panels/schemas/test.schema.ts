@@ -72,8 +72,7 @@ export class Test {
   options: string[];
 
   @Prop({ default: null })
-  note: string
-
+  note: string;
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);

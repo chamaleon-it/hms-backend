@@ -11,7 +11,7 @@ import { Patient, PatientSchema } from '../../patients/schemas/patient.schema';
     MongooseModule.forFeature([
       { name: Report.name, schema: ReportSchema },
       { name: Test.name, schema: TestSchema },
-      { name: Patient.name, schema: PatientSchema }
+      { name: Patient.name, schema: PatientSchema },
     ]),
   ],
   controllers: [ReportController],

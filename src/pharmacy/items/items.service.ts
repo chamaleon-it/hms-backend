@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -305,7 +305,6 @@ export class ItemsService {
     return data.filter((supplier) => supplier !== '' && supplier !== '-');
   }
 
-
   async addMRP() {
     const cursor = this.itemModel
       .find({ mrp: { $exists: false }, packing: { $gt: 0 } })
@@ -322,12 +321,12 @@ export class ItemsService {
             mrp: newMrp,
             unitPrice: newUnitPrice,
           },
-        }
+        },
       );
 
       // ✅ Log
       console.log(
-        `Drug: ${item.name} | MRP: ${newMrp} | Packing: ${item.packing} | UnitPrice: ${newUnitPrice.toFixed(2)}`
+        `Drug: ${item.name} | MRP: ${newMrp} | Packing: ${item.packing} | UnitPrice: ${newUnitPrice.toFixed(2)}`,
       );
 
       // ✅ Delay (e.g., 200ms)
@@ -340,5 +339,4 @@ export class ItemsService {
   private delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
-
 }

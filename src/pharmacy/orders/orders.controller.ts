@@ -26,11 +26,12 @@ import configuration from 'src/config/configuration';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
-    if (!dto.doctor) dto.doctor = new mongoose.Types.ObjectId(configuration().in_doctor_id as string);
+    if (!dto.doctor)
+      dto.doctor = new mongoose.Types.ObjectId(configuration().in_doctor_id);
     const data = await this.ordersService.createOrder(dto);
     return {
       message: 'Order created successfully',

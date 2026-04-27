@@ -4,8 +4,6 @@ import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
-
-
 export enum ReportStatus {
   UPCOMING = 'Upcoming',
   SAMPLE_COLLECTED = 'Sample Collected',

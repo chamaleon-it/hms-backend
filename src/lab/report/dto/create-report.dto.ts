@@ -1,5 +1,5 @@
 import mongoose, { Types } from 'mongoose';
-import { ReportStatus, } from 'src/lab/report/schemas/report.schema';
+import { ReportStatus } from 'src/lab/report/schemas/report.schema';
 
 export class CreateReportDto {
   patient: Types.ObjectId;

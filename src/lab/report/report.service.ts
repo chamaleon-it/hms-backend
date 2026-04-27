@@ -22,8 +22,8 @@ export class ReportService {
   constructor(
     @InjectModel(Report.name) private reportModel: Model<Report>,
     @InjectModel(Test.name) private testModel: Model<Test>,
-    @InjectModel(Patient.name) private patientModel: Model<Patient>
-  ) { }
+    @InjectModel(Patient.name) private patientModel: Model<Patient>,
+  ) {}
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -151,7 +151,11 @@ export class ReportService {
       const updateData: any = {};
       if (collectedDate) updateData.sampleCollectedAt = new Date(collectedDate);
       if (reportedDate) updateData.testStartedAt = new Date(reportedDate);
-      await this.reportModel.updateOne({ _id: report._id }, { $set: updateData }, { timestamps: false, strict: false });
+      await this.reportModel.updateOne(
+        { _id: report._id },
+        { $set: updateData },
+        { timestamps: false, strict: false },
+      );
     }
 
     return { message: 'Updated successfully' };
@@ -164,23 +168,27 @@ export class ReportService {
     let report = await this.reportModel.findOne({
       sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' },
       isDeleted: false,
-      status: { $ne: ReportStatus.COMPLETED }
+      status: { $ne: ReportStatus.COMPLETED },
     });
 
     // Fallback: If Sample ID fails, try to find the patient's most recent active report using MRN
-    if (!report && patientId && patientId !== "Unknown") {
+    if (!report && patientId && patientId !== 'Unknown') {
       const patient = await this.patientModel.findOne({ mrn: patientId });
       if (patient) {
-        report = await this.reportModel.findOne({
-          patient: patient._id,
-          isDeleted: false,
-          status: { $ne: ReportStatus.COMPLETED }
-        }).sort({ createdAt: -1 });
+        report = await this.reportModel
+          .findOne({
+            patient: patient._id,
+            isDeleted: false,
+            status: { $ne: ReportStatus.COMPLETED },
+          })
+          .sort({ createdAt: -1 });
       }
     }
 
     if (!report) {
-      throw new NotFoundException(`Active Report for sampleId ${sampleId} or patientId ${patientId} not found`);
+      throw new NotFoundException(
+        `Active Report for sampleId ${sampleId} or patientId ${patientId} not found`,
+      );
     }
 
     // Only load tests that are actually in this report
@@ -188,15 +196,15 @@ export class ReportService {
     const tests = await this.testModel.find({ _id: { $in: testIdsInReport } });
 
     let updatedCount = 0;
-    tests.forEach(testDoc => {
+    tests.forEach((testDoc) => {
       // Find the value in results by matching keys safely
       let matchedKey: string | null = null;
       for (const key of Object.keys(results)) {
         const k = key.toLowerCase();
         const cleanK = k.replace(/[^a-z0-9]/g, ''); // "lym%", "*mentzr" -> "lym", "mentzr"
         const baseK = k.replace(/[^a-z0-9\-\+]/g, ''); // "lym%" -> "lym"
-        const tCode = (testDoc.code || "").toLowerCase();
-        const tName = (testDoc.name || "").toLowerCase();
+        const tCode = (testDoc.code || '').toLowerCase();
+        const tName = (testDoc.name || '').toLowerCase();
 
         // Strict check for exactly same strings or codes
         if (tCode === k || tName === k) {
@@ -205,14 +213,21 @@ export class ReportService {
         }
 
         // Specific handling for % vs # (Absolute vs Percentage)
-        const isPercentTest = tName.includes('%') || tName.includes('percentage');
-        const isAbsoluteTest = tName.includes('#') || tName.includes('abs') || tName.includes('absolute');
+        const isPercentTest =
+          tName.includes('%') || tName.includes('percentage');
+        const isAbsoluteTest =
+          tName.includes('#') ||
+          tName.includes('abs') ||
+          tName.includes('absolute');
 
         const isMachinePercent = k.includes('%');
         const isMachineAbsolute = k.includes('#');
 
         // If one is explicitly percent and the other is absolute, DO NOT MATCH.
-        if ((isPercentTest && isMachineAbsolute) || (isAbsoluteTest && isMachinePercent)) {
+        if (
+          (isPercentTest && isMachineAbsolute) ||
+          (isAbsoluteTest && isMachinePercent)
+        ) {
           continue;
         }
 
@@ -227,14 +242,27 @@ export class ReportService {
           (k === 'k' && tName.includes('potassium')) ||
           (k === 'cl' && tName.includes('chloride')) ||
           // Common CBC Fallbacks (Erba H360)
-          (k === 'wbc' && (tName.includes('white blood') || tName.includes('total count') || new RegExp(`\\btc\\b`).test(tName))) ||
+          (k === 'wbc' &&
+            (tName.includes('white blood') ||
+              tName.includes('total count') ||
+              new RegExp(`\\btc\\b`).test(tName))) ||
           (k === 'rbc' && tName.includes('red blood')) ||
-          (k === 'hgb' && (tName.includes('hemoglobin') || tName.includes('(hb)') || tName === 'hb' || tName.includes('haemoglobin'))) ||
-          (k === 'hct' && (tName.includes('hematocrit') || new RegExp(`\\bpcv\\b`).test(tName))) ||
+          (k === 'hgb' &&
+            (tName.includes('hemoglobin') ||
+              tName.includes('(hb)') ||
+              tName === 'hb' ||
+              tName.includes('haemoglobin'))) ||
+          (k === 'hct' &&
+            (tName.includes('hematocrit') ||
+              new RegExp(`\\bpcv\\b`).test(tName))) ||
           (baseK === 'lym' && tName.includes('lymphocyte')) ||
-          (baseK === 'gran' && (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
-          (baseK === 'mid' && (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
-          (k === 'plt' && (new RegExp(`\\bplatelet\\b`).test(tName) || new RegExp(`\\bplatelets\\b`).test(tName))) ||
+          (baseK === 'gran' &&
+            (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
+          (baseK === 'mid' &&
+            (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
+          (k === 'plt' &&
+            (new RegExp(`\\bplatelet\\b`).test(tName) ||
+              new RegExp(`\\bplatelets\\b`).test(tName))) ||
           (k === 'pct' && tName.includes('plateletcrit')) ||
           (baseK === 'mentzr' && tName.includes('mentzer')) ||
           (baseK === 'rdwi' && tName.includes('rdwi'))
@@ -244,10 +272,14 @@ export class ReportService {
         }
       }
 
-      if (matchedKey && results[matchedKey] && results[matchedKey].value !== undefined) {
+      if (
+        matchedKey &&
+        results[matchedKey] &&
+        results[matchedKey].value !== undefined
+      ) {
         // Find this test in the report.test array
         const index = report.test.findIndex(
-          (x) => x?.name?.toString() === testDoc._id.toString()
+          (x) => x?.name?.toString() === testDoc._id.toString(),
         );
         if (index !== -1) {
           report.test[index].value = results[matchedKey].value;
@@ -279,7 +311,10 @@ export class ReportService {
 
     await report.save();
 
-    return { message: `LIS Result processed from ${machine}. Updated ${updatedCount} parameters.`, reportId: report._id };
+    return {
+      message: `LIS Result processed from ${machine}. Updated ${updatedCount} parameters.`,
+      reportId: report._id,
+    };
   }
 
   async getPatientReports(patient: mongoose.Types.ObjectId) {
@@ -377,7 +412,7 @@ export class ReportService {
     data.status = ReportStatus.SAMPLE_COLLECTED;
     data.sampleCollectedAt = new Date();
     data.sampleId = dto.sampleId;
-    data.sampleType = dto?.sampleType || "";
+    data.sampleType = dto?.sampleType || '';
     await data.save();
     return data;
   }
@@ -543,7 +578,7 @@ export class ReportService {
       test: data.test,
       patient: data.patient,
       priority: data.priority,
-      sampleType: data.sampleType || "",
+      sampleType: data.sampleType || '',
       status: ReportStatus.UPCOMING,
       lab: data.lab,
     });
