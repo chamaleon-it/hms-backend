@@ -362,7 +362,7 @@ export class BillingService {
     const { query = '', } = getBillDropDownDto;
 
     const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
-      .limit(5).select("user patient mrn")
+      .limit(10).select("user patient mrn")
       .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
       .lean()
       .exec();
