@@ -21,10 +21,11 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
+import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -57,6 +58,16 @@ export class BillingController {
       total,
       page: Number(getBillisDto.page),
       limit: Number(getBillisDto.limit),
+    };
+  }
+
+  @Get('drop-down')
+  // @UseGuards(JwtAuthGuard)
+  async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
+    const data = await this.billingService.getBillDropDown(getBillDropDownDto);
+    return {
+      data,
+      message: 'Bill drop down retrived successfully',
     };
   }
 

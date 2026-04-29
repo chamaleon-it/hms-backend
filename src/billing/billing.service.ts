@@ -16,6 +16,7 @@ import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
+import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
 @Injectable()
 export class BillingService {
@@ -24,7 +25,7 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const lastRecord = await this.billingModel
@@ -65,14 +66,14 @@ export class BillingService {
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
+            order.items.reduce(
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
             ? order.items.reduce(
-                (total, item) => total + item.quantity * item.name.unitPrice,
-                0,
-              )
+              (total, item) => total + item.quantity * item.name.unitPrice,
+              0,
+            )
             : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
@@ -354,6 +355,17 @@ export class BillingService {
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+  async getBillDropDown(getBillDropDownDto: GetBillDropdownDto) {
+    const { query = '', } = getBillDropDownDto;
+
+    const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
+      .limit(5).select("user patient mrn")
+      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+      .lean()
+      .exec();
     return data;
   }
 }
