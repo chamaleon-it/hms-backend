@@ -251,7 +251,9 @@ export class OrdersService {
         'Order not found. Please check your details.',
       );
     }
-  }  async getCustomers(query: GetCustomersDto) {
+  }
+
+  async getCustomers(query: GetCustomersDto) {
     const {
       page = 1,
       limit = 10,
