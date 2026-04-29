@@ -161,10 +161,11 @@ export class BillingService {
 
     if (status) {
       if (status === 'Unpaid') {
-        pipeline.push({ $match: { totalPaid: 0 } });
+        pipeline.push({ $match: { totalPaid: 0, transactionType: 'Sale' } });
       } else if (status === 'Paid') {
         pipeline.push({
           $match: {
+            transactionType: 'Sale',
             $expr: {
               $lte: [
                 '$itemsTotal',
@@ -178,6 +179,7 @@ export class BillingService {
       } else if (status === 'Partial') {
         pipeline.push({
           $match: {
+            transactionType: 'Sale',
             $and: [
               {
                 $expr: {
@@ -363,6 +365,14 @@ export class BillingService {
 
     const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
       .limit(10).select("user patient mrn")
+      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+      .lean()
+      .exec();
+    return data;
+  }
+
+  async getSingleCustomerBill(q: string) {
+    const data = await this.billingModel.find({ patient: q })
       .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
       .lean()
       .exec();

@@ -363,7 +363,7 @@ export class OrdersService {
         { $match: { 'patientDetail.status': { $ne: PatientStatus.DELETED } } },
       ];
 
-      // Re-apply patient-specific filters on the joined data
+
       if (q) {
         const searchRegex = { $regex: q, $options: 'i' };
         aggregationPipeline.push({
@@ -581,7 +581,10 @@ export class OrdersService {
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
-    const existOrder = await this.orderModel.findById(id).lean().exec();
+
+    const bill = await this.billingModel.findById(id).lean().exec();
+    const existOrder = await this.orderModel.findOne({ billNo: bill?.mrn }).lean().exec();
+
     if (!existOrder) {
       throw new NotFoundException('Order not found');
     }
@@ -601,10 +604,8 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      configuration().in_house_pharmacy_id,
-    );
-    if (autoGenerateBill) {
+
+    if (true) {
       const items = await Promise.all(
         data.items.map(async (item) => {
           const itemData = await this.itemsService.getItem(item.name);

@@ -71,6 +71,15 @@ export class BillingController {
     };
   }
 
+  @Get('single')
+  async getSingleCustomerBill(@Query('q') q: string) {
+    const data = await this.billingService.getSingleCustomerBill(q);
+    return {
+      data,
+      message: 'Single bill were retrived successfully',
+    };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('billing_item')
   async addBillingItem(

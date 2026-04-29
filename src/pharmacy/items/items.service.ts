@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -307,12 +307,12 @@ export class ItemsService {
 
   async addMRP() {
     const cursor = this.itemModel
-      .find({ mrp: { $exists: false }, packing: { $gt: 0 } })
+      .find({ mrp: { $exists: false } })
       .cursor();
 
     for await (const item of cursor) {
       const newMrp = item.unitPrice;
-      const newUnitPrice = item.unitPrice / item.packing;
+      const newUnitPrice = item.unitPrice / (item.packing || 1);
 
       await this.itemModel.updateOne(
         { _id: item._id },
@@ -324,13 +324,11 @@ export class ItemsService {
         },
       );
 
-      // ✅ Log
       console.log(
         `Drug: ${item.name} | MRP: ${newMrp} | Packing: ${item.packing} | UnitPrice: ${newUnitPrice.toFixed(2)}`,
       );
 
-      // ✅ Delay (e.g., 200ms)
-      await this.delay(1000);
+      await this.delay(20);
     }
 
     console.log('✅ Completed updating all items');
