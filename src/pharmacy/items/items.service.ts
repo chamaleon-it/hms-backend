@@ -135,8 +135,8 @@ export class ItemsService {
 
       filter.quantity = stockConditions[stock];
     }
-    if (lowStockItemsView) {
-      filter.quantity = { $lt: Number(lowStockThreshold ?? 20) };
+    if (lowStockItemsView && (stock === "Low" || stock === "Out" || !stock)) {
+      filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
     }
 
     if (query.expiry) {
@@ -165,9 +165,10 @@ export class ItemsService {
       this.itemModel.countDocuments(filter),
     ]);
 
-    const lowStockCount = await this.itemModel.countDocuments({
-      quantity: { $lt: Number(lowStockThreshold ?? 20) },
-    });
+    const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
+      ...filter,
+      quantity: { $lte: Number(lowStockThreshold ?? 20) },
+    }) : 0;
 
     return { items, total, lowStockCount };
   }
