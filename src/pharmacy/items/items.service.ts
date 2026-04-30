@@ -155,7 +155,7 @@ export class ItemsService {
 
     filter.status = { $ne: ItemStatus.Deleted };
 
-    const [items, total] = await Promise.all([
+    const [items, total, lowStockCount] = await Promise.all([
       this.itemModel
         .find(filter)
         .skip(skip)
@@ -163,12 +163,16 @@ export class ItemsService {
         .lean()
         .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 }),
       this.itemModel.countDocuments(filter),
+      (stock === "Low" || stock === "Out" || !stock) ? await this.itemModel.countDocuments({
+        ...filter,
+        quantity: { $lte: Number(lowStockThreshold ?? 20) },
+      }) : Promise.resolve(0)
     ]);
 
-    const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
-      ...filter,
-      quantity: { $lte: Number(lowStockThreshold ?? 20) },
-    }) : 0;
+    // const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
+    //   ...filter,
+    //   quantity: { $lte: Number(lowStockThreshold ?? 20) },
+    // }) : 0;
 
     return { items, total, lowStockCount };
   }
