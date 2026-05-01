@@ -76,6 +76,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
+        doctor: "Self",
       });
 
       data.billNo = bill.mrn;
@@ -629,6 +630,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
+        doctor: "Self",
       });
     }
 

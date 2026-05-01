@@ -56,6 +56,10 @@ export class CreateBillingDto {
   @IsNotEmpty()
   patient: mongoose.Types.ObjectId;
 
+  @IsString()
+  @IsOptional()
+  doctor: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateBillingItemDto)

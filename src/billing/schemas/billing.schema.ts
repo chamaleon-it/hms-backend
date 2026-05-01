@@ -33,6 +33,9 @@ export class Billing {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient', required: true })
   patient: Types.ObjectId;
 
+  @Prop({ type: String, default: 'Self' })
+  doctor: string;
+
   @Prop({ type: [BillingItemSchema], default: [] })
   items: BillingItem[];
 
