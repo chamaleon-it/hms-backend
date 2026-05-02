@@ -260,6 +260,17 @@ export class ItemsService {
       await item.save();
     }
 
+    if (quantity > 0 && newQuantity >= 0) {
+      const newSoldQuantity = item.soldQuantity + quantity;
+      item.soldQuantity = newSoldQuantity;
+      await item.save();
+    }
+    item.soldHistory.push({
+      date: new Date(),
+      quantity,
+    });
+    await item.save();
+
     return item;
   }
 
