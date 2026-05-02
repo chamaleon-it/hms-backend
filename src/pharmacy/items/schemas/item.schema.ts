@@ -88,11 +88,13 @@ export class Item {
     type: [{
       date: { type: Date, required: true },
       quantity: { type: Number, required: true },
+      unitPrice: { type: Number, required: true },
+      total: { type: Number, required: true },
     }],
     default: [],
     required: true
   })
-  soldHistory: { date: Date, quantity: number }[];
+  soldHistory: { date: Date, quantity: number, unitPrice: number, total: number }[];
 
   @Prop({ type: Date })
   expiryDate?: Date;

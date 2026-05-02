@@ -268,6 +268,8 @@ export class ItemsService {
     item.soldHistory.push({
       date: new Date(),
       quantity,
+      unitPrice: item.unitPrice,
+      total: item.unitPrice * quantity,
     });
     await item.save();
 
