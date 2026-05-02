@@ -263,15 +263,16 @@ export class ItemsService {
     if (quantity > 0 && newQuantity >= 0) {
       const newSoldQuantity = item.soldQuantity + quantity;
       item.soldQuantity = newSoldQuantity;
+      item.soldHistory.push({
+        date: new Date(),
+        quantity,
+        unitPrice: item.unitPrice,
+        total: item.unitPrice * quantity,
+      });
       await item.save();
     }
-    item.soldHistory.push({
-      date: new Date(),
-      quantity,
-      unitPrice: item.unitPrice,
-      total: item.unitPrice * quantity,
-    });
-    await item.save();
+
+
 
     return item;
   }
