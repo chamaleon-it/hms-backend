@@ -16,7 +16,7 @@ import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -85,13 +85,13 @@ export class PatientsService {
     } = {};
 
     if (query && query.trim() !== '') {
-      const nameRegex = { $regex: `^${query}`, $options: 'i' };
+      const nameRegex = { $regex: `${query}`, $options: 'i' };
       const searchRegex = { $regex: `^${query}`, $options: 'i' };
       filter = {
         $or: [
           { name: nameRegex },
           { phoneNumber: searchRegex },
-          { mrn: searchRegex },
+          { mrn: nameRegex },
           { address: searchRegex },
         ],
       };
@@ -160,7 +160,7 @@ export class PatientsService {
       .skip(skip)
       .limit(limit)
       .populate('doctor')
-      .sort({ createdAt: -1 });
+      .sort({ name: query ? 1 : -1, createdAt: -1 });
     return data;
   }
 
