@@ -164,7 +164,7 @@ export class ItemsService {
     const [items, total, lowStockCount] = await Promise.all([
       this.itemModel
         .find(filter)
-        .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 })  // sort BEFORE skip/limit
+        .sort(q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 })  // sort BEFORE skip/limit
         .skip(skip)
         .limit(limit)
         .lean(),
