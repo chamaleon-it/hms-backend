@@ -5,9 +5,7 @@ export type PatientDocument = HydratedDocument<Patient>;
 
 export enum Gender {
   MALE = 'Male',
-  FEMALE = 'Female',
-  OTHER = 'Other',
-  PREFER_NOT_TO_SAY = 'Prefer not to say',
+  FEMALE = 'Female'
 }
 
 export enum PatientStatus {

@@ -28,7 +28,7 @@ export class PatientRegisterDto {
   @IsString()
   doctor: string;
 
-  @IsIn(['Male', 'Female', 'Other', 'Prefer not to say'])
+  @IsIn(['Male', 'Female'])
   gender: string;
 
   @IsString()
@@ -45,9 +45,9 @@ export class PatientRegisterDto {
     if (!str) return undefined;
     return str.includes(',')
       ? str
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
       : [str];
   })
   @IsArray()

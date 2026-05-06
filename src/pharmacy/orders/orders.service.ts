@@ -286,8 +286,7 @@ export class OrdersService {
     }
 
     if (gender) {
-      patientFilter.gender =
-        gender === 'Other' ? { $nin: ['Male', 'Female'] } : gender;
+      patientFilter.gender = gender;
     }
 
     if (doctor && alreadyPurchase === 'false') {
