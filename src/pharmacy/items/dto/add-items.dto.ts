@@ -117,6 +117,9 @@ export class AddItemDto {
   packing?: number;
 
   @IsOptional()
+  noOfpacking?: number;
+
+  @IsOptional()
   gst?: number;
 
   @IsOptional()
