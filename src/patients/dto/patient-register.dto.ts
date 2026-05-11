@@ -109,4 +109,8 @@ export class PatientRegisterDto {
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
   guardianRelation?: string;
+
+  @IsOptional()
+  @IsString()
+  weight?: string;
 }
