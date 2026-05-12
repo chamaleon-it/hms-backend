@@ -88,7 +88,7 @@ export class Patient {
   guardianRelation: string;
 
   @Prop({ required: false})
-  weight?: string; 
+  weight?: number; 
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

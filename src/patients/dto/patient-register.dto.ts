@@ -111,6 +111,5 @@ export class PatientRegisterDto {
   guardianRelation?: string;
 
   @IsOptional()
-  @IsString()
-  weight?: string;
+  weight?: number;
 }
