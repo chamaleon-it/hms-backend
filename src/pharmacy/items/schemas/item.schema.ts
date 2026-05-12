@@ -106,6 +106,9 @@ export class Item {
   packing: number;
 
   @Prop({ type: Number, default: 0 })
+  noOfPacking: number;
+
+  @Prop({ type: Number, default: 0 })
   gst: number;
 
   @Prop({
