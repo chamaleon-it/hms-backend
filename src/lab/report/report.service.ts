@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { GetReportDto } from './dto/get-report.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 import { Test } from '../panels/schemas/test.schema';
 import { Patient } from '../../patients/schemas/patient.schema';
+import { async } from 'rxjs';
 
 @Injectable()
 export class ReportService {
@@ -405,17 +407,39 @@ export class ReportService {
   }
 
   async sampleCollected(id: mongoose.Types.ObjectId, dto: SampleCollectedDto) {
+    if (dto.sampleId) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const rawSampleId = dto.sampleId.split(' (')[0].trim();
+
+      const duplicateReport = await this.reportModel.findOne({
+        _id: { $ne: id },
+        sampleId: { $regex: new RegExp(`^${rawSampleId}\\b`, 'i') },
+        createdAt: { $gte: today },
+      });
+
+      if (duplicateReport) {
+        throw new ConflictException(
+          `Warning: Sample ID "${rawSampleId}" is already assigned to another test today.`,
+        );
+      }
+    }
+
     const data = await this.reportModel.findById(id);
     if (!data) {
       throw new NotFoundException('Records not found');
     }
+
     data.status = ReportStatus.SAMPLE_COLLECTED;
     data.sampleCollectedAt = new Date();
     data.sampleId = dto.sampleId;
     data.sampleType = dto?.sampleType || '';
+    
     await data.save();
     return data;
   }
+
 
   async startTest(id: mongoose.Types.ObjectId) {
     const data = await this.reportModel.findById(id);

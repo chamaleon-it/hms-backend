@@ -106,6 +106,9 @@ export class Report {
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
 
+ReportSchema.index({ createdAt: -1 });
+ReportSchema.index({ sampleId: 1 });
+
 ReportSchema.pre('save', async function (next) {
   if (this.isNew) {
     const model = this.constructor as Model<ReportDocument>;
