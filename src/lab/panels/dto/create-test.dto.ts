@@ -120,4 +120,8 @@ export class CreateTestDto {
   @IsOptional()
   @IsString({ message: 'Note must be a string' })
   note?: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 }
