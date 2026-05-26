@@ -66,11 +66,14 @@ export class ItemsService {
       addItemDto.manufacturer = '-';
     }
 
+    const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+
     const data = await this.itemModel.create({
       ...addItemDto,
-      quantity: 0,
+      quantity: addItemDto.batchNumber ? 0 : openingQty, // will be incremented by addBatchItems if batch exists
       pharmacy,
     });
+
     if (addItemDto.batchNumber) {
       await this.addBatchItems(data._id, {
         batchNumber: addItemDto.batchNumber,
@@ -78,7 +81,7 @@ export class ItemsService {
           ? new Date(addItemDto?.expiryDate)
           : new Date(),
         purchasePrice: addItemDto.purchasePrice,
-        quantity: addItemDto.quantity ?? 0,
+        quantity: openingQty,
         supplier: addItemDto.supplier || '-',
       });
     }
