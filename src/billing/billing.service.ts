@@ -239,6 +239,16 @@ export class BillingService {
     const data = result[0].data;
     const total = result[0].metadata[0]?.total ?? 0;
 
+    // Populate doctor names for the bills
+    for (const bill of data) {
+      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
+        const doc = await this.usersService.getUserById(bill.doctor);
+        if (doc) {
+          bill.doctor = doc;
+        }
+      }
+    }
+
     return { data, total };
   }
 
@@ -252,6 +262,13 @@ export class BillingService {
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
+
+    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
+      const doc = await this.usersService.getUserById(data.doctor);
+      if (doc) {
+        (data as any).doctor = doc;
+      }
+    }
     return data;
   }
 
@@ -265,6 +282,13 @@ export class BillingService {
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
+
+    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
+      const doc = await this.usersService.getUserById(data.doctor);
+      if (doc) {
+        (data as any).doctor = doc;
+      }
+    }
     return data;
   }
 

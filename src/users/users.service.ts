@@ -188,4 +188,9 @@ export class UsersService {
 
     return user.consultationValues;
   }
+
+  async getUserById(id: any) {
+    if (!mongoose.isValidObjectId(id)) return null;
+    return this.userModel.findById(id).lean().exec();
+  }
 }
