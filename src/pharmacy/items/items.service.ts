@@ -73,6 +73,7 @@ export class ItemsService {
       quantity: addItemDto.batchNumber ? 0 : openingQty, // will be incremented by addBatchItems if batch exists
       pharmacy,
     });
+
     if (addItemDto.batchNumber) {
       const updatedItem = await this.addBatchItems(data._id, {
         batchNumber: addItemDto.batchNumber,
