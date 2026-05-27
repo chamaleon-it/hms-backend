@@ -81,6 +81,12 @@ export class Billing {
 
   @Prop({ type: String, required: false })
   salesMRN?: string;
+
+  @Prop({ type: String, enum: ['Draft', 'Completed'], default: 'Draft' })
+  status: 'Draft' | 'Completed';
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Report', required: false })
+  reportId?: Types.ObjectId;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

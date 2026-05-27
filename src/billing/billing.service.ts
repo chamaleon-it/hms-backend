@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateBillingDto } from './dto/create-billing.dto';
+import { UpdateBillingDto } from './dto/update-billing.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
 import mongoose, { Model } from 'mongoose';
@@ -251,6 +252,51 @@ export class BillingService {
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+  async getBillByReportId(reportId: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(reportId))
+      throw new BadRequestException('Please provide a valid report id');
+    const data = await this.billingModel
+      .findOne({ reportId })
+      .populate('patient')
+      .populate('items')
+      .lean()
+      .exec();
+    if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+
+  async updateBill(id: mongoose.Types.ObjectId, updateBillDto: UpdateBillingDto) {
+    if (!mongoose.isValidObjectId(id))
+      throw new BadRequestException('Please provide a valid bill id');
+    
+    const existingBill = await this.billingModel.findById(id);
+    if (!existingBill) throw new NotFoundException('Bill is not found.');
+    
+    if (existingBill.status === 'Completed') {
+      throw new BadRequestException('Cannot edit a completed bill');
+    }
+
+    const data = await this.billingModel.findByIdAndUpdate(
+      id,
+      { $set: updateBillDto },
+      { new: true }
+    );
+    return data;
+  }
+
+  async updateBillStatusByReportId(reportId: mongoose.Types.ObjectId, status: 'Draft' | 'Completed') {
+    if (!mongoose.isValidObjectId(reportId))
+      throw new BadRequestException('Please provide a valid report id');
+    
+    const data = await this.billingModel.findOneAndUpdate(
+      { reportId },
+      { $set: { status } },
+      { new: true }
+    );
     return data;
   }
 

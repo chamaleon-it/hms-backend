@@ -117,4 +117,12 @@ export class CreateBillingDto {
   @IsString()
   @IsOptional()
   rxId?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsMongoId()
+  @IsOptional()
+  reportId?: mongoose.Types.ObjectId;
 }

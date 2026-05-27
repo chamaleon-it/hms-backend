@@ -22,6 +22,7 @@ import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -143,6 +144,16 @@ export class BillingController {
     };
   }
 
+  @Get('report/:reportId')
+  @UseGuards(JwtAuthGuard)
+  async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId) {
+    const data = await this.billingService.getBillByReportId(reportId);
+    return {
+      data,
+      message: 'Bill retrieved successfully by report ID.',
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {
@@ -150,6 +161,19 @@ export class BillingController {
     return {
       data,
       message: 'Bill were retrived successfully.',
+    };
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateBill(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateBillDto: UpdateBillingDto,
+  ) {
+    const data = await this.billingService.updateBill(id, updateBillDto);
+    return {
+      data,
+      message: 'Bill updated successfully.',
     };
   }
 

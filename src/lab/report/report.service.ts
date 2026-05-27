@@ -17,6 +17,8 @@ import { GetReportDto } from './dto/get-report.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 import { Test } from '../panels/schemas/test.schema';
 import { Patient } from '../../patients/schemas/patient.schema';
+import { Panel } from '../panels/schemas/panel.schema';
+import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
 
 @Injectable()
@@ -25,6 +27,8 @@ export class ReportService {
     @InjectModel(Report.name) private reportModel: Model<Report>,
     @InjectModel(Test.name) private testModel: Model<Test>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(Panel.name) private panelModel: Model<Panel>,
+    private billingService: BillingService,
   ) {}
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
@@ -45,6 +49,7 @@ export class ReportService {
 
     if (!userReport) {
       const data = await this.reportModel.create(dto);
+      await this.createOrUpdateDraftBill(data);
       return data;
     } else {
       userReport.test.push(
@@ -69,7 +74,84 @@ export class ReportService {
         );
       }
       await userReport.save();
+      await this.createOrUpdateDraftBill(userReport);
       return userReport;
+    }
+  }
+
+  private async createOrUpdateDraftBill(report: Report & { _id: any }) {
+    const items: any[] = [];
+    let total = 0;
+
+    if (report.panels && report.panels.length > 0) {
+      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
+      for (const panel of panelsData) {
+        items.push({
+          name: panel.name,
+          quantity: 1,
+          unitPrice: panel.price || 0,
+          total: panel.price || 0,
+          gst: 0,
+          discount: 0,
+        });
+        total += panel.price || 0;
+      }
+    }
+
+    if (report.test && report.test.length > 0) {
+      const testIds = report.test.map(t => t.name);
+      const testsData = await this.testModel.find({ _id: { $in: testIds } });
+      
+      // If tests are already part of a panel, should we exclude them? 
+      // The frontend logic for bill printing excludes tests if they are in the selected panels.
+      // We should mirror that logic:
+      let panelTestIds: string[] = [];
+      if (report.panels && report.panels.length > 0) {
+        const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
+        panelTestIds = panelsData.flatMap(p => p.tests || []).map(id => id.toString());
+      }
+
+      for (const test of testsData) {
+        if (!panelTestIds.includes(test._id.toString())) {
+          items.push({
+            name: test.name,
+            quantity: 1,
+            unitPrice: test.price || 0,
+            total: test.price || 0,
+            gst: 0,
+            discount: 0,
+          });
+          total += test.price || 0;
+        }
+      }
+    }
+
+    // Try to find existing bill for this report
+    let existingBill;
+    try {
+      existingBill = await this.billingService['billingModel'].findOne({ reportId: report._id });
+    } catch(e) {}
+
+    if (existingBill) {
+      if (existingBill.status === 'Draft') {
+        // Update items only if it is a draft
+        await this.billingService.updateBill(existingBill._id, {
+          items,
+        });
+      }
+    } else {
+      await this.billingService.generateBill({
+        patient: report.patient,
+        user: report.lab,
+        doctor: report.doctor ? report.doctor.toString() : 'Self',
+        items,
+        cash: 0,
+        online: 0,
+        insurance: 0,
+        discount: 0,
+        reportId: report._id,
+        status: 'Draft',
+      });
     }
   }
 
@@ -147,6 +229,10 @@ export class ReportService {
       : ReportStatus.WAITING_FOR_RESULT;
 
     await report.save();
+
+    if (allFilled) {
+      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+    }
 
     // Forcefully override locked timestamp behavior directly in Mongo
     if (collectedDate || reportedDate) {
@@ -312,6 +398,10 @@ export class ReportService {
     }
 
     await report.save();
+
+    if (allFilled) {
+      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+    }
 
     return {
       message: `LIS Result processed from ${machine}. Updated ${updatedCount} parameters.`,
@@ -587,6 +677,7 @@ export class ReportService {
     }
 
     await data.save();
+    await this.createOrUpdateDraftBill(data);
     return data;
   }
 
