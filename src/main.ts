@@ -11,20 +11,20 @@ async function bootstrap() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.enableCors({
-    origin: true,
-    // [
-    //   'http://localhost:3000',
-    //   'http://localhost:3001',
-    //   'http://localhost:3002',
-    //   'http://localhost:3003',
-    //   'http://localhost:3004',
-    //   'https://synapsehms.com',
-    // ],
+   origin: true,
+      // // 'http://localhost:3000',
+      // // 'http://127.0.0.1:3001',
+      // // 'http://localhost:3001',
+      // // 'http://127.0.0.1:3000',
+      // // 'https://synapsehms.com',
+      // // 'http://192.168.220.10:3001',
+      // // 'http://192.168.220.10:3000',
+    
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
-  await app.listen(3001);
+  await app.listen(3001, '0.0.0.0');
 }
 
 bootstrap();
