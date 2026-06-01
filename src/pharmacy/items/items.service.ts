@@ -83,7 +83,7 @@ export class ItemsService {
         purchasePrice: addItemDto.purchasePrice,
         quantity: openingQty,
         supplier: addItemDto.supplier || '-',
-      });
+      }, addItemDto.unitPrice);
     }
     return data;
   }
@@ -304,7 +304,10 @@ export class ItemsService {
       purchasePrice: number;
       supplier: string;
     },
+    unitPrice?: number,
+    mrp?: number
   ) {
+
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
@@ -312,7 +315,8 @@ export class ItemsService {
 
     item.batches.push({ ...batchData, createdAt: new Date() });
     item.quantity += batchData.quantity;
-
+    item.unitPrice = unitPrice ? unitPrice : 0;
+    item.mrp = mrp ? mrp : 0;
     if (
       !item.expiryDate ||
       new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
