@@ -18,6 +18,7 @@ import { LisResultDto } from './dto/lis-result.dto';
 import { Test } from '../panels/schemas/test.schema';
 import { Patient } from '../../patients/schemas/patient.schema';
 import { Panel } from '../panels/schemas/panel.schema';
+import { Group } from '../panels/schemas/group.schema';
 import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
 
@@ -28,6 +29,7 @@ export class ReportService {
     @InjectModel(Test.name) private testModel: Model<Test>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
+    @InjectModel(Group.name) private groupModel: Model<Group>,
     private billingService: BillingService,
   ) {}
   async createReport(@Body() dto: CreateReportDto) {
@@ -65,12 +67,13 @@ export class ReportService {
 
       if (dto.panels && dto.panels.length > 0) {
         userReport.panels.push(
-          ...dto.panels.filter(
-            (p) =>
-              !userReport.panels.some(
-                (existing) => existing.toString() === p.toString(),
-              ),
-          ),
+          ...dto.panels.filter((p) => !userReport.panels.includes(p))
+        );
+      }
+      if (dto.groups && dto.groups.length > 0) {
+        if (!userReport.groups) userReport.groups = [];
+        userReport.groups.push(
+          ...dto.groups.filter((g) => !userReport.groups.includes(g))
         );
       }
       await userReport.save();
@@ -83,18 +86,42 @@ export class ReportService {
     const items: any[] = [];
     let total = 0;
 
-    if (report.panels && report.panels.length > 0) {
-      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
-      for (const panel of panelsData) {
+    if (report.groups && report.groups.length > 0) {
+      const groupsData = await this.groupModel.find({ name: { $in: report.groups } });
+      for (const group of groupsData) {
         items.push({
-          name: panel.name,
+          name: group.name,
           quantity: 1,
-          unitPrice: panel.price || 0,
-          total: panel.price || 0,
+          unitPrice: group.price || 0,
+          total: group.price || 0,
           gst: 0,
           discount: 0,
         });
-        total += panel.price || 0;
+        total += group.price || 0;
+      }
+    }
+
+    if (report.panels && report.panels.length > 0) {
+      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
+      
+      let groupPanelNames: string[] = [];
+      if (report.groups && report.groups.length > 0) {
+        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('panels');
+        groupPanelNames = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+      }
+      
+      for (const panel of panelsData) {
+        if (!groupPanelNames.includes(panel.name)) {
+          items.push({
+            name: panel.name,
+            quantity: 1,
+            unitPrice: panel.price || 0,
+            total: panel.price || 0,
+            gst: 0,
+            discount: 0,
+          });
+          total += panel.price || 0;
+        }
       }
     }
 
@@ -102,17 +129,25 @@ export class ReportService {
       const testIds = report.test.map(t => t.name);
       const testsData = await this.testModel.find({ _id: { $in: testIds } });
       
-      // If tests are already part of a panel, should we exclude them? 
-      // The frontend logic for bill printing excludes tests if they are in the selected panels.
-      // We should mirror that logic:
       let panelTestIds: string[] = [];
+      let groupTestIds: string[] = [];
+      
       if (report.panels && report.panels.length > 0) {
         const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
         panelTestIds = panelsData.flatMap(p => p.tests || []).map(id => id.toString());
       }
+      
+      if (report.groups && report.groups.length > 0) {
+        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('tests').populate('panels');
+        groupTestIds = groupsData.flatMap(g => g.tests || []).map((t: any) => t._id?.toString() || t.toString());
+        
+        const groupPanelIds = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+        const groupPanelsData = await this.panelModel.find({ name: { $in: groupPanelIds } });
+        groupTestIds.push(...groupPanelsData.flatMap(p => p.tests || []).map(id => id.toString()));
+      }
 
       for (const test of testsData) {
-        if (!panelTestIds.includes(test._id.toString())) {
+        if (!panelTestIds.includes(test._id.toString()) && !groupTestIds.includes(test._id.toString())) {
           items.push({
             name: test.name,
             quantity: 1,

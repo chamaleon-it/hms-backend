@@ -40,6 +40,9 @@ export class Report {
   @Prop({ type: [String], default: [] })
   panels: string[];
 
+  @Prop({ type: [String], default: [] })
+  groups: string[];
+
   @Prop([
     {
       name: { type: mongoose.Schema.Types.ObjectId, ref: 'Test' },

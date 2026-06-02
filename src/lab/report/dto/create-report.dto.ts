@@ -8,6 +8,7 @@ export class CreateReportDto {
   date: Date;
   priority: string;
   panels?: string[];
+  groups?: string[];
   test: {
     name: mongoose.Types.ObjectId;
     value?: string | number;

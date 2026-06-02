@@ -10,12 +10,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CreateTestDto } from './dto/create-test.dto';
 import { Test } from './schemas/test.schema';
 import { AddTestDto } from './dto/add-test.dto';
+import { CreateGroupDto } from './dto/create-group.dto';
+import { Group, GroupStatus } from './schemas/group.schema';
 
 @Injectable()
 export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
+    @InjectModel(Group.name) private groupModel: Model<Group>,
   ) {}
 
   async createPanel(createPanelDto: CreatePanelDto) {
@@ -40,6 +43,7 @@ export class PanelsService {
       .lean()
       .exec();
     return panels.map((panel) => ({
+      _id: (panel as any)._id.toString(),
       name: panel.name,
       price: panel.price,
       estimatedTime: panel.estimatedTime,
@@ -198,5 +202,41 @@ export class PanelsService {
     // Remove test from all panels
     await this.panelModel.updateMany({ tests: id }, { $pull: { tests: id } });
     return test;
+  }
+
+  async createGroup(dto: CreateGroupDto) {
+    const isExist = await this.groupModel.findOne({ name: dto.name });
+    if (isExist) throw new BadRequestException('Group name already exists');
+    const group = new this.groupModel(dto);
+    return group.save();
+  }
+
+  async getGroups() {
+    return this.groupModel
+      .find({ status: GroupStatus.ACTIVE })
+      .populate('tests', 'name price code')
+      .populate('panels', 'name price tests')
+      .sort({ _id: 1 })
+      .exec();
+  }
+
+  async updateGroup(name: string, dto: CreateGroupDto) {
+    const group = await this.groupModel.findOneAndUpdate(
+      { name },
+      { $set: dto },
+      { new: true },
+    );
+    if (!group) throw new NotFoundException('Group not found');
+    return group;
+  }
+
+  async deleteGroup(name: string) {
+    const group = await this.groupModel.findOneAndUpdate(
+      { name },
+      { $set: { status: GroupStatus.DELETED } },
+      { new: true },
+    );
+    if (!group) throw new NotFoundException('Group not found');
+    return group;
   }
 }
