@@ -83,7 +83,7 @@ export class ItemsService {
         purchasePrice: addItemDto.purchasePrice,
         quantity: openingQty,
         supplier: addItemDto.supplier || '-',
-      });
+      }, addItemDto.mrp);
       return updatedItem; // ✅ return the DB-refreshed item with correct quantity
     }
     return data;
@@ -305,6 +305,8 @@ export class ItemsService {
       purchasePrice: number;
       supplier: string;
     },
+    unitPrice?:number,
+    mrp?:number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
@@ -322,6 +324,12 @@ export class ItemsService {
       item.expiryDate = batchData.expiryDate;
       item.purchasePrice = batchData.purchasePrice;
       item.supplier = batchData.supplier;
+      if(unitPrice){
+        item.unitPrice = unitPrice ;
+      }
+      if(mrp){
+        item.mrp = mrp;
+      }
     }
     await item.save();
 
