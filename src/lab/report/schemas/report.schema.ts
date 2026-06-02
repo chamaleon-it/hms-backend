@@ -100,6 +100,9 @@ export class Report {
   @Prop({ type: String, default: null })
   technician: string;
 
+  @Prop({ type: String, default: '' })
+  note: string;
+
   @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
   graphs: Record<string, string>;
 }

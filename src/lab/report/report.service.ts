@@ -4,6 +4,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -22,7 +23,7 @@ import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
 
 @Injectable()
-export class ReportService {
+export class ReportService implements OnModuleInit {
   constructor(
     @InjectModel(Report.name) private reportModel: Model<Report>,
     @InjectModel(Test.name) private testModel: Model<Test>,
@@ -30,6 +31,20 @@ export class ReportService {
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     private billingService: BillingService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const result = await this.reportModel.updateMany(
+        { status: 'Sample Collected' },
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+      );
+      if (result.modifiedCount > 0) {
+        console.log(`[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`);
+      }
+    } catch (e) {
+      console.error('[Migration] Error migrating reports:', e);
+    }
+  }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
@@ -217,6 +232,10 @@ export class ReportService {
         report.test[index].value = n.value;
       }
     });
+
+    if (dto.note !== undefined) {
+      report.note = dto.note;
+    }
 
     const allFilled = report.test.every((item) => {
       return (
@@ -521,8 +540,9 @@ export class ReportService {
       throw new NotFoundException('Records not found');
     }
 
-    data.status = ReportStatus.SAMPLE_COLLECTED;
+    data.status = ReportStatus.WAITING_FOR_RESULT;
     data.sampleCollectedAt = new Date();
+    data.testStartedAt = new Date();
     data.sampleId = dto.sampleId;
     data.sampleType = dto?.sampleType || '';
     
