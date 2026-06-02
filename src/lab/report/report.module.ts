@@ -6,6 +6,7 @@ import { Report, ReportSchema } from './schemas/report.schema';
 import { Test, TestSchema } from '../panels/schemas/test.schema';
 import { Patient, PatientSchema } from '../../patients/schemas/patient.schema';
 import { Panel, PanelSchema } from '../panels/schemas/panel.schema';
+import { Group, GroupSchema } from '../panels/schemas/group.schema';
 import { BillingModule } from '../../billing/billing.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { BillingModule } from '../../billing/billing.module';
       { name: Test.name, schema: TestSchema },
       { name: Patient.name, schema: PatientSchema },
       { name: Panel.name, schema: PanelSchema },
+      { name: Group.name, schema: GroupSchema },
     ]),
     BillingModule,
   ],

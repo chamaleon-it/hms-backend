@@ -16,6 +16,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { CreateTestDto } from './dto/create-test.dto';
 import mongoose from 'mongoose';
 import { AddTestDto } from './dto/add-test.dto';
+import { CreateGroupDto } from './dto/create-group.dto';
 @Controller('lab/panels')
 export class PanelsController {
   constructor(private readonly panelsService: PanelsService) {}
@@ -130,5 +131,39 @@ export class PanelsController {
       message: 'Test is deleted',
       data,
     };
+  }
+
+  @Post('groups')
+  @UseGuards(JwtAuthGuard)
+  async createGroup(
+    @Body() dto: CreateGroupDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    dto.user = user.id;
+    const data = await this.panelsService.createGroup(dto);
+    return { message: 'Group created successfully', data };
+  }
+
+  @Get('groups')
+  async getGroups() {
+    const data = await this.panelsService.getGroups();
+    return { message: 'Groups fetched successfully', data };
+  }
+
+  @Patch('groups/:name')
+  @UseGuards(JwtAuthGuard)
+  async updateGroup(
+    @Param('name') name: string,
+    @Body() dto: CreateGroupDto,
+  ) {
+    const data = await this.panelsService.updateGroup(name, dto);
+    return { message: 'Group updated successfully', data };
+  }
+
+  @Delete('groups/:name')
+  @UseGuards(JwtAuthGuard)
+  async deleteGroup(@Param('name') name: string) {
+    await this.panelsService.deleteGroup(name);
+    return { message: 'Group deleted successfully' };
   }
 }
