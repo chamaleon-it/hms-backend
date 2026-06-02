@@ -316,20 +316,20 @@ export class ItemsService {
     item.batches.push({ ...batchData, createdAt: new Date() });
     item.quantity += batchData.quantity;
 
-    if (
-      !item.expiryDate ||
-      new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-      new Date() > new Date(item.expiryDate)
-    ) {
-      item.expiryDate = batchData.expiryDate;
-      item.purchasePrice = batchData.purchasePrice;
-      item.supplier = batchData.supplier;
-      if(unitPrice){
+    // if (
+    //   !item.expiryDate ||
+    //   new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
+    //   new Date() > new Date(item.expiryDate)
+    // ) {
+    item.expiryDate = batchData.expiryDate;
+    item.purchasePrice = batchData.purchasePrice;
+    item.supplier = batchData.supplier;
+    // }
+    if(unitPrice){
         item.unitPrice = unitPrice ;
-      }
-      if(mrp){
+    }
+    if(mrp){
         item.mrp = mrp;
-      }
     }
     await item.save();
 
