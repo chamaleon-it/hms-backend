@@ -47,7 +47,8 @@ export class PanelsController {
   @Delete(':name')
   @UseGuards(JwtAuthGuard)
   async deletePanel(@Param('name') name: string) {
-    await this.panelsService.deletePanel(name);
+    const decodedName = decodeURIComponent(name);
+    await this.panelsService.deletePanel(decodedName);
     return {
       message: 'Panel deleted successfully',
     };
@@ -59,7 +60,8 @@ export class PanelsController {
     @Param('name') name: string,
     @Body() updatePanelDto: CreatePanelDto,
   ) {
-    const data = await this.panelsService.updatePanel(name, updatePanelDto);
+    const decodedName = decodeURIComponent(name);
+    const data = await this.panelsService.updatePanel(decodedName, updatePanelDto);
     return {
       message: 'Panel updated successfully',
       data,
