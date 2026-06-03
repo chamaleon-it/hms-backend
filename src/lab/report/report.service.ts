@@ -278,13 +278,16 @@ export class ReportService implements OnModuleInit {
       );
     });
 
-    report.status = allFilled
-      ? ReportStatus.COMPLETED
-      : ReportStatus.WAITING_FOR_RESULT;
+    if (dto.status === 'Completed') {
+      report.status = ReportStatus.COMPLETED;
+    } else {
+      report.status = allFilled
+        ? ReportStatus.COMPLETED
+        : ReportStatus.WAITING_FOR_RESULT;
+    }
 
     await report.save();
-
-    if (allFilled) {
+    if (allFilled || dto.status === 'Completed') {
       await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
     }
 

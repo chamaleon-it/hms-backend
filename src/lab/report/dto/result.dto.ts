@@ -12,4 +12,5 @@ export class ResultDto {
   collectedDate?: Date;
   reportedDate?: Date;
   note?: string;
+  status?: string;
 }
