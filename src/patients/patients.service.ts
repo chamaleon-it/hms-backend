@@ -24,7 +24,7 @@ export class PatientsService {
 
     do {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `P${randomNum}`;
+      mrn = `${randomNum}`;
 
       // Check if MRN already exists
       const existing = await this.patientModel.exists({ mrn });
@@ -49,7 +49,6 @@ export class PatientsService {
         throw new BadRequestException('MRN already exists');
       }
     }
-
     const patient = await this.patientModel.create({
       ...patientRegisterDto,
       createdBy,
