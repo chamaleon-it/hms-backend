@@ -23,7 +23,7 @@ export class PatientsService {
     let exists = true;
 
     do {
-      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
       mrn = `${randomNum}`;
 
       // Check if MRN already exists
