@@ -24,7 +24,7 @@ export class PatientsService {
 
     do {
       const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `P${randomNum}`;
+      mrn = `${randomNum}`;
 
       // Check if MRN already exists
       const existing = await this.patientModel.exists({ mrn });
@@ -74,28 +74,7 @@ export class PatientsService {
 
     const skip = (page - 1) * limit;
 
-    let filter: {
-      gender?: string;
-      $or?: Record<string, Record<string, string>>[];
-      doctor?: mongoose.Types.ObjectId;
-      createdAt?: Record<string, Date>;
-      status?: string | Record<string, PatientStatus>;
-      dateOfBirth?: Record<string, Date>;
-      conditions?: Record<string, string[]>;
-    } = {};
-
-    if (query && query.trim() !== '') {
-      const nameRegex = { $regex: `${query}`, $options: 'i' };
-      const searchRegex = { $regex: `^${query}`, $options: 'i' };
-      filter = {
-        $or: [
-          { name: nameRegex },
-          { phoneNumber: searchRegex },
-          { mrn: nameRegex },
-          { address: searchRegex },
-        ],
-      };
-    }
+    const filter: any = {};
 
     if (gender) {
       filter.gender = gender;
@@ -104,25 +83,23 @@ export class PatientsService {
     const ageFilter: Record<string, Date> = {};
     const now = new Date();
 
-    if (minAge && Number.isFinite(Number(minAge))) {
-      const maxDOB = new Date(
+    if (Number.isFinite(Number(minAge))) {
+      ageFilter.$lte = new Date(
         now.getFullYear() - Number(minAge),
         now.getMonth(),
         now.getDate(),
       );
-      ageFilter.$lte = maxDOB;
     }
 
-    if (maxAge && Number.isFinite(Number(maxAge))) {
-      const minDOB = new Date(
+    if (Number.isFinite(Number(maxAge))) {
+      ageFilter.$gte = new Date(
         now.getFullYear() - Number(maxAge) - 1,
         now.getMonth(),
         now.getDate() + 1,
       );
-      ageFilter.$gte = minDOB;
     }
 
-    if (Object.keys(ageFilter).length) {
+    if (Object.keys(ageFilter).length > 0) {
       filter.dateOfBirth = ageFilter;
     }
 
@@ -131,37 +108,102 @@ export class PatientsService {
     }
 
     if (conditions) {
-      const parsed: string[] =
+      const parsedConditions: string[] =
         typeof conditions === 'string'
-          ? (JSON.parse(conditions) as string[])
-          : (conditions as string[]);
+          ? JSON.parse(conditions)
+          : conditions;
 
-      if (parsed.length > 0) {
-        filter.conditions = { $in: parsed };
+      if (parsedConditions.length > 0) {
+        filter.conditions = { $in: parsedConditions };
       }
     }
 
     if (from && to) {
-      const startUTC = new Date(from);
-      const endUTC = new Date(to);
       filter.createdAt = {
-        $gte: startUTC,
-        $lt: endUTC,
+        $gte: new Date(from),
+        $lt: new Date(to),
       };
     }
 
-    if (status) {
-      filter.status = status;
-    } else {
-      filter.status = { $ne: PatientStatus.DELETED };
+    filter.status = status || { $ne: PatientStatus.DELETED };
+
+    if (!query?.trim()) {
+      return this.patientModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate('doctor')
+        .sort({ createdAt: -1 });
     }
-    const data = await this.patientModel
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
+
+    const searchTerm = query.trim().toLowerCase();
+
+    const patients = await this.patientModel
+      .find({
+        ...filter,
+        $or: [
+          { name: { $regex: searchTerm, $options: 'i' } },
+          { mrn: { $regex: searchTerm, $options: 'i' } },
+          { phoneNumber: { $regex: searchTerm, $options: 'i' } },
+          { address: { $regex: searchTerm, $options: 'i' } },
+        ],
+      })
       .populate('doctor')
-      .sort({ name: query ? 1 : -1, createdAt: -1 });
-    return data;
+      .lean();
+
+    const getPriority = (patient: any): number => {
+      const name = (patient.name || '').toLowerCase().trim();
+      const mrn = (patient.mrn || '').toLowerCase();
+      const phone = (patient.phoneNumber || '').toLowerCase();
+      const address = (patient.address || '').toLowerCase();
+
+      const words = name.split(/\s+/);
+
+      if (name.startsWith(searchTerm)) {
+        return 1;
+      }
+
+      if (words.some((word) => word.startsWith(searchTerm))) {
+        return 2;
+      }
+
+      if (words.some((word) => word.endsWith(searchTerm))) {
+        return 3;
+      }
+
+      if (mrn.includes(searchTerm)) {
+        return 4;
+      }
+
+      if (phone.includes(searchTerm)) {
+        return 5;
+      }
+
+      if (address.includes(searchTerm)) {
+        return 6;
+      }
+
+      return 999;
+    };
+
+    const sortedPatients = patients
+      .map((patient) => ({
+        ...patient,
+        _searchPriority: getPriority(patient),
+      }))
+      .filter((patient) => patient._searchPriority !== 999)
+      .sort((a, b) => {
+        if (a._searchPriority !== b._searchPriority) {
+          return a._searchPriority - b._searchPriority;
+        }
+
+        return (a.name || '').localeCompare(b.name || '', undefined, {
+          sensitivity: 'base',
+        });
+      })
+      .map(({ _searchPriority, ...patient }) => patient);
+
+    return sortedPatients.slice(skip, skip + Number(limit));
   }
 
   async getSinglePatient(id: mongoose.Types.ObjectId) {
