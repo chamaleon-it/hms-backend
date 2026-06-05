@@ -29,7 +29,23 @@ import { TechnicianModule } from './lab/technician/technician.module';
     ConfigModule.forRoot({
       load: [configuration],
     }),
-    MongooseModule.forRoot(configuration().databaseUrl),
+    MongooseModule.forRoot(configuration().databaseUrl, {
+      connectionFactory: (connection) => {
+        connection.plugin((schema: any) => {
+          schema.eachPath((pathname: string, schemaType: any) => {
+            if (schemaType.instance === 'Number') {
+              schemaType.set((val: any) => {
+                if (typeof val === 'number') {
+                  return Math.round((val + Number.EPSILON) * 100) / 100;
+                }
+                return val;
+              });
+            }
+          });
+        });
+        return connection;
+      },
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
