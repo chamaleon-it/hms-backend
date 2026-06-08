@@ -130,7 +130,6 @@ export class LabService {
       user,
       {
         $set: {
-          'lab.reportLayout': dto.reportLayout,
           'lab.panelPerPage': dto.panelPerPage,
         },
       },
