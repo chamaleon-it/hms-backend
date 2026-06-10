@@ -44,22 +44,22 @@ export class PanelsController {
     };
   }
 
-  @Delete(':name')
+  @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  async deletePanel(@Param('name') name: string) {
-    await this.panelsService.deletePanel(name);
+  async deletePanel(@Param('id') id: string) {
+    await this.panelsService.deletePanel(id);
     return {
       message: 'Panel deleted successfully',
     };
   }
 
-  @Patch(':name')
+  @Patch(':id')
   @UseGuards(JwtAuthGuard)
   async updatePanel(
-    @Param('name') name: string,
+    @Param('id') id: string,
     @Body() updatePanelDto: CreatePanelDto,
   ) {
-    const data = await this.panelsService.updatePanel(name, updatePanelDto);
+    const data = await this.panelsService.updatePanel(id, updatePanelDto);
     return {
       message: 'Panel updated successfully',
       data,
