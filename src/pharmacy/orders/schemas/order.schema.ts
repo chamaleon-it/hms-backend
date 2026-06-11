@@ -62,8 +62,8 @@ export class Order {
   })
   patient: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-  doctor: Types.ObjectId;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false, default: null })
+  doctor: Types.ObjectId | null;
 
   @Prop({ default: '-' })
   doctorName: string;
