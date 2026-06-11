@@ -79,4 +79,8 @@ export class CreateOrderDto {
 
   @IsOptional()
   pharmacist?: string;
+
+  @IsString()
+  @IsOptional()
+  doctorName?: string;
 }

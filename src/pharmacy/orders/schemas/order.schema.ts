@@ -65,6 +65,9 @@ export class Order {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   doctor: Types.ObjectId;
 
+  @Prop({ default: '-' })
+  doctorName: string;
+
   @Prop({ type: [OrderItemSchema], default: [] })
   items: OrderItem[];
 

@@ -76,7 +76,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
-        doctor: "Self",
+        doctor: order.doctorName || "Self",
       });
 
       data.billNo = bill.mrn;
@@ -593,6 +593,7 @@ export class OrdersService {
     newOrder.mrn = mrn;
     newOrder.patient = existOrder.patient;
     newOrder.doctor = existOrder.doctor;
+    newOrder.doctorName = existOrder.doctorName;
     newOrder.items = existOrder.items.map((item) => {
       return {
         ...item,
@@ -629,7 +630,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
-        doctor: "Self",
+        doctor: existOrder.doctorName || "Self",
       });
     }
 
