@@ -21,6 +21,9 @@ export class RangeItem {
   max?: number;
 
   @Prop({ default: null })
+  upto?: number;
+
+  @Prop({ default: null })
   fromAge?: number;
 
   @Prop({ default: null })

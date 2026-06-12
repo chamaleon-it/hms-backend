@@ -49,6 +49,10 @@ export class RangeItemDto {
 
   @IsOptional()
   @IsNumber()
+  upto?: number;
+
+  @IsOptional()
+  @IsNumber()
   fromAge?: number;
 
   @IsOptional()
