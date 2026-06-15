@@ -36,7 +36,7 @@ export class PanelsService {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
       .select(
-        'name price estimatedTime tests mainHeading subheadings testSubheadings method specimen',
+        'name price estimatedTime tests mainHeading subheadings testSubheadings method specimen department',
       )
       .populate('tests', 'name unit range code')
       .sort({ _id: 1 })
@@ -53,6 +53,7 @@ export class PanelsService {
       testSubheadings: panel.testSubheadings || {},
       method: panel.method,
       specimen: panel.specimen,
+      department: panel.department,
     }));
   }
 

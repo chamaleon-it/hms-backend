@@ -47,6 +47,9 @@ export class Panel {
 
   @Prop({ type: Object, default: {} })
   testSubheadings: Record<string, string>;
+
+  @Prop({ default: null })
+  department: string;
 }
 
 export const PanelSchema = SchemaFactory.createForClass(Panel);

@@ -128,4 +128,8 @@ export class CreateTestDto {
   @IsString()
   @IsOptional()
   category?: string;
+
+  @IsString()
+  @IsOptional()
+  department?: string;
 }

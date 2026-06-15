@@ -79,6 +79,9 @@ export class Test {
 
   @Prop({ default: null })
   category: string;
+
+  @Prop({ default: null })
+  department: string;
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);
