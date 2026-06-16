@@ -125,9 +125,6 @@ export class CreateTestDto {
   @IsString({ message: 'Note must be a string' })
   note?: string;
 
-  @IsString()
-  @IsOptional()
-  category?: string;
 
   @IsOptional()
   @IsString({ message: 'Department must be a string' })

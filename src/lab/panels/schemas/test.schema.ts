@@ -77,8 +77,6 @@ export class Test {
   @Prop({ default: null })
   note: string;
 
-  @Prop({ default: null })
-  category: string;
 
   @Prop({ required: false, default: null, trim: true })
   department: string;

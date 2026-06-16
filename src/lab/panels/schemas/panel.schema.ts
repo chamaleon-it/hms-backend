@@ -39,7 +39,7 @@ export class Panel {
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Test', default: [] })
   tests: mongoose.Types.ObjectId[];
 
-  @Prop({ required: false })
+  @Prop({ type: String, required: false, trim: true })
   mainHeading: string;
 
   @Prop({ type: [String], default: [] })

@@ -41,6 +41,7 @@ export class CreatePanelDto {
   tests?: string[];
 
   @IsOptional()
+  @IsString({ message: 'Main heading must be a string' })
   mainHeading?: string;
 
   @IsOptional()

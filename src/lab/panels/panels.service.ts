@@ -40,11 +40,12 @@ export class PanelsService {
       .lean()
       .exec();
     return panels.map((panel) => ({
+      _id: panel._id,
       name: panel.name,
       price: panel.price,
       estimatedTime: panel.estimatedTime,
-      tests: panel.tests,
       mainHeading: panel.mainHeading,
+      tests: panel.tests,
       subheadings: panel.subheadings || [],
       testSubheadings: panel.testSubheadings || {},
       method: panel.method,
@@ -53,8 +54,8 @@ export class PanelsService {
     }));
   }
 
-  async updatePanel(name: string, updatePanelDto: CreatePanelDto) {
-    const isExist = await this.panelModel.findOne({ name });
+  async updatePanel(id: string, updatePanelDto: CreatePanelDto) {
+    const isExist = await this.panelModel.findById(id);
     if (!isExist) {
       throw new BadRequestException('Panel not found');
     }
@@ -62,8 +63,8 @@ export class PanelsService {
     const { tests, ...rest } = updatePanelDto;
 
     // First update panel document mapping
-    const panel = await this.panelModel.findOneAndUpdate(
-      { name },
+    const panel = await this.panelModel.findByIdAndUpdate(
+      id,
       { ...rest, tests: tests || [] },
       { new: true },
     );
@@ -104,9 +105,9 @@ export class PanelsService {
     return panel;
   }
 
-  async deletePanel(name: string) {
-    await this.panelModel.findOneAndUpdate(
-      { name },
+  async deletePanel(id: string) {
+    await this.panelModel.findByIdAndUpdate(
+      id,
       { status: PanelStatus.DELETED },
     );
   }
