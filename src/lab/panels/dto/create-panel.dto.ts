@@ -52,6 +52,10 @@ export class CreatePanelDto {
   @IsObject()
   testSubheadings?: Record<string, string>;
 
+  @IsOptional()
+  @IsString({ message: 'Department must be a string' })
+  department?: string;
+
   @IsEmpty()
   user: mongoose.Types.ObjectId;
 }

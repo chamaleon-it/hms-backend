@@ -435,11 +435,10 @@ export class ReportService {
     data.sampleCollectedAt = new Date();
     data.sampleId = dto.sampleId;
     data.sampleType = dto?.sampleType || '';
-    
+
     await data.save();
     return data;
   }
-
 
   async startTest(id: mongoose.Types.ObjectId) {
     const data = await this.reportModel.findById(id);

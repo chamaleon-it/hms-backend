@@ -29,7 +29,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -76,7 +76,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
-        doctor: "Self",
+        doctor: 'Self',
       });
 
       data.billNo = bill.mrn;
@@ -581,9 +581,11 @@ export class OrdersService {
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
-
     const bill = await this.billingModel.findById(id).lean().exec();
-    const existOrder = await this.orderModel.findOne({ billNo: bill?.mrn }).lean().exec();
+    const existOrder = await this.orderModel
+      .findOne({ billNo: bill?.mrn })
+      .lean()
+      .exec();
 
     if (!existOrder) {
       throw new NotFoundException('Order not found');
@@ -603,7 +605,6 @@ export class OrdersService {
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
-
 
     if (true) {
       const items = await Promise.all(
@@ -629,7 +630,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
-        doctor: "Self",
+        doctor: 'Self',
       });
     }
 

@@ -16,7 +16,7 @@ import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
@@ -109,9 +109,7 @@ export class PatientsService {
 
     if (conditions) {
       const parsedConditions: string[] =
-        typeof conditions === 'string'
-          ? JSON.parse(conditions)
-          : conditions;
+        typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
 
       if (parsedConditions.length > 0) {
         filter.conditions = { $in: parsedConditions };

@@ -21,6 +21,9 @@ export class RangeItem {
   max?: number;
 
   @Prop({ default: null })
+  upto?: number;
+
+  @Prop({ default: null })
   fromAge?: number;
 
   @Prop({ default: null })
@@ -76,6 +79,9 @@ export class Test {
 
   @Prop({ default: null })
   category: string;
+
+  @Prop({ required: false, default: null, trim: true })
+  department: string;
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);
