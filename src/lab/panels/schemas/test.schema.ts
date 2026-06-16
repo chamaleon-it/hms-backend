@@ -74,9 +74,6 @@ export class Test {
   @Prop({ type: [String], default: [] })
   options: string[];
 
-  @Prop({ default: null })
-  note: string;
-
 
   @Prop({ required: false, default: null, trim: true })
   department: string;

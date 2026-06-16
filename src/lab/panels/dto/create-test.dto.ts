@@ -121,10 +121,6 @@ export class CreateTestDto {
   @Type(() => RangeItemDto)
   range?: RangeItemDto[];
 
-  @IsOptional()
-  @IsString({ message: 'Note must be a string' })
-  note?: string;
-
 
   @IsOptional()
   @IsString({ message: 'Department must be a string' })
