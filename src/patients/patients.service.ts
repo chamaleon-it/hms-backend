@@ -19,19 +19,32 @@ export class PatientsService {
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
-    let mrn: string;
+    const latest = await this.patientModel.aggregate([
+      { $match: { mrn: { $regex: /^\d+$/ } } },
+      { $addFields: { mrnInt: { $toInt: '$mrn' } } },
+      { $match: { mrnInt: { $lt: 100000 } } },
+      { $sort: { mrnInt: -1 } },
+      { $limit: 1 },
+    ]);
+
+    let nextMrn = 10000;
+    if (latest.length > 0 && latest[0].mrnInt >= 10000) {
+      nextMrn = latest[0].mrnInt + 1;
+    }
+
+    let mrnStr = nextMrn.toString();
     let exists = true;
+    while (exists) {
+      const existing = await this.patientModel.exists({ mrn: mrnStr });
+      if (existing) {
+        nextMrn++;
+        mrnStr = nextMrn.toString();
+      } else {
+        exists = false;
+      }
+    }
 
-    do {
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      mrn = `${randomNum}`;
-
-      // Check if MRN already exists
-      const existing = await this.patientModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+    return mrnStr;
   }
 
   async register(
@@ -46,7 +59,7 @@ export class PatientsService {
         mrn: patientRegisterDto.mrn,
       });
       if (mrn) {
-        throw new BadRequestException('MRN already exists');
+        throw new BadRequestException('pid is already exist');
       }
     }
 
@@ -329,6 +342,13 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     patient: mongoose.Types.ObjectId,
   ) {
+    if (patientRegisterDto.mrn) {
+       const existing = await this.patientModel.findOne({ mrn: patientRegisterDto.mrn });
+       if (existing && existing._id.toString() !== patient.toString()) {
+          throw new BadRequestException('pid is already exist');
+       }
+    }
+
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
       patientRegisterDto,

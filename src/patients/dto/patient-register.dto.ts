@@ -22,7 +22,10 @@ export class PatientRegisterDto {
   email?: string;
 
   @IsOptional()
-  @Transform(({ value }: { value: string }) => value?.trim().toUpperCase())
+  @Transform(({ value }: { value: string }) => {
+    const trimmed = value?.trim().toUpperCase();
+    return trimmed === '' ? undefined : trimmed;
+  })
   mrn?: string;
 
   @IsString()
