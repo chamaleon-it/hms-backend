@@ -521,10 +521,12 @@ export class ReportService implements OnModuleInit {
     if (age) {
       const [minAge, maxAge] = age.split('-').map(Number);
       if (!isNaN(minAge) && !isNaN(maxAge)) {
-        const now = new Date();
-        const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate());
-        const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
-        patientMatch.dateOfBirth = { $gte: minDate, $lte: maxDate };
+        if (minAge > 0 || maxAge < 100) {
+          const now = new Date();
+          const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate() + 1);
+          const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
+          patientMatch.dateOfBirth = { $gte: minDate.toISOString().split('T')[0], $lte: maxDate.toISOString().split('T')[0] };
+        }
       }
     }
 
@@ -606,10 +608,12 @@ export class ReportService implements OnModuleInit {
       if (age) {
         const [minAge, maxAge] = age.split('-').map(Number);
         if (!isNaN(minAge) && !isNaN(maxAge)) {
-          const now = new Date();
-          const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate());
-          const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
-          pipeline.push({ $match: { 'patientDetail.dateOfBirth': { $gte: minDate, $lte: maxDate } } });
+          if (minAge > 0 || maxAge < 100) {
+            const now = new Date();
+            const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate() + 1);
+            const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
+            pipeline.push({ $match: { 'patientDetail.dateOfBirth': { $gte: minDate.toISOString().split('T')[0], $lte: maxDate.toISOString().split('T')[0] } } });
+          }
         }
       }
 

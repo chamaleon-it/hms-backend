@@ -92,27 +92,19 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     filter.gender = gender;
   }
 
-  const ageFilter: Record<string, Date> = {};
   const now = new Date();
+  const minA = Number(minAge);
+  const maxA = Number(maxAge);
 
-  if (Number.isFinite(Number(minAge))) {
-    ageFilter.$lte = new Date(
-      now.getFullYear() - Number(minAge),
-      now.getMonth(),
-      now.getDate(),
-    );
-  }
-
-  if (Number.isFinite(Number(maxAge))) {
-    ageFilter.$gte = new Date(
-      now.getFullYear() - Number(maxAge) - 1,
-      now.getMonth(),
-      now.getDate() + 1,
-    );
-  }
-
-  if (Object.keys(ageFilter).length > 0) {
-    filter.dateOfBirth = ageFilter;
+  if (Number.isFinite(minA) && Number.isFinite(maxA)) {
+    if (minA > 0 || maxA < 100) {
+      const minDate = new Date(now.getFullYear() - maxA - 1, now.getMonth(), now.getDate() + 1);
+      const maxDate = new Date(now.getFullYear() - minA, now.getMonth(), now.getDate());
+      filter.dateOfBirth = {
+        $gte: minDate.toISOString().split('T')[0],
+        $lte: maxDate.toISOString().split('T')[0],
+      };
+    }
   }
 
   if (doctor) {

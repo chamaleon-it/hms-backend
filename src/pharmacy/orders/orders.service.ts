@@ -312,18 +312,23 @@ export class OrdersService {
     if (age) {
       const [minAge, maxAge] = age.split('-').map(Number);
       if (!isNaN(minAge) && !isNaN(maxAge)) {
-        const now = new Date();
-        const minDate = new Date(
-          now.getFullYear() - maxAge - 1,
-          now.getMonth(),
-          now.getDate(),
-        );
-        const maxDate = new Date(
-          now.getFullYear() - minAge,
-          now.getMonth(),
-          now.getDate(),
-        );
-        patientFilter.dateOfBirth = { $gte: minDate, $lte: maxDate };
+        if (minAge > 0 || maxAge < 100) {
+          const now = new Date();
+          const minDate = new Date(
+            now.getFullYear() - maxAge - 1,
+            now.getMonth(),
+            now.getDate() + 1,
+          );
+          const maxDate = new Date(
+            now.getFullYear() - minAge,
+            now.getMonth(),
+            now.getDate(),
+          );
+          patientFilter.dateOfBirth = { 
+            $gte: minDate.toISOString().split('T')[0], 
+            $lte: maxDate.toISOString().split('T')[0] 
+          };
+        }
       }
     }
 
@@ -414,22 +419,27 @@ export class OrdersService {
       if (age) {
         const [minAge, maxAge] = age.split('-').map(Number);
         if (!isNaN(minAge) && !isNaN(maxAge)) {
-          const now = new Date();
-          const minDate = new Date(
-            now.getFullYear() - maxAge - 1,
-            now.getMonth(),
-            now.getDate(),
-          );
-          const maxDate = new Date(
-            now.getFullYear() - minAge,
-            now.getMonth(),
-            now.getDate(),
-          );
-          aggregationPipeline.push({
-            $match: {
-              'patientDetail.dateOfBirth': { $gte: minDate, $lte: maxDate },
-            },
-          });
+          if (minAge > 0 || maxAge < 100) {
+            const now = new Date();
+            const minDate = new Date(
+              now.getFullYear() - maxAge - 1,
+              now.getMonth(),
+              now.getDate() + 1,
+            );
+            const maxDate = new Date(
+              now.getFullYear() - minAge,
+              now.getMonth(),
+              now.getDate(),
+            );
+            aggregationPipeline.push({
+              $match: {
+                'patientDetail.dateOfBirth': { 
+                  $gte: minDate.toISOString().split('T')[0], 
+                  $lte: maxDate.toISOString().split('T')[0] 
+                },
+              },
+            });
+          }
         }
       }
 
