@@ -25,8 +25,9 @@ export class PatientRegisterDto {
   @Transform(({ value }: { value: string }) => value?.trim().toUpperCase())
   mrn?: string;
 
+  @IsOptional()
   @IsString()
-  doctor: string;
+  doctor?: string;
 
   @IsIn(['Male', 'Female'])
   gender: string;

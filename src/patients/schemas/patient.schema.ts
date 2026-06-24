@@ -81,7 +81,7 @@ export class Patient {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false, default: null })
   doctor: mongoose.Types.ObjectId;
 
   @Prop({ enum: Object.values(PatientStatus), default: PatientStatus.ACTIVE })
