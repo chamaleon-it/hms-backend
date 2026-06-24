@@ -656,7 +656,7 @@ export class ReportService implements OnModuleInit {
       .exec();
 
     const data = patients.map((e) => {
-      const patientReports = reports.filter(i => i.patient.toString() === e._id.toString());
+      const patientReports = reports.filter(i => i.patient.toString() === e._id.toString()) as any[];
       patientReports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       return {
