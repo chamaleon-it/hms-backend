@@ -19,16 +19,30 @@ export class ItemsService {
   ) { }
 
   private async generateUniqueSKU(): Promise<string> {
+    const prefix = 'ITM-';
+    const lastRecord = await this.itemModel
+      .findOne({ sku: { $regex: `^${prefix}\\d+$` } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ sku: -1 })
+      .select('sku')
+      .lean()
+      .exec();
+
+    let nextNumber = 1;
+    if (lastRecord && lastRecord.sku) {
+      const match = lastRecord.sku.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match && match[1]) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
     let sku: string;
     let exists = true;
-
     do {
-      const randomNum = Math.floor(10000 + Math.random() * 90000);
-      sku = `MED${randomNum}`;
-
-      // Check if SKU already exists
+      sku = `${prefix}${nextNumber.toString().padStart(5, '0')}`;
       const existing = await this.itemModel.exists({ sku });
       exists = !!existing;
+      if (exists) nextNumber++;
     } while (exists);
 
     return sku;

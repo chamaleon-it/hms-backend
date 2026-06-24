@@ -29,23 +29,33 @@ export class BillingService {
   ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
+    const prefixWithHyphen = prefix.endsWith('-') ? prefix : `${prefix}-`;
     const lastRecord = await this.billingModel
-      .findOne({ mrn: { $regex: `^${prefix}` } })
+      .findOne({ mrn: { $regex: `^${prefixWithHyphen}\\d+$` } })
       .collation({ locale: 'en_US', numericOrdering: true })
       .sort({ mrn: -1 })
       .select('mrn')
       .lean()
       .exec();
 
+    let nextNumber = 1;
     if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
+      const match = lastRecord.mrn.match(new RegExp(`^${prefixWithHyphen}(\\d+)$`));
       if (match && match[1]) {
-        const nextNumber = parseInt(match[1], 10) + 1;
-        return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+        nextNumber = parseInt(match[1], 10) + 1;
       }
     }
 
-    return `${prefix}0001`;
+    let mrn: string;
+    let exists = true;
+    do {
+      mrn = `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
+      const existing = await this.billingModel.exists({ mrn });
+      exists = !!existing;
+      if (exists) nextNumber++;
+    } while (exists);
+
+    return mrn;
   }
 
   async generateBill(createBill: CreateBillingDto) {
