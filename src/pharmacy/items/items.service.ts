@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -66,21 +66,25 @@ export class ItemsService {
       addItemDto.manufacturer = '-';
     }
 
+    const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+
     const data = await this.itemModel.create({
       ...addItemDto,
-      quantity: 0,
+      quantity: addItemDto.batchNumber ? 0 : openingQty, // will be incremented by addBatchItems if batch exists
       pharmacy,
     });
+
     if (addItemDto.batchNumber) {
-      await this.addBatchItems(data._id, {
+      const updatedItem = await this.addBatchItems(data._id, {
         batchNumber: addItemDto.batchNumber,
         expiryDate: addItemDto?.expiryDate
           ? new Date(addItemDto?.expiryDate)
           : new Date(),
         purchasePrice: addItemDto.purchasePrice,
-        quantity: addItemDto.quantity ?? 0,
+        quantity: openingQty,
         supplier: addItemDto.supplier || '-',
-      });
+      }, addItemDto.mrp);
+      return updatedItem; // ✅ return the DB-refreshed item with correct quantity
     }
     return data;
   }
@@ -135,8 +139,8 @@ export class ItemsService {
 
       filter.quantity = stockConditions[stock];
     }
-    if (lowStockItemsView) {
-      filter.quantity = { $lt: Number(lowStockThreshold ?? 20) };
+    if (lowStockItemsView && (stock === "Low" || stock === "Out" || !stock)) {
+      filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
     }
 
     if (query.expiry) {
@@ -155,19 +159,29 @@ export class ItemsService {
 
     filter.status = { $ne: ItemStatus.Deleted };
 
-    const [items, total] = await Promise.all([
+    const shouldCountLowStock = stock === "Low" || stock === "Out" || !stock;
+    const lowStockFilter = {
+      ...filter,
+      quantity: { $lte: Number(lowStockThreshold ?? 20) },
+    };
+
+    const [items, total, lowStockCount] = await Promise.all([
       this.itemModel
         .find(filter)
+        .sort(q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 })  // sort BEFORE skip/limit
         .skip(skip)
         .limit(limit)
-        .lean()
-        .sort({ [sortBy]: orderBy === 'asc' ? 1 : -1 }),
+        .lean(),
       this.itemModel.countDocuments(filter),
+      shouldCountLowStock
+        ? this.itemModel.countDocuments(lowStockFilter)
+        : Promise.resolve(0),
     ]);
 
-    const lowStockCount = await this.itemModel.countDocuments({
-      quantity: { $lt: Number(lowStockThreshold ?? 20) },
-    });
+    // const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
+    //   ...filter,
+    //   quantity: { $lte: Number(lowStockThreshold ?? 20) },
+    // }) : 0;
 
     return { items, total, lowStockCount };
   }
@@ -250,6 +264,20 @@ export class ItemsService {
       await item.save();
     }
 
+    if (quantity > 0 && newQuantity >= 0) {
+      const newSoldQuantity = item.soldQuantity + quantity;
+      item.soldQuantity = newSoldQuantity;
+      item.soldHistory.push({
+        date: new Date(),
+        quantity,
+        unitPrice: item.unitPrice,
+        total: item.unitPrice * quantity,
+      });
+      await item.save();
+    }
+
+
+
     return item;
   }
 
@@ -277,6 +305,8 @@ export class ItemsService {
       purchasePrice: number;
       supplier: string;
     },
+    unitPrice?:number,
+    mrp?:number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
@@ -286,14 +316,20 @@ export class ItemsService {
     item.batches.push({ ...batchData, createdAt: new Date() });
     item.quantity += batchData.quantity;
 
-    if (
-      !item.expiryDate ||
-      new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-      new Date() > new Date(item.expiryDate)
-    ) {
-      item.expiryDate = batchData.expiryDate;
-      item.purchasePrice = batchData.purchasePrice;
-      item.supplier = batchData.supplier;
+    // if (
+    //   !item.expiryDate ||
+    //   new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
+    //   new Date() > new Date(item.expiryDate)
+    // ) {
+    item.expiryDate = batchData.expiryDate;
+    item.purchasePrice = batchData.purchasePrice;
+    item.supplier = batchData.supplier;
+    // }
+    if(unitPrice){
+        item.unitPrice = unitPrice ;
+    }
+    if(mrp){
+        item.mrp = mrp;
     }
     await item.save();
 
@@ -303,5 +339,38 @@ export class ItemsService {
   async getSuppliers() {
     const data = await this.itemModel.distinct('supplier').lean();
     return data.filter((supplier) => supplier !== '' && supplier !== '-');
+  }
+
+  async addMRP() {
+    const cursor = this.itemModel
+      .find({ mrp: { $exists: false } })
+      .cursor();
+
+    for await (const item of cursor) {
+      const newMrp = item.unitPrice;
+      const newUnitPrice = item.unitPrice / (item.packing || 1);
+
+      await this.itemModel.updateOne(
+        { _id: item._id },
+        {
+          $set: {
+            mrp: newMrp,
+            unitPrice: newUnitPrice,
+          },
+        },
+      );
+
+      console.log(
+        `Drug: ${item.name} | MRP: ${newMrp} | Packing: ${item.packing} | UnitPrice: ${newUnitPrice.toFixed(2)}`,
+      );
+
+      await this.delay(20);
+    }
+
+    console.log('✅ Completed updating all items');
+  }
+
+  private delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -20,7 +20,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) { }
+  constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -45,6 +45,7 @@ export class AppointmentsController {
       query: getListDto.query,
       status: getListDto.status ? getListDto.status : [],
       date: getListDto.date || new Date().toString(),
+      activeDate: getListDto.activeDate,
     });
     return {
       data,
@@ -175,7 +176,7 @@ export class AppointmentsController {
     };
   }
 
-  @Post("recover/:id")
+  @Post('recover/:id')
   async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.recoverAppointment(id);
     return {

@@ -20,10 +20,13 @@ import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
+import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
+import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -56,6 +59,25 @@ export class BillingController {
       total,
       page: Number(getBillisDto.page),
       limit: Number(getBillisDto.limit),
+    };
+  }
+
+  @Get('drop-down')
+  // @UseGuards(JwtAuthGuard)
+  async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
+    const data = await this.billingService.getBillDropDown(getBillDropDownDto);
+    return {
+      data,
+      message: 'Bill drop down retrived successfully',
+    };
+  }
+
+  @Get('single')
+  async getSingleCustomerBill(@Query('q') q: string) {
+    const data = await this.billingService.getSingleCustomerBill(q);
+    return {
+      data,
+      message: 'Single bill were retrived successfully',
     };
   }
 
@@ -92,6 +114,24 @@ export class BillingController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Patch('billing_item/:id')
+  async updateBillingItem(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateBillingItemDto: UpdateBillingItemDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.updateBillingItem(
+      id,
+      updateBillingItemDto,
+      user.id,
+    );
+    return {
+      data,
+      message: 'Item is updated successfully.',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete('billing_item')
   async deleteBillingItem(
     @Query('item') item: string,
@@ -104,6 +144,16 @@ export class BillingController {
     };
   }
 
+  @Get('report/:reportId')
+  @UseGuards(JwtAuthGuard)
+  async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId) {
+    const data = await this.billingService.getBillByReportId(reportId);
+    return {
+      data,
+      message: 'Bill retrieved successfully by report ID.',
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {
@@ -111,6 +161,19 @@ export class BillingController {
     return {
       data,
       message: 'Bill were retrived successfully.',
+    };
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async updateBill(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateBillDto: UpdateBillingDto,
+  ) {
+    const data = await this.billingService.updateBill(id, updateBillDto);
+    return {
+      data,
+      message: 'Bill updated successfully.',
     };
   }
 

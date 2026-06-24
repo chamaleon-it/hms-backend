@@ -6,6 +6,7 @@ import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
+import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 
 @Injectable()
 export class LabService {
@@ -109,6 +110,27 @@ export class LabService {
           ...(dto.note && {
             'lab.notifications.note': dto.note,
           }),
+        },
+      },
+      { new: true, runValidators: true, context: 'query' },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Lab Not found');
+    }
+
+    return updated;
+  }
+
+  async updateReportLayout(
+    user: mongoose.Types.ObjectId,
+    dto: UpdateReportLayoutDto,
+  ) {
+    const updated = await this.userModel.findByIdAndUpdate(
+      user,
+      {
+        $set: {
+          'lab.panelPerPage': dto.panelPerPage,
         },
       },
       { new: true, runValidators: true, context: 'query' },

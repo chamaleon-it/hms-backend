@@ -46,7 +46,7 @@ export class CreateOrderDto {
   @IsMongoId({ message: 'Patient ID must be a valid MongoDB ObjectId' })
   patient: mongoose.Types.ObjectId;
 
-  @IsMongoId({ message: 'Doctor ID must be a valid MongoDB ObjectId' })
+  @IsOptional()
   doctor: mongoose.Types.ObjectId;
 
   @IsArray({ message: 'Items must be an array' })
@@ -79,4 +79,8 @@ export class CreateOrderDto {
 
   @IsOptional()
   pharmacist?: string;
+
+  @IsString()
+  @IsOptional()
+  doctorName?: string;
 }

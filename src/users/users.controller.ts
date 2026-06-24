@@ -53,7 +53,7 @@ export class UsersController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('doctors')
   async getAllDoctors() {
     const data = await this.usersService.getAllDoctors();

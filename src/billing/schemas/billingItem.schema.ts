@@ -11,7 +11,7 @@ export class BillingItem {
   @Prop({ required: true, trim: true })
   code: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 0 })
   price: number;
 
   @Prop({

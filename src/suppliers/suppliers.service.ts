@@ -9,7 +9,7 @@ import { UpdateSupplierDto } from './dto/update-suppllier.dto';
 export class SuppliersService {
   constructor(
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
-  ) { }
+  ) {}
 
   async registerSupplier(dto: RegisterSupplierDto) {
     const supplier = new this.supplierModel(dto);
@@ -60,6 +60,8 @@ export class SuppliersService {
   }
 
   async updateSupplier(id: string, dto: UpdateSupplierDto) {
-    return await this.supplierModel.findByIdAndUpdate(id, dto, { new: true }).exec();
+    return await this.supplierModel
+      .findByIdAndUpdate(id, dto, { new: true })
+      .exec();
   }
 }

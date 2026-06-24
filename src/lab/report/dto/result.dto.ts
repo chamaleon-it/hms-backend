@@ -9,4 +9,8 @@ export class ResultDto {
       _id: mongoose.Types.ObjectId;
     };
   }[];
+  collectedDate?: Date;
+  reportedDate?: Date;
+  note?: string;
+  status?: string;
 }

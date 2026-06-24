@@ -22,6 +22,7 @@ import { PanelsModule } from './lab/panels/panels.module';
 import { BackupModule } from './backup/backup.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
+import { TechnicianModule } from './lab/technician/technician.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
     BackupModule,
     SuppliersModule,
     PharmacistModule,
+    TechnicianModule,
   ],
   controllers: [AppController],
   providers: [AppService],

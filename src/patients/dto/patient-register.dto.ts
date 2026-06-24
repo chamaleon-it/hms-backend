@@ -28,7 +28,7 @@ export class PatientRegisterDto {
   @IsString()
   doctor: string;
 
-  @IsIn(['Male', 'Female', 'Other', 'Prefer not to say'])
+  @IsIn(['Male', 'Female'])
   gender: string;
 
   @IsString()
@@ -109,4 +109,7 @@ export class PatientRegisterDto {
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
   guardianRelation?: string;
+
+  @IsOptional()
+  weight?: number;
 }

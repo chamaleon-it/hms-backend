@@ -1,5 +1,12 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class GetBillisDto {
   @IsOptional()
@@ -19,6 +26,10 @@ export class GetBillisDto {
   q?: string;
 
   @IsOptional()
+  @IsString()
+  qEnd?: string;
+
+  @IsOptional()
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEnum(['Cash', 'Online', 'Insurance'])
   method?: 'Cash' | 'Online' | 'Insurance';
@@ -29,6 +40,16 @@ export class GetBillisDto {
   status?: 'Paid' | 'Partial' | 'Unpaid';
 
   @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  startDate?: Date;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  endDate?: Date;
+
+  @IsOptional()
   @IsString()
-  date?: string;
+  activeDate?: string;
 }

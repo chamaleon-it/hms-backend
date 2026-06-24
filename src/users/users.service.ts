@@ -101,6 +101,7 @@ export class UsersService {
     const data = await this.userModel
       .find({ role: UserRole.DOCTOR })
       .select('name email phoneNumber address profilePic')
+      .sort({ name: 1 })
       .lean();
     return data;
   }
@@ -186,5 +187,10 @@ export class UsersService {
     }
 
     return user.consultationValues;
+  }
+
+  async getUserById(id: any) {
+    if (!mongoose.isValidObjectId(id)) return null;
+    return this.userModel.findById(id).lean().exec();
   }
 }

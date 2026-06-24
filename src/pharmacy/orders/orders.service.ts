@@ -76,6 +76,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
+        doctor: order.doctorName || "Self",
       });
 
       data.billNo = bill.mrn;
@@ -97,11 +98,18 @@ export class OrdersService {
     const filter: {
       status?: Record<string, string> | string;
       priority?: string;
-      isDeleted?: boolean
+      isDeleted?: boolean;
+      createdAt?: Record<string, Date>;
     } = {};
 
+    if (query.startDate && query.endDate) {
+      filter.createdAt = {
+        $gte: query.startDate,
+        $lte: query.endDate,
+      };
+    }
 
-    filter.isDeleted = false
+    filter.isDeleted = false;
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
@@ -111,8 +119,8 @@ export class OrdersService {
       filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
-    } else if (q === "Deleted") {
-      filter.isDeleted = true
+    } else if (q === 'Deleted') {
+      filter.isDeleted = true;
     }
 
     const [data, total] = await Promise.all([
@@ -170,7 +178,7 @@ export class OrdersService {
       .lean();
 
     if (!data) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException('Order not found.');
     }
 
     return data;
@@ -278,8 +286,7 @@ export class OrdersService {
     }
 
     if (gender) {
-      patientFilter.gender =
-        gender === 'Other' ? { $nin: ['Male', 'Female'] } : gender;
+      patientFilter.gender = gender;
     }
 
     if (doctor && alreadyPurchase === 'false') {
@@ -307,14 +314,10 @@ export class OrdersService {
     let patientIds: mongoose.Types.ObjectId[] | null = null;
     let total = 0;
 
-    const orderMatch: any = {
-      isDeleted: false,
+    const billingMatch: any = {
       patient: { $exists: true, $ne: null },
+      transactionType: 'Sale',
     };
-
-    if (doctor && alreadyPurchase === 'true') {
-      orderMatch.doctor = new mongoose.Types.ObjectId(doctor);
-    }
 
     if (lastVisit) {
       let dateLimit: Date | null = null;
@@ -324,24 +327,24 @@ export class OrdersService {
       } else if (lastVisit === '30') {
         dateLimit = new Date(now.setDate(now.getDate() - 30));
       } else if (lastVisit === 'Custom' && from && to) {
-        orderMatch.createdAt = {
+        billingMatch.createdAt = {
           $gte: new Date(from),
           $lte: new Date(to),
         };
       }
 
       if (dateLimit) {
-        orderMatch.createdAt = { $gte: dateLimit };
+        billingMatch.createdAt = { $gte: dateLimit };
       }
     }
 
     if (alreadyPurchase === 'true') {
       const aggregationPipeline: any[] = [
-        { $match: orderMatch },
+        { $match: billingMatch },
         {
           $group: {
             _id: '$patient',
-            lastOrderDate: { $max: '$createdAt' },
+            lastPurchaseDate: { $max: '$createdAt' },
           },
         },
         {
@@ -356,7 +359,14 @@ export class OrdersService {
         { $match: { 'patientDetail.status': { $ne: PatientStatus.DELETED } } },
       ];
 
-      // Re-apply patient-specific filters on the joined data
+      if (doctor) {
+        aggregationPipeline.push({
+          $match: {
+            'patientDetail.doctor': new mongoose.Types.ObjectId(doctor),
+          },
+        });
+      }
+
       if (q) {
         const searchRegex = { $regex: q, $options: 'i' };
         aggregationPipeline.push({
@@ -407,15 +417,15 @@ export class OrdersService {
         }
       }
 
-      const countResult = await this.orderModel.aggregate([
+      const countResult = await this.billingModel.aggregate([
         ...aggregationPipeline,
         { $count: 'total' },
       ]);
       total = countResult[0]?.total ?? 0;
 
-      const result = await this.orderModel.aggregate([
+      const result = await this.billingModel.aggregate([
         ...aggregationPipeline,
-        { $sort: { lastOrderDate: -1 } },
+        { $sort: { lastPurchaseDate: -1 } },
         { $skip: skip },
         { $limit: limit },
       ]);
@@ -453,40 +463,34 @@ export class OrdersService {
         .exec();
     }
 
-    const orders: any[] = await this.orderModel
+    const bills: any[] = await this.billingModel
       .find({
-        isDeleted: false,
         patient: { $in: patients.map((e) => e._id) },
       })
-      .select('patient items.quantity createdAt')
-      .populate('items.name', 'unitPrice -_id')
       .lean()
       .exec();
 
     const data = patients.map((e) => {
-      const patientOrders = orders.filter(
-        (i) => i.patient.toString() === e._id.toString(),
+      const patientBills = bills.filter(
+        (i) =>
+          i.patient.toString() === e._id.toString() &&
+          i.transactionType === 'Sale',
       );
-      patientOrders.sort(
+      patientBills.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
 
-      const totalSpend: number = patientOrders.reduce(
-        (a, b) =>
-          a +
-          b.items.reduce(
-            (c, d) => c + d.quantity * (d?.name?.unitPrice ?? 0),
-            0,
-          ),
+      const totalSpend: number = patientBills.reduce(
+        (a, b) => a + (b.items?.reduce((c, d) => c + (d.total || 0), 0) || 0),
         0,
       );
 
       return {
         totalSpend,
-        visits: patientOrders.length,
+        visits: patientBills.length,
         patient: e,
-        lastPurchase: patientOrders[0]?.createdAt ?? null,
+        lastPurchase: patientBills[0]?.createdAt ?? null,
       };
     });
 
@@ -494,55 +498,58 @@ export class OrdersService {
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {
-    const [sampleOrder, orders] = await Promise.all([
-      this.orderModel
+    const [sampleBill, bills] = await Promise.all([
+      this.billingModel
         .findOne({ patient: patientId })
         .populate('patient')
         .select('patient')
         .lean()
         .exec(),
-      this.orderModel
+      this.billingModel
         .find({ patient: patientId })
-        .populate('items.name', 'unitPrice name generic manufacturer  -_id ')
         .sort({ createdAt: -1 })
         .lean()
         .exec(),
     ]);
 
-    const patient = sampleOrder?.patient ?? null;
+    const patient = sampleBill?.patient ?? null;
 
     if (!patient) {
       throw new NotFoundException('This patient has not purchased any items.');
     }
-    const totalVisit = orders.length;
 
-    const totalSpend: number = orders.reduce((orderAcc, order: any) => {
-      const itemsTotal: number = (order.items || []).reduce(
-        (
-          itemAcc: number,
-          item: { quantity: number; name: { unitPrice: number } },
-        ) => {
-          const qty = Number(item.quantity ?? 0);
-          const price = Number(item.name?.unitPrice ?? 0);
-          return itemAcc + qty * price;
-        },
+    const salesOnly = bills.filter((b) => b.transactionType === 'Sale');
+    const totalVisit = salesOnly.length;
+
+    const totalSpend: number = salesOnly.reduce((acc, bill: any) => {
+      const billTotal = (bill.items || []).reduce(
+        (itemAcc, item) => itemAcc + (item.total || 0),
         0,
       );
-      return orderAcc + itemsTotal - (order.discount || 0);
+      return acc + billTotal - (bill.discount || 0);
     }, 0);
 
     const averageSpend = totalVisit > 0 ? totalSpend / totalVisit : 0;
-    const lastPurchase: Date | null = (orders[0] as any)?.createdAt ?? null;
+    const lastPurchase: Date | null = (salesOnly[0] as any)?.createdAt ?? null;
 
-    const totalPaid = orders.reduce((acc, order) => {
-      return acc + (order.paidAmount ?? 0);
+    const totalPaid = bills.reduce((acc, bill) => {
+      return (
+        acc + (bill.cash ?? 0) + (bill.online ?? 0) + (bill.insurance ?? 0)
+      );
     }, 0);
 
-    const totalDue = totalSpend - totalPaid;
+    const itemsTotal = salesOnly.reduce(
+      (acc, bill) =>
+        acc +
+        (bill.items || []).reduce((iAcc, i) => iAcc + (i.total || 0), 0) -
+        (bill.discount || 0),
+      0,
+    );
+    const totalDue = itemsTotal - totalPaid;
 
     return {
       patient,
-      orders,
+      orders: bills,
       totalVisit,
       averageSpend,
       totalSpend,
@@ -574,7 +581,10 @@ export class OrdersService {
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
-    const existOrder = await this.orderModel.findById(id).lean().exec();
+
+    const bill = await this.billingModel.findById(id).lean().exec();
+    const existOrder = await this.orderModel.findOne({ billNo: bill?.mrn }).lean().exec();
+
     if (!existOrder) {
       throw new NotFoundException('Order not found');
     }
@@ -583,6 +593,7 @@ export class OrdersService {
     newOrder.mrn = mrn;
     newOrder.patient = existOrder.patient;
     newOrder.doctor = existOrder.doctor;
+    newOrder.doctorName = existOrder.doctorName;
     newOrder.items = existOrder.items.map((item) => {
       return {
         ...item,
@@ -594,10 +605,8 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      configuration().in_house_pharmacy_id,
-    );
-    if (autoGenerateBill) {
+
+    if (true) {
       const items = await Promise.all(
         data.items.map(async (item) => {
           const itemData = await this.itemsService.getItem(item.name);
@@ -621,6 +630,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
+        doctor: existOrder.doctorName || "Self",
       });
     }
 
@@ -652,7 +662,13 @@ export class OrdersService {
   }
 
   async recoverOrder(id: mongoose.Types.ObjectId) {
-    const data = await this.orderModel.findByIdAndUpdate(id, { isDeleted: false }, { new: true, runValidators: true }).lean();
+    const data = await this.orderModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false },
+        { new: true, runValidators: true },
+      )
+      .lean();
     if (!data) {
       throw new NotFoundException('Order not found');
     }

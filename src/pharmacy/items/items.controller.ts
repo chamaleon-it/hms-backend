@@ -112,4 +112,13 @@ export class ItemsController {
       message: 'Batch items added successfully',
     };
   }
+
+  @Get('addmrp')
+  async addMrp() {
+    const data = await this.itemsService.addMRP();
+    return {
+      data,
+      message: 'Mrp added successfully',
+    };
+  }
 }

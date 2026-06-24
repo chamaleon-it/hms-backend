@@ -23,7 +23,7 @@ export class GetCustomersDto {
   q?: string; // phone number / patiner name / address / patient id
 
   @IsOptional()
-  gender?: string; // Female, Male, Other
+  gender?: string; // Female, Male
 
   @IsOptional()
   doctor?: string; // mongose id

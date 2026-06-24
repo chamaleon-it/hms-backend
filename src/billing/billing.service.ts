@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateBillingDto } from './dto/create-billing.dto';
+import { UpdateBillingDto } from './dto/update-billing.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
 import mongoose, { Model } from 'mongoose';
@@ -14,10 +15,9 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
-import {
-  Order,
-  PaymentStatus,
-} from 'src/pharmacy/orders/schemas/order.schema';
+import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
+import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
+import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
 @Injectable()
 export class BillingService {
@@ -29,19 +29,23 @@ export class BillingService {
   ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
-    let mrn: string;
-    let exists = true;
+    const lastRecord = await this.billingModel
+      .findOne({ mrn: { $regex: `^${prefix}` } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
 
-    do {
-      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `${prefix}${randomNum}`;
+    if (lastRecord && lastRecord.mrn) {
+      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match && match[1]) {
+        const nextNumber = parseInt(match[1], 10) + 1;
+        return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+      }
+    }
 
-      // Check if MRN already exists
-      const existing = await this.billingModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+    return `${prefix}0001`;
   }
 
   async generateBill(createBill: CreateBillingDto) {
@@ -98,24 +102,35 @@ export class BillingService {
   }
 
   async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const { page = 1, limit = 10, q, method, status, date } = getBillisDto;
+    const {
+      page = 1,
+      limit = 10,
+      q,
+      qEnd,
+      method,
+      status,
+      startDate,
+      endDate,
+      activeDate,
+    } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
+    const qEndFound = await this.billingModel.exists({
+      mrn: qEnd?.toUpperCase(),
+    });
 
-    if (q) {
-      match.mrn = { $regex: '^' + q, $options: 'i' };
+    if (q && qEnd && qEndFound) {
+      match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
     }
+    // else if (q) {
+    //   match.mrn = { $regex: '^' + q, $options: 'i' };
+    // }
 
-    if (date) {
-      const from = new Date(date);
-      if (isNaN(from.getTime())) {
-        throw new BadRequestException('Invalid date');
-      }
-      const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
-      match.createdAt = { $gte: from, $lt: to };
+    if (!q && startDate && endDate) {
+      match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
     if (method) {
@@ -147,10 +162,11 @@ export class BillingService {
 
     if (status) {
       if (status === 'Unpaid') {
-        pipeline.push({ $match: { totalPaid: 0 } });
+        pipeline.push({ $match: { totalPaid: 0, transactionType: 'Sale' } });
       } else if (status === 'Paid') {
         pipeline.push({
           $match: {
+            transactionType: 'Sale',
             $expr: {
               $lte: [
                 '$itemsTotal',
@@ -164,6 +180,7 @@ export class BillingService {
       } else if (status === 'Partial') {
         pipeline.push({
           $match: {
+            transactionType: 'Sale',
             $and: [
               {
                 $expr: {
@@ -187,8 +204,9 @@ export class BillingService {
         metadata: [{ $count: 'total' }],
         data: [
           { $sort: { createdAt: -1 } },
-          { $skip: skip },
-          { $limit: limit },
+          ...(activeDate === 'Today' || activeDate === 'Custom' || true
+            ? []
+            : [{ $skip: skip }, { $limit: limit }]),
           {
             $lookup: {
               from: 'patients',
@@ -221,6 +239,16 @@ export class BillingService {
     const data = result[0].data;
     const total = result[0].metadata[0]?.total ?? 0;
 
+    // Populate doctor names for the bills
+    for (const bill of data) {
+      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
+        const doc = await this.usersService.getUserById(bill.doctor);
+        if (doc) {
+          bill.doctor = doc;
+        }
+      }
+    }
+
     return { data, total };
   }
 
@@ -234,6 +262,65 @@ export class BillingService {
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
+
+    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
+      const doc = await this.usersService.getUserById(data.doctor);
+      if (doc) {
+        (data as any).doctor = doc;
+      }
+    }
+    return data;
+  }
+
+  async getBillByReportId(reportId: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(reportId))
+      throw new BadRequestException('Please provide a valid report id');
+    const data = await this.billingModel
+      .findOne({ reportId })
+      .populate('patient')
+      .populate('items')
+      .lean()
+      .exec();
+    if (!data) throw new NotFoundException('Bill is not found.');
+
+    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
+      const doc = await this.usersService.getUserById(data.doctor);
+      if (doc) {
+        (data as any).doctor = doc;
+      }
+    }
+    return data;
+  }
+
+
+  async updateBill(id: mongoose.Types.ObjectId, updateBillDto: UpdateBillingDto) {
+    if (!mongoose.isValidObjectId(id))
+      throw new BadRequestException('Please provide a valid bill id');
+    
+    const existingBill = await this.billingModel.findById(id);
+    if (!existingBill) throw new NotFoundException('Bill is not found.');
+    
+    if (existingBill.status === 'Completed') {
+      throw new BadRequestException('Cannot edit a completed bill');
+    }
+
+    const data = await this.billingModel.findByIdAndUpdate(
+      id,
+      { $set: updateBillDto },
+      { new: true }
+    );
+    return data;
+  }
+
+  async updateBillStatusByReportId(reportId: mongoose.Types.ObjectId, status: 'Draft' | 'Completed') {
+    if (!mongoose.isValidObjectId(reportId))
+      throw new BadRequestException('Please provide a valid report id');
+    
+    const data = await this.billingModel.findOneAndUpdate(
+      { reportId },
+      { $set: { status } },
+      { new: true }
+    );
     return data;
   }
 
@@ -247,12 +334,48 @@ export class BillingService {
     });
 
     if (isExist) {
-      throw new BadRequestException('Already added to billing.');
+      throw new BadRequestException(
+        'Item code already exists in billing items.',
+      );
     }
     const data = await this.billingItemModel.create({
       user,
       ...addBillingItemDto,
     });
+    return data;
+  }
+
+  async updateBillingItem(
+    id: mongoose.Types.ObjectId,
+    updateBillingItemDto: UpdateBillingItemDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid billing item ID');
+    }
+
+    if (updateBillingItemDto.code) {
+      const isExist = await this.billingItemModel.exists({
+        user,
+        code: updateBillingItemDto.code,
+        _id: { $ne: id },
+      });
+
+      if (isExist) {
+        throw new BadRequestException('Item code already exists in billing.');
+      }
+    }
+
+    const data = await this.billingItemModel.findOneAndUpdate(
+      { _id: id, user },
+      updateBillingItemDto,
+      { new: true },
+    );
+
+    if (!data) {
+      throw new NotFoundException('Billing item not found');
+    }
+
     return data;
   }
 
@@ -263,7 +386,10 @@ export class BillingService {
     const filter: any = { user };
 
     if (item) {
-      filter.item = new RegExp(`^${item}`, 'i');
+      filter.$or = [
+        { item: new RegExp(`^${item}`, 'i') },
+        { code: new RegExp(`^${item}`, 'i') },
+      ];
     }
 
     return this.billingItemModel.find(filter).lean().exec();
@@ -301,6 +427,25 @@ export class BillingService {
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+  async getBillDropDown(getBillDropDownDto: GetBillDropdownDto) {
+    const { query = '', } = getBillDropDownDto;
+
+    const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
+      .limit(10).select("user patient mrn")
+      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+      .lean()
+      .exec();
+    return data;
+  }
+
+  async getSingleCustomerBill(q: string) {
+    const data = await this.billingModel.find({ patient: q })
+      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+      .lean()
+      .exec();
     return data;
   }
 }

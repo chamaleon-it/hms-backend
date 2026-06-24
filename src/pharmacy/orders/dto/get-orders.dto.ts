@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDate, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class GetOrdersDto {
   @IsOptional()
@@ -18,4 +18,14 @@ export class GetOrdersDto {
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   q?: string;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  startDate?: Date;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  endDate?: Date;
 }

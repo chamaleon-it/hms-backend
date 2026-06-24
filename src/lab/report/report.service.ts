@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,23 +15,58 @@ import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { LisResultDto } from './dto/lis-result.dto';
+import { Test } from '../panels/schemas/test.schema';
+import { Patient } from '../../patients/schemas/patient.schema';
+import { Panel } from '../panels/schemas/panel.schema';
+import { Group } from '../panels/schemas/group.schema';
+import { BillingService } from '../../billing/billing.service';
+import { async } from 'rxjs';
 
 @Injectable()
-export class ReportService {
-  constructor(@InjectModel(Report.name) private reportModel: Model<Report>) { }
+export class ReportService implements OnModuleInit {
+  constructor(
+    @InjectModel(Report.name) private reportModel: Model<Report>,
+    @InjectModel(Test.name) private testModel: Model<Test>,
+    @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(Panel.name) private panelModel: Model<Panel>,
+    @InjectModel(Group.name) private groupModel: Model<Group>,
+    private billingService: BillingService,
+  ) {}
+
+  async onModuleInit() {
+    try {
+      const result = await this.reportModel.updateMany(
+        { status: 'Sample Collected' },
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+      );
+      if (result.modifiedCount > 0) {
+        console.log(`[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`);
+      }
+    } catch (e) {
+      console.error('[Migration] Error migrating reports:', e);
+    }
+  }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
     }
+    const startOfDay = new Date(dto.date);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(dto.date);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
     const userReport = await this.reportModel.findOne({
       patient: dto.patient,
       status: ReportStatus.UPCOMING,
       lab: dto.lab,
+      date: { $gte: startOfDay, $lte: endOfDay },
       isDeleted: false,
     });
 
     if (!userReport) {
       const data = await this.reportModel.create(dto);
+      await this.createOrUpdateDraftBill(data);
       return data;
     } else {
       userReport.test.push(
@@ -45,16 +82,126 @@ export class ReportService {
 
       if (dto.panels && dto.panels.length > 0) {
         userReport.panels.push(
-          ...dto.panels.filter(
-            (p) =>
-              !userReport.panels.some(
-                (existing) => existing.toString() === p.toString(),
-              ),
-          ),
+          ...dto.panels.filter((p) => !userReport.panels.includes(p))
+        );
+      }
+      if (dto.groups && dto.groups.length > 0) {
+        if (!userReport.groups) userReport.groups = [];
+        userReport.groups.push(
+          ...dto.groups.filter((g) => !userReport.groups.includes(g))
         );
       }
       await userReport.save();
+      await this.createOrUpdateDraftBill(userReport);
       return userReport;
+    }
+  }
+
+  private async createOrUpdateDraftBill(report: Report & { _id: any }) {
+    const items: any[] = [];
+    let total = 0;
+
+    if (report.groups && report.groups.length > 0) {
+      const groupsData = await this.groupModel.find({ name: { $in: report.groups } });
+      for (const group of groupsData) {
+        items.push({
+          name: group.name,
+          quantity: 1,
+          unitPrice: group.price || 0,
+          total: group.price || 0,
+          gst: 0,
+          discount: 0,
+        });
+        total += group.price || 0;
+      }
+    }
+
+    if (report.panels && report.panels.length > 0) {
+      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
+      
+      let groupPanelNames: string[] = [];
+      if (report.groups && report.groups.length > 0) {
+        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('panels');
+        groupPanelNames = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+      }
+      
+      for (const panel of panelsData) {
+        if (!groupPanelNames.includes(panel.name)) {
+          items.push({
+            name: panel.name,
+            quantity: 1,
+            unitPrice: panel.price || 0,
+            total: panel.price || 0,
+            gst: 0,
+            discount: 0,
+          });
+          total += panel.price || 0;
+        }
+      }
+    }
+
+    if (report.test && report.test.length > 0) {
+      const testIds = report.test.map(t => t.name);
+      const testsData = await this.testModel.find({ _id: { $in: testIds } });
+      
+      let panelTestIds: string[] = [];
+      let groupTestIds: string[] = [];
+      
+      if (report.panels && report.panels.length > 0) {
+        const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
+        panelTestIds = panelsData.flatMap(p => p.tests || []).map(id => id.toString());
+      }
+      
+      if (report.groups && report.groups.length > 0) {
+        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('tests').populate('panels');
+        groupTestIds = groupsData.flatMap(g => g.tests || []).map((t: any) => t._id?.toString() || t.toString());
+        
+        const groupPanelIds = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+        const groupPanelsData = await this.panelModel.find({ name: { $in: groupPanelIds } });
+        groupTestIds.push(...groupPanelsData.flatMap(p => p.tests || []).map(id => id.toString()));
+      }
+
+      for (const test of testsData) {
+        if (!panelTestIds.includes(test._id.toString()) && !groupTestIds.includes(test._id.toString())) {
+          items.push({
+            name: test.name,
+            quantity: 1,
+            unitPrice: test.price || 0,
+            total: test.price || 0,
+            gst: 0,
+            discount: 0,
+          });
+          total += test.price || 0;
+        }
+      }
+    }
+
+    // Try to find existing bill for this report
+    let existingBill;
+    try {
+      existingBill = await this.billingService['billingModel'].findOne({ reportId: report._id });
+    } catch(e) {}
+
+    if (existingBill) {
+      if (existingBill.status === 'Draft') {
+        // Update items only if it is a draft
+        await this.billingService.updateBill(existingBill._id, {
+          items,
+        });
+      }
+    } else {
+      await this.billingService.generateBill({
+        patient: report.patient,
+        user: report.lab,
+        doctor: report.doctor ? report.doctor.toString() : 'Self',
+        items,
+        cash: 0,
+        online: 0,
+        insurance: 0,
+        discount: 0,
+        reportId: report._id,
+        status: 'Draft',
+      });
     }
   }
 
@@ -68,10 +215,9 @@ export class ReportService {
     if (dto.status) {
       if (dto.status === 'Flagged') {
         match.isFlagged = true;
-      } else if (dto.status === "Deleted") {
+      } else if (dto.status === 'Deleted') {
         match.isDeleted = true;
-      }
-      else {
+      } else {
         match.status = dto.status;
       }
     }
@@ -80,9 +226,8 @@ export class ReportService {
       match.createdAt = {
         $gte: dto.startDate,
         $lte: dto.endDate,
-      }
+      };
     }
-
 
     const data = await this.reportModel
       .find(match)
@@ -93,6 +238,10 @@ export class ReportService {
         path: 'test.name',
         populate: {
           path: 'panels',
+          populate: {
+            path: 'tests',
+            select: 'name',
+          },
         },
       })
       // .sort({ createdAt: -1 })
@@ -103,7 +252,7 @@ export class ReportService {
   }
 
   async updateResult(dto: ResultDto) {
-    const { _id, test } = dto;
+    const { _id, test, collectedDate, reportedDate } = dto;
 
     const report = await this.reportModel.findById(_id);
     if (!report) throw new NotFoundException('Report not found');
@@ -119,19 +268,202 @@ export class ReportService {
       }
     });
 
+    if (dto.note !== undefined) {
+      report.note = dto.note;
+    }
+
     const allFilled = report.test.every((item) => {
       return (
         item.value !== null && item.value !== '' && item.value !== undefined
       );
     });
 
+    if (dto.status === 'Completed') {
+      report.status = ReportStatus.COMPLETED;
+    } else {
+      report.status = allFilled
+        ? ReportStatus.COMPLETED
+        : ReportStatus.WAITING_FOR_RESULT;
+    }
+
+    await report.save();
+    if (allFilled || dto.status === 'Completed') {
+      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+    }
+
+    // Forcefully override locked timestamp behavior directly in Mongo
+    if (collectedDate || reportedDate) {
+      const updateData: any = {};
+      if (collectedDate) updateData.sampleCollectedAt = new Date(collectedDate);
+      if (reportedDate) updateData.testStartedAt = new Date(reportedDate);
+      await this.reportModel.updateOne(
+        { _id: report._id },
+        { $set: updateData },
+        { timestamps: false, strict: false },
+      );
+    }
+
+    return { message: 'Updated successfully' };
+  }
+
+  async updateFromLis(dto: LisResultDto) {
+    const { sampleId, patientId, machine, results, graphs } = dto;
+
+    // Use a regex to allow matching "004" to "004 (Blood)" safely in Mongoose
+    let report = await this.reportModel.findOne({
+      sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' },
+      isDeleted: false,
+      status: { $ne: ReportStatus.COMPLETED },
+    });
+
+    // Fallback: If Sample ID fails, try to find the patient's most recent active report using MRN
+    if (!report && patientId && patientId !== 'Unknown') {
+      const patient = await this.patientModel.findOne({ mrn: patientId });
+      if (patient) {
+        report = await this.reportModel
+          .findOne({
+            patient: patient._id,
+            isDeleted: false,
+            status: { $ne: ReportStatus.COMPLETED },
+          })
+          .sort({ createdAt: -1 });
+      }
+    }
+
+    if (!report) {
+      throw new NotFoundException(
+        `Active Report for sampleId ${sampleId} or patientId ${patientId} not found`,
+      );
+    }
+
+    // Only load tests that are actually in this report
+    const testIdsInReport = report.test.map((t) => t.name);
+    const tests = await this.testModel.find({ _id: { $in: testIdsInReport } });
+
+    let updatedCount = 0;
+    tests.forEach((testDoc) => {
+      // Find the value in results by matching keys safely
+      let matchedKey: string | null = null;
+      for (const key of Object.keys(results)) {
+        const k = key.toLowerCase();
+        const cleanK = k.replace(/[^a-z0-9]/g, ''); // "lym%", "*mentzr" -> "lym", "mentzr"
+        const baseK = k.replace(/[^a-z0-9\-\+]/g, ''); // "lym%" -> "lym"
+        const tCode = (testDoc.code || '').toLowerCase();
+        const tName = (testDoc.name || '').toLowerCase();
+
+        // Strict check for exactly same strings or codes
+        if (tCode === k || tName === k) {
+          matchedKey = key;
+          break;
+        }
+
+        // Specific handling for % vs # (Absolute vs Percentage)
+        const isPercentTest =
+          tName.includes('%') || tName.includes('percentage');
+        const isAbsoluteTest =
+          tName.includes('#') ||
+          tName.includes('abs') ||
+          tName.includes('absolute');
+
+        const isMachinePercent = k.includes('%');
+        const isMachineAbsolute = k.includes('#');
+
+        // If one is explicitly percent and the other is absolute, DO NOT MATCH.
+        if (
+          (isPercentTest && isMachineAbsolute) ||
+          (isAbsoluteTest && isMachinePercent)
+        ) {
+          continue;
+        }
+
+        if (
+          tName.includes(`(${k})`) ||
+          tName.includes(`(${k}+)`) ||
+          tName.includes(`(${k}-)`) ||
+          // Match stripped names cleanly only if isolated (boundaries)
+          (cleanK.length >= 3 && new RegExp(`\\b${cleanK}\\b`).test(tName)) ||
+          // Common Electrolyte Fallbacks
+          (k === 'na' && tName.includes('sodium')) ||
+          (k === 'k' && tName.includes('potassium')) ||
+          (k === 'cl' && tName.includes('chloride')) ||
+          // Common CBC Fallbacks (Erba H360)
+          (k === 'wbc' &&
+            (tName.includes('white blood') ||
+              tName.includes('total count') ||
+              new RegExp(`\\btc\\b`).test(tName))) ||
+          (k === 'rbc' && tName.includes('red blood')) ||
+          (k === 'hgb' &&
+            (tName.includes('hemoglobin') ||
+              tName.includes('(hb)') ||
+              tName === 'hb' ||
+              tName.includes('haemoglobin'))) ||
+          (k === 'hct' &&
+            (tName.includes('hematocrit') ||
+              new RegExp(`\\bpcv\\b`).test(tName))) ||
+          (baseK === 'lym' && tName.includes('lymphocyte')) ||
+          (baseK === 'gran' &&
+            (tName.includes('granulocyte') || tName.includes('neutrophil'))) ||
+          (baseK === 'mid' &&
+            (tName.includes('monocyte') || tName.includes('eosinophil'))) ||
+          (k === 'plt' &&
+            (new RegExp(`\\bplatelet\\b`).test(tName) ||
+              new RegExp(`\\bplatelets\\b`).test(tName))) ||
+          (k === 'pct' && tName.includes('plateletcrit')) ||
+          (baseK === 'mentzr' && tName.includes('mentzer')) ||
+          (baseK === 'rdwi' && tName.includes('rdwi'))
+        ) {
+          matchedKey = key;
+          break;
+        }
+      }
+
+      if (
+        matchedKey &&
+        results[matchedKey] &&
+        results[matchedKey].value !== undefined
+      ) {
+        // Find this test in the report.test array
+        const index = report.test.findIndex(
+          (x) => x?.name?.toString() === testDoc._id.toString(),
+        );
+        if (index !== -1) {
+          report.test[index].value = results[matchedKey].value;
+          updatedCount++;
+        }
+      }
+    });
+
+    const allFilled = report.test.every((item) => {
+      return (
+        item.value !== null && item.value !== '' && item.value !== undefined
+      );
+    });
+
+    // Update time test actually started/received
+    if (!report.testStartedAt && updatedCount > 0) {
+      report.testStartedAt = new Date();
+    }
+
     report.status = allFilled
       ? ReportStatus.COMPLETED
       : ReportStatus.WAITING_FOR_RESULT;
 
+    if (graphs && Object.keys(graphs).length > 0) {
+      if (!report.graphs) report.graphs = {};
+      Object.assign(report.graphs, graphs);
+      report.markModified('graphs');
+    }
+
     await report.save();
 
-    return { message: 'Updated successfully' };
+    if (allFilled) {
+      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+    }
+
+    return {
+      message: `LIS Result processed from ${machine}. Updated ${updatedCount} parameters.`,
+      reportId: report._id,
+    };
   }
 
   async getPatientReports(patient: mongoose.Types.ObjectId) {
@@ -222,16 +554,40 @@ export class ReportService {
   }
 
   async sampleCollected(id: mongoose.Types.ObjectId, dto: SampleCollectedDto) {
+    if (dto.sampleId) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const rawSampleId = dto.sampleId.split(' (')[0].trim();
+
+      const duplicateReport = await this.reportModel.findOne({
+        _id: { $ne: id },
+        sampleId: { $regex: new RegExp(`^${rawSampleId}\\b`, 'i') },
+        createdAt: { $gte: today },
+      });
+
+      if (duplicateReport) {
+        throw new ConflictException(
+          `Warning: Sample ID "${rawSampleId}" is already assigned to another test today.`,
+        );
+      }
+    }
+
     const data = await this.reportModel.findById(id);
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    data.status = ReportStatus.SAMPLE_COLLECTED;
+
+    data.status = ReportStatus.WAITING_FOR_RESULT;
     data.sampleCollectedAt = new Date();
+    data.testStartedAt = new Date();
     data.sampleId = dto.sampleId;
+    data.sampleType = dto?.sampleType || '';
+    
     await data.save();
     return data;
   }
+
 
   async startTest(id: mongoose.Types.ObjectId) {
     const data = await this.reportModel.findById(id);
@@ -275,7 +631,7 @@ export class ReportService {
   }
 
   async getStatistics() {
-    const data = await this.reportModel.aggregate([
+    const data: any[] = await this.reportModel.aggregate([
       {
         $match: {
           isDeleted: false,
@@ -363,7 +719,10 @@ export class ReportService {
     }
 
     if (dto.test) {
-      data.test = dto.test.map((t) => ({ name: t.name, value: t.value ?? '' })) as any;
+      data.test = dto.test.map((t) => ({
+        name: t.name,
+        value: t.value ?? '',
+      })) as any;
     }
     if (dto.panels) {
       data.panels = dto.panels;
@@ -376,6 +735,7 @@ export class ReportService {
     }
 
     await data.save();
+    await this.createOrUpdateDraftBill(data);
     return data;
   }
 
@@ -384,7 +744,17 @@ export class ReportService {
     if (!data) {
       throw new NotFoundException('Records not found');
     }
-    const newReport = await this.createReport({ date: new Date(), doctor: data.doctor, panels: data.panels, test: data.test, patient: data.patient, priority: data.priority, sampleType: data.sampleType, status: ReportStatus.UPCOMING, lab: data.lab })
+    const newReport = await this.createReport({
+      date: new Date(),
+      doctor: data.doctor || null,
+      panels: data.panels,
+      test: data.test,
+      patient: data.patient,
+      priority: data.priority,
+      sampleType: data.sampleType || '',
+      status: ReportStatus.UPCOMING,
+      lab: data.lab,
+    });
     return newReport;
   }
 }

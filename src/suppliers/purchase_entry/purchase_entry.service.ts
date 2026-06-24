@@ -35,13 +35,14 @@ export class PurchaseEntryService {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
+        console.log(item)
       await this.itemsService.addBatchItems(item.item, {
         batchNumber: item.batch,
-        quantity: item.quantity + item.free,
+        quantity: item.quantity,
         expiryDate: item.expiryDate,
         purchasePrice: item.purchasePrice,
         supplier: supplier?.name || '-',
-      });
+      },item.unitPrice/item.pack,item.unitPrice);
     }
     return data;
   }

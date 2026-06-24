@@ -4,12 +4,6 @@ import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
-export enum SampleType {
-  BLOOD = 'Blood',
-  URINE = 'Urine',
-  OTHER = 'Other',
-}
-
 export enum ReportStatus {
   UPCOMING = 'Upcoming',
   SAMPLE_COLLECTED = 'Sample Collected',
@@ -26,8 +20,8 @@ export class Report {
   })
   patient: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-  doctor: Types.ObjectId;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null })
+  doctor: Types.ObjectId | null;
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
@@ -46,6 +40,9 @@ export class Report {
   @Prop({ type: [String], default: [] })
   panels: string[];
 
+  @Prop({ type: [String], default: [] })
+  groups: string[];
+
   @Prop([
     {
       name: { type: mongoose.Schema.Types.ObjectId, ref: 'Test' },
@@ -59,10 +56,9 @@ export class Report {
 
   @Prop({
     type: String,
-    enum: Object.values(SampleType),
-    default: SampleType.OTHER,
+    default: null,
   })
-  sampleType: SampleType;
+  sampleType: string | null;
 
   @Prop({
     type: Date,
@@ -103,9 +99,21 @@ export class Report {
 
   @Prop({ type: Number, unique: true })
   mrn: number;
+
+  @Prop({ type: String, default: null })
+  technician: string;
+
+  @Prop({ type: String, default: '' })
+  note: string;
+
+  @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
+  graphs: Record<string, string>;
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+
+ReportSchema.index({ createdAt: -1 });
+ReportSchema.index({ sampleId: 1 });
 
 ReportSchema.pre('save', async function (next) {
   if (this.isNew) {

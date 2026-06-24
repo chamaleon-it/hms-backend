@@ -33,6 +33,9 @@ export class Billing {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient', required: true })
   patient: Types.ObjectId;
 
+  @Prop({ type: String, default: 'Self' })
+  doctor: string;
+
   @Prop({ type: [BillingItemSchema], default: [] })
   items: BillingItem[];
 
@@ -78,6 +81,12 @@ export class Billing {
 
   @Prop({ type: String, required: false })
   salesMRN?: string;
+
+  @Prop({ type: String, enum: ['Draft', 'Completed'], default: 'Draft' })
+  status: 'Draft' | 'Completed';
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Report', required: false })
+  reportId?: Types.ObjectId;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

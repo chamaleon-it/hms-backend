@@ -15,7 +15,7 @@ export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
@@ -33,15 +33,35 @@ export class AppointmentsService {
     query,
     status,
     date,
+    activeDate,
   }: {
     query?: string;
     status?: string[];
     date: string;
+    activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
   }) {
-    const startOfDay = new Date(date);
+    let startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
+    let endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
+
+    if (activeDate === 'Today') {
+      const today = new Date();
+      startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      endOfDay = new Date(today.setHours(23, 59, 59, 999));
+    }
+    if (activeDate === '7 days') {
+      const today = new Date();
+      startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      endOfDay = new Date(today.setDate(today.getDate() + 7));
+      endOfDay.setHours(23, 59, 59, 999);
+    }
+    if (activeDate === '30 days') {
+      const today = new Date();
+      startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      endOfDay = new Date(today.setDate(today.getDate() + 30));
+      endOfDay.setHours(23, 59, 59, 999);
+    }
 
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
@@ -49,13 +69,13 @@ export class AppointmentsService {
     if (query && query.trim())
       $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
     if (status?.length) {
-      if (status.includes("Deleted")) {
+      if (status.includes('Deleted')) {
         $match.isDeleted = true;
       } else {
         $match.isDeleted = false;
-        $match.status = { $in: status }
+        $match.status = { $in: status };
       }
-    };
+    }
 
     return this.appointmentModel
       .aggregate([
@@ -317,12 +337,12 @@ export class AppointmentsService {
       endTime?: string | null | undefined;
       days?: string[] | undefined;
       rounds?:
-      | {
-        label?: string | undefined;
-        start?: string | undefined;
-        end?: string | undefined;
-      }[]
-      | undefined;
+        | {
+            label?: string | undefined;
+            start?: string | undefined;
+            end?: string | undefined;
+          }[]
+        | undefined;
     }> = await this.usersService.getDoctorAvailability(doctor);
 
     const isAvailable = availability.days

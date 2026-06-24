@@ -5,9 +5,7 @@ export type PatientDocument = HydratedDocument<Patient>;
 
 export enum Gender {
   MALE = 'Male',
-  FEMALE = 'Female',
-  OTHER = 'Other',
-  PREFER_NOT_TO_SAY = 'Prefer not to say',
+  FEMALE = 'Female'
 }
 
 export enum PatientStatus {
@@ -23,7 +21,7 @@ export class Patient {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: false, trim: true })
   phoneNumber: string;
 
   @Prop({ trim: true, lowercase: true, default: '' })
@@ -32,7 +30,7 @@ export class Patient {
   @Prop({ enum: Object.values(Gender) })
   gender: Gender;
 
-  @Prop({ required: true })
+  @Prop({ default: new Date() })
   dateOfBirth: Date;
 
   @Prop({ default: [], type: [String] })
@@ -88,6 +86,9 @@ export class Patient {
 
   @Prop({ default: null, trim: true })
   guardianRelation: string;
+
+  @Prop({ required: false})
+  weight?: number; 
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

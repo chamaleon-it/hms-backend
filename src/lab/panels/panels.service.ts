@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePanelDto } from './dto/create-panel.dto';
 import { Panel, PanelStatus } from './schemas/panel.schema';
 import mongoose, { Model } from 'mongoose';
@@ -6,12 +10,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CreateTestDto } from './dto/create-test.dto';
 import { Test } from './schemas/test.schema';
 import { AddTestDto } from './dto/add-test.dto';
+import { CreateGroupDto } from './dto/create-group.dto';
+import { Group, GroupStatus } from './schemas/group.schema';
 
 @Injectable()
 export class PanelsService {
   constructor(
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Test.name) private testModel: Model<Test>,
+    @InjectModel(Group.name) private groupModel: Model<Group>,
   ) {}
 
   async createPanel(createPanelDto: CreatePanelDto) {
@@ -25,26 +32,92 @@ export class PanelsService {
     return panel.save();
   }
 
-  async getPanels(): Promise<{ name: string; price: number }[]> {
+  async getPanels() {
     const panels = await this.panelModel
       .find({ status: PanelStatus.ACTIVE })
-      .select('name price')
+      .select(
+        'name price estimatedTime tests mainHeading subheadings testSubheadings method specimen department',
+      )
+      .populate('tests', 'name unit range code')
       .sort({ _id: 1 })
       .lean()
       .exec();
-    return panels.map((panel) => ({ name: panel.name, price: panel.price }));
+    return panels.map((panel) => ({
+      _id: (panel as any)._id.toString(),
+      name: panel.name,
+      price: panel.price,
+      estimatedTime: panel.estimatedTime,
+      tests: panel.tests,
+      mainHeading: panel.mainHeading,
+      subheadings: panel.subheadings || [],
+      testSubheadings: panel.testSubheadings || {},
+      method: panel.method,
+      specimen: panel.specimen,
+      department: panel.department,
+    }));
   }
 
-  async deletePanel(name: string) {
-    await this.panelModel.findOneAndUpdate(
-      { name },
+  async updatePanel(id: string, updatePanelDto: CreatePanelDto) {
+    const isExist = await this.panelModel.findById(id);
+    if (!isExist) {
+      throw new BadRequestException('Panel not found');
+    }
+
+    const { tests, ...rest } = updatePanelDto;
+
+    // First update panel document mapping
+    const panel = await this.panelModel.findByIdAndUpdate(
+      id,
+      { ...rest, tests: tests || [] },
+      { new: true },
+    );
+
+    if (!panel) {
+      throw new BadRequestException('Panel not found');
+    }
+
+    // Update reverse mapping of tests to ensure synchronization
+    if (tests) {
+      // Find existing tests with this panel
+      const testDocs = await this.testModel.find({ panels: panel._id });
+
+      // Remove panel from tests that are no longer in the payload
+      for (const t of testDocs) {
+        if (!tests.includes(t._id.toString())) {
+          t.panels = t.panels.filter(
+            (pId) => pId.toString() !== panel._id.toString(),
+          );
+          await t.save();
+        }
+      }
+
+      // Add panel to tests that are in the payload but don't have the panel
+      for (const testId of tests) {
+        const testDoc = await this.testModel.findById(testId);
+        if (
+          testDoc &&
+          (!testDoc.panels || !testDoc.panels.includes(panel._id))
+        ) {
+          if (!testDoc.panels) testDoc.panels = [];
+          testDoc.panels.push(panel._id);
+          await testDoc.save();
+        }
+      }
+    }
+
+    return panel;
+  }
+
+  async deletePanel(id: string) {
+    await this.panelModel.findByIdAndUpdate(
+      id,
       { status: PanelStatus.DELETED },
     );
   }
 
   async createTest(dto: CreateTestDto) {
     const isExist = await this.testModel.exists({ code: dto.code });
-    if (isExist) {
+    if (isExist && dto.code !== null) {
       throw new BadRequestException('Test with this code already exists');
     }
     const test = await this.testModel.create(dto);
@@ -61,6 +134,13 @@ export class PanelsService {
   }
 
   async updateTest(id: mongoose.Types.ObjectId, dto: CreateTestDto) {
+    const isExist = await this.testModel.exists({
+      code: dto.code,
+      _id: { $ne: id },
+    });
+    if (isExist && dto.code !== null) {
+      throw new BadRequestException('Test with this code already exists');
+    }
     const test = await this.testModel.findByIdAndUpdate(id, dto, { new: true });
     return test;
   }
@@ -110,5 +190,54 @@ export class PanelsService {
       }
     }
     return panel;
+  }
+
+  async deleteTest(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid ID provided.');
+    }
+    const test = await this.testModel.findByIdAndDelete(id);
+    if (!test) {
+      throw new NotFoundException('Test not found.');
+    }
+    // Remove test from all panels
+    await this.panelModel.updateMany({ tests: id }, { $pull: { tests: id } });
+    return test;
+  }
+
+  async createGroup(dto: CreateGroupDto) {
+    const isExist = await this.groupModel.findOne({ name: dto.name });
+    if (isExist) throw new BadRequestException('Group name already exists');
+    const group = new this.groupModel(dto);
+    return group.save();
+  }
+
+  async getGroups() {
+    return this.groupModel
+      .find({ status: GroupStatus.ACTIVE })
+      .populate('tests', 'name price code')
+      .populate('panels', 'name price tests')
+      .sort({ _id: 1 })
+      .exec();
+  }
+
+  async updateGroup(name: string, dto: CreateGroupDto) {
+    const group = await this.groupModel.findOneAndUpdate(
+      { name },
+      { $set: dto },
+      { new: true },
+    );
+    if (!group) throw new NotFoundException('Group not found');
+    return group;
+  }
+
+  async deleteGroup(name: string) {
+    const group = await this.groupModel.findOneAndUpdate(
+      { name },
+      { $set: { status: GroupStatus.DELETED } },
+      { new: true },
+    );
+    if (!group) throw new NotFoundException('Group not found');
+    return group;
   }
 }

@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-03-25T10:36:16.018Z",
+  "sampleId": "99",
+  "patient": {
+    "id": "00000043",
+    "name": ""
+  },
+  "electrolytes": {
+    "Na": {
+      "value": 139.1,
+      "unit": "mmol/l"
+    },
+    "K": {
+      "value": 4.39,
+      "unit": "mmol/l"
+    },
+    "Cl": {
+      "value": 106.6,
+      "unit": "mmol/l"
+    }
+  }
+},

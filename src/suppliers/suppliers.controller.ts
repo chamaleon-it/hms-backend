@@ -5,7 +5,7 @@ import { UpdateSupplierDto } from './dto/update-suppllier.dto';
 
 @Controller('suppliers')
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) { }
+  constructor(private readonly suppliersService: SuppliersService) {}
 
   @Post()
   async registerSupplier(@Body() dto: RegisterSupplierDto) {
@@ -40,7 +40,10 @@ export class SuppliersController {
   }
 
   @Patch(':id')
-  async updateSupplier(@Param('id') id: string, @Body() dto: UpdateSupplierDto) {
+  async updateSupplier(
+    @Param('id') id: string,
+    @Body() dto: UpdateSupplierDto,
+  ) {
     return {
       message: 'Supplier updated successfully',
       data: await this.suppliersService.updateSupplier(id, dto),

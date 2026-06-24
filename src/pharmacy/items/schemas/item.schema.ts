@@ -53,6 +53,13 @@ export class Item {
   @Prop({
     required: true,
     type: Number,
+    min: [0, 'MRP cannot be negative'],
+  })
+  mrp: number;
+
+  @Prop({
+    required: true,
+    type: Number,
     min: [0, 'Unit price cannot be negative'],
   })
   purchasePrice: number;
@@ -70,6 +77,25 @@ export class Item {
   })
   quantity: number;
 
+  @Prop({
+    type: Number,
+    default: 0,
+    required: true
+  })
+  soldQuantity: number;
+
+  @Prop({
+    type: [{
+      date: { type: Date, required: true },
+      quantity: { type: Number, required: true },
+      unitPrice: { type: Number, required: true },
+      total: { type: Number, required: true },
+    }],
+    default: [],
+    required: true
+  })
+  soldHistory: { date: Date, quantity: number, unitPrice: number, total: number }[];
+
   @Prop({ type: Date })
   expiryDate?: Date;
 
@@ -78,6 +104,9 @@ export class Item {
 
   @Prop({ type: Number, default: 0 })
   packing: number;
+
+  @Prop({ type: Number, default: 0 })
+  noOfPacking: number;
 
   @Prop({ type: Number, default: 0 })
   gst: number;
