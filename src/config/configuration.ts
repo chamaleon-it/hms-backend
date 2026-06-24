@@ -1,22 +1,11 @@
 export default () => ({
   databaseUrl: process.env.DATABASE_URL as string,
   secret: {
-    accessToken: 'accessTokenaccessToken',
-    refreshToken: 'refreshTokenrefreshToken',
-    forgotPassword: 'forgotPasswordforgotPassword',
+    accessToken: process.env.JWT_ACCESS_SECRET || 'fallbackAccessTokenSecret',
+    refreshToken: process.env.JWT_REFRESH_SECRET || 'fallbackRefreshTokenSecret',
+    forgotPassword: process.env.JWT_FORGOT_SECRET || 'fallbackForgotPasswordSecret',
   },
   in_house_lab_id: process.env.IN_HOUSE_LAB_ID,
   in_house_pharmacy_id: process.env.IN_HOUSE_PHARMACY_ID as string,
   in_doctor_id: process.env.IN_DOCTOR_ID as string,
 });
-
-// export default () => ({
-//   databaseUrl: "mongodb+srv://root:hms321@hms.rtnjqlm.mongodb.net/development?retryWrites=true&w=majority&appName=HMS", // "mongodb://localhost:27017/dev", //process.env.DATABASE_URL as string,
-//   secret: {
-//     accessToken: 'accessTokenaccessToken',
-//     refreshToken: 'refreshTokenrefreshToken',
-//     forgotPassword: 'forgotPasswordforgotPassword',
-//   },
-//   in_house_lab_id: "68e4e8c7534364541c8deeb2",// "696491f1d123c2740e924a7a", //process.env.IN_HOUSE_LAB_ID,
-//   in_house_pharmacy_id: "68e4e8c7534364541c8deeb2"//"696491f1d123c2740e924a7a", //process.env.IN_HOUSE_PHARMACY_ID as string,
-// });

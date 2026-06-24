@@ -69,8 +69,12 @@ export class AuthService {
     user.lastLogin = new Date();
     await user.save();
 
+    const userObj = user.toObject() as any;
+    delete userObj.password;
+    delete userObj.refreshToken;
+
     return {
-      user,
+      user: userObj,
       accessToken,
       refreshToken,
     };
@@ -90,11 +94,11 @@ export class AuthService {
         throw new BadRequestException('User not found');
       }
 
-      // const isRefreshTokenMatching =
-      //   user?.refreshToken === getRefreshTokenDto.refreshToken;
+      const isRefreshTokenMatching =
+        user?.refreshToken === getRefreshTokenDto.refreshToken;
 
-      // if (!isRefreshTokenMatching)
-      //   throw new UnauthorizedException('Refresh token is not matching.');
+      if (!isRefreshTokenMatching)
+        throw new UnauthorizedException('Refresh token is not matching.');
 
       const accessToken = await this.jwtService.signAsync(
         { id: user._id, email: user.email, role: user.role },
@@ -115,7 +119,11 @@ export class AuthService {
       user.refreshToken = refreshToken;
       await user.save();
 
-      return { user, accessToken, refreshToken };
+      const userObj = user.toObject() as any;
+      delete userObj.password;
+      delete userObj.refreshToken;
+
+      return { user: userObj, accessToken, refreshToken };
     } catch (error) {
       throw error;
     }

@@ -35,7 +35,7 @@ export class PurchaseEntryService {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
-        console.log(item)
+
       await this.itemsService.addBatchItems(item.item, {
         batchNumber: item.batch,
         quantity: item.quantity,

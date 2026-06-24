@@ -381,7 +381,7 @@ export class ItemsService {
       await this.delay(20);
     }
 
-    console.log('✅ Completed updating all items');
+
   }
 
   private delay(ms: number) {

@@ -41,7 +41,7 @@ export class ReportService implements OnModuleInit {
         { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
       );
       if (result.modifiedCount > 0) {
-        console.log(`[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`);
+
       }
     } catch (e) {
       console.error('[Migration] Error migrating reports:', e);
@@ -180,7 +180,9 @@ export class ReportService implements OnModuleInit {
     let existingBill;
     try {
       existingBill = await this.billingService['billingModel'].findOne({ reportId: report._id });
-    } catch(e) {}
+    } catch(e) {
+      console.error('Error generating report items PDF:', e);
+    }
 
     if (existingBill) {
       if (existingBill.status === 'Draft') {

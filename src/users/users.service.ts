@@ -92,8 +92,8 @@ export class UsersService {
         expiresIn: '7d',
       },
     );
-    console.log(`${forgotPasswordDto.email} is requaest for reset link.`);
-    console.log(`https://hms.com/reset-passsword?token=${token}`);
+
+
     return token;
   }
 
