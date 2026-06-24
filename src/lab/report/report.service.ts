@@ -486,6 +486,7 @@ export class ReportService implements OnModuleInit {
     const {
       page = 1,
       limit = 20,
+      alreadyPurchase = 'false',
       q,
       gender,
       doctor,
@@ -498,13 +499,45 @@ export class ReportService implements OnModuleInit {
     const skip = (Number(page) - 1) * Number(limit);
     const limitNum = Number(limit);
 
+    const patientMatch: any = { status: { $ne: 'Deleted' } };
+
+    if (q) {
+      const searchRegex = { $regex: q, $options: 'i' };
+      patientMatch.$or = [
+        { name: searchRegex },
+        { phoneNumber: searchRegex },
+        { address: searchRegex },
+        { mrn: searchRegex },
+      ];
+      if (mongoose.isValidObjectId(q)) {
+        patientMatch.$or.push({ _id: new mongoose.Types.ObjectId(q) });
+      }
+    }
+
+    if (gender) {
+      patientMatch.gender = gender;
+    }
+
+    if (age) {
+      const [minAge, maxAge] = age.split('-').map(Number);
+      if (!isNaN(minAge) && !isNaN(maxAge)) {
+        const now = new Date();
+        const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate());
+        const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
+        patientMatch.dateOfBirth = { $gte: minDate, $lte: maxDate };
+      }
+    }
+
+    let patientIds: mongoose.Types.ObjectId[] | null = null;
+    let total = 0;
+
     const reportMatch: any = {
       patient: { $exists: true, $ne: null },
       isDeleted: false,
     };
 
-    if (doctor) {
-      reportMatch.doctor = new mongoose.Types.ObjectId(doctor);
+    if (doctor && alreadyPurchase === 'false') {
+      patientMatch.doctor = new mongoose.Types.ObjectId(doctor);
     }
 
     if (lastVisit) {
@@ -526,95 +559,112 @@ export class ReportService implements OnModuleInit {
       }
     }
 
-    const pipeline: any[] = [
-      { $match: reportMatch },
-      {
-        $group: {
-          _id: '$patient',
-          visits: { $sum: 1 },
-          lastVisit: { $max: '$createdAt' },
-        },
-      },
-      {
-        $lookup: {
-          from: 'patients',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'patient',
-        },
-      },
-      { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
-    ];
-
-    const patientMatch: any = { 'patient.status': { $ne: 'Deleted' } };
-
-    if (q) {
-      const searchRegex = { $regex: q, $options: 'i' };
-      patientMatch.$or = [
-        { 'patient.name': searchRegex },
-        { 'patient.phoneNumber': searchRegex },
-        { 'patient.address': searchRegex },
-        { 'patient.mrn': searchRegex },
-      ];
-      if (mongoose.isValidObjectId(q)) {
-        patientMatch.$or.push({ 'patient._id': new mongoose.Types.ObjectId(q) });
+    if (alreadyPurchase === 'true') {
+      if (doctor) {
+        reportMatch.doctor = new mongoose.Types.ObjectId(doctor);
       }
-    }
-
-    if (gender) {
-      patientMatch['patient.gender'] = gender;
-    }
-
-    if (age) {
-      const [minAge, maxAge] = age.split('-').map(Number);
-      if (!isNaN(minAge) && !isNaN(maxAge)) {
-        const now = new Date();
-        const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate());
-        const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
-        patientMatch['patient.dateOfBirth'] = { $gte: minDate, $lte: maxDate };
-      }
-    }
-
-    if (Object.keys(patientMatch).length > 0) {
-      pipeline.push({ $match: patientMatch });
-    }
-
-    const countPipeline = [...pipeline, { $count: 'total' }];
-    const countResult = await this.reportModel.aggregate(countPipeline).exec();
-    const total = countResult[0]?.total ?? 0;
-
-    pipeline.push(
-      {
-        $replaceRoot: {
-          newRoot: {
-            $mergeObjects: [
-              '$patient',
-              { visits: '$visits', lastVisit: '$lastVisit' },
-            ],
+      const pipeline: any[] = [
+        { $match: reportMatch },
+        {
+          $group: {
+            _id: '$patient',
+            visits: { $sum: 1 },
+            lastVisit: { $max: '$createdAt' },
           },
         },
-      },
-      {
-        $project: {
-          name: 1,
-          address: 1,
-          mrn: 1,
-          dateOfBirth: 1,
-          gender: 1,
-          phoneNumber: 1,
-          createdAt: 1,
-          visits: 1,
-          lastVisit: 1,
+        {
+          $lookup: {
+            from: 'patients',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'patientDetail',
+          },
         },
-      },
-      { $sort: { lastVisit: -1 } }
-    );
+        { $unwind: { path: '$patientDetail', preserveNullAndEmptyArrays: false } },
+        { $match: { 'patientDetail.status': { $ne: 'Deleted' } } }
+      ];
 
-    if (limitNum > 0) {
-      pipeline.push({ $skip: skip }, { $limit: limitNum });
+      if (q) {
+        const searchRegex = { $regex: q, $options: 'i' };
+        pipeline.push({
+          $match: {
+            $or: [
+              { 'patientDetail.name': searchRegex },
+              { 'patientDetail.phoneNumber': searchRegex },
+              { 'patientDetail.address': searchRegex },
+              { 'patientDetail.mrn': searchRegex },
+              ...(mongoose.isValidObjectId(q) ? [{ 'patientDetail._id': new mongoose.Types.ObjectId(q) }] : [])
+            ]
+          }
+        });
+      }
+
+      if (gender) {
+        pipeline.push({ $match: { 'patientDetail.gender': gender } });
+      }
+
+      if (age) {
+        const [minAge, maxAge] = age.split('-').map(Number);
+        if (!isNaN(minAge) && !isNaN(maxAge)) {
+          const now = new Date();
+          const minDate = new Date(now.getFullYear() - maxAge - 1, now.getMonth(), now.getDate());
+          const maxDate = new Date(now.getFullYear() - minAge, now.getMonth(), now.getDate());
+          pipeline.push({ $match: { 'patientDetail.dateOfBirth': { $gte: minDate, $lte: maxDate } } });
+        }
+      }
+
+      const countResult = await this.reportModel.aggregate([...pipeline, { $count: 'total' }]);
+      total = countResult[0]?.total ?? 0;
+
+      const result = await this.reportModel.aggregate([
+        ...pipeline,
+        { $sort: { lastVisit: -1 } },
+        ...(limitNum > 0 ? [{ $skip: skip }, { $limit: limitNum }] : [])
+      ]);
+
+      patientIds = result.map(item => item._id);
+    } else {
+      total = await this.patientModel.countDocuments(patientMatch);
     }
 
-    const data = await this.reportModel.aggregate(pipeline).exec();
+    let patients: any[] = [];
+
+    if (alreadyPurchase === 'true') {
+      if (patientIds && patientIds.length > 0) {
+        const patientsUnordered = await this.patientModel.find({ _id: { $in: patientIds } }).lean().exec();
+        const patientMap = new Map(patientsUnordered.map(p => [p._id.toString(), p]));
+        patients = patientIds.map(id => patientMap.get(id.toString())).filter(p => !!p);
+      } else {
+        return { data: [], total: 0 };
+      }
+    } else {
+      patients = await this.patientModel
+        .find(patientMatch)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum > 0 ? limitNum : 0)
+        .lean()
+        .exec();
+    }
+
+    const reports = await this.reportModel
+      .find({
+        patient: { $in: patients.map(e => e._id) },
+        isDeleted: false
+      })
+      .lean()
+      .exec();
+
+    const data = patients.map((e) => {
+      const patientReports = reports.filter(i => i.patient.toString() === e._id.toString());
+      patientReports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      return {
+        visits: patientReports.length,
+        ...e,
+        lastVisit: patientReports[0]?.createdAt ?? null,
+      };
+    });
 
     return { data, total };
   }

@@ -11,11 +11,13 @@ import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
+import { Appointment } from '../appointments/schemas/appointment.schema';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
   ) { }
 
   private async generateUniqueMRN(): Promise<string> {
@@ -79,7 +81,8 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     status,
     from,
     to,
-  } = getPatientsDto;
+    consultedOnly,
+  } = getPatientsDto as any;
 
   const skip = (page - 1) * limit;
 
@@ -135,6 +138,15 @@ async getPatient(getPatientsDto: GetPatientsDto) {
   }
 
   filter.status = status || { $ne: PatientStatus.DELETED };
+
+  if (consultedOnly === 'true') {
+    const appointmentMatch: any = { isDeleted: false };
+    if (doctor) {
+      appointmentMatch.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+    const patientsWithAppts = await this.appointmentModel.distinct('patient', appointmentMatch);
+    filter._id = { $in: patientsWithAppts };
+  }
 
   if (!query?.trim()) {
     return this.patientModel
