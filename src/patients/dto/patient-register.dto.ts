@@ -31,8 +31,9 @@ export class PatientRegisterDto {
   @IsIn(['Male', 'Female'])
   gender: string;
 
+  @IsOptional()
   @IsString()
-  dateOfBirth: string;
+  dateOfBirth?: string;
 
   @IsOptional()
   @Transform(({ value }) => {
