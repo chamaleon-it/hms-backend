@@ -106,10 +106,11 @@ export class ReportController {
   }
 
   @Get('patients')
-  async getPatients() {
-    const data = await this.reportService.getPatients();
+  async getPatients(@Query() query: any) {
+    const { data, total } = await this.reportService.getPatients(query);
     return {
       data,
+      total,
       message: 'All patient data retrived',
     };
   }
