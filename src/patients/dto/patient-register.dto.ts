@@ -88,6 +88,36 @@ export class PatientRegisterDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
+  addressLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  addressLine2?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  locality?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  pinCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
   address?: string;
 
   @IsOptional()

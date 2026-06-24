@@ -55,6 +55,24 @@ export class Patient {
   emergencyContactNumber: string;
 
   @Prop()
+  addressLine1: string;
+
+  @Prop()
+  addressLine2: string;
+
+  @Prop()
+  locality: string;
+
+  @Prop()
+  state: string;
+
+  @Prop()
+  pinCode: string;
+
+  @Prop()
+  country: string;
+
+  @Prop()
   address: string;
 
   @Prop()
