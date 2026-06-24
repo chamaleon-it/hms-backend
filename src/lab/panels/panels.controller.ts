@@ -19,7 +19,7 @@ import { AddTestDto } from './dto/add-test.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 @Controller('lab/panels')
 export class PanelsController {
-  constructor(private readonly panelsService: PanelsService) {}
+  constructor(private readonly panelsService: PanelsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
