@@ -78,9 +78,6 @@ export class Test {
   note: string;
 
   @Prop({ default: null })
-  category: string;
-
-  @Prop({ default: null })
   department: string;
 }
 
