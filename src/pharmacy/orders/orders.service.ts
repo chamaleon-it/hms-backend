@@ -312,9 +312,11 @@ export class OrdersService {
         $or: [
           { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
           { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
+          { locality: { $regex: addressSearchTerm, $options: 'i' } },
           { state: { $regex: addressSearchTerm, $options: 'i' } },
           { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
           { country: { $regex: addressSearchTerm, $options: 'i' } },
+          { address: { $regex: addressSearchTerm, $options: 'i' } },
         ],
       });
     }
