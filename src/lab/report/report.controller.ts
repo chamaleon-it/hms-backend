@@ -86,8 +86,8 @@ export class ReportController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('lis-result')
-  // No JwtAuthGuard here to allow local scripts to call it automatically
   async receiveLisResult(@Body() dto: LisResultDto) {
     const data = await this.reportService.updateFromLis(dto);
     return {

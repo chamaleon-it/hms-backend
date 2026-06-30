@@ -81,7 +81,7 @@ export class PanelsController {
   }
 
   @Get('tests')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getTests() {
     const data = await this.panelsService.getTests();
     return {
