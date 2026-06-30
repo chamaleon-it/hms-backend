@@ -61,7 +61,10 @@ export class Patient {
   addressLine2: string;
 
   @Prop()
-  locality: string;
+  city: string;
+
+  @Prop()
+  district: string;
 
   @Prop()
   state: string;

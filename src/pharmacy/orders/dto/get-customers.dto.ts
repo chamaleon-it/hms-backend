@@ -26,7 +26,10 @@ export class GetCustomersDto {
   address?: string;
 
   @IsOptional()
-  locality?: string;
+  city?: string;
+
+  @IsOptional()
+  district?: string;
 
   @IsOptional()
   state?: string;

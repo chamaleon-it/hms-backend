@@ -100,7 +100,12 @@ export class PatientRegisterDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
-  locality?: string;
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.trim())
+  district?: string;
 
   @IsOptional()
   @IsString()

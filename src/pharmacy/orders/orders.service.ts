@@ -283,7 +283,8 @@ export class OrdersService {
       to,
       age,
       address,
-      locality,
+      city,
+      district,
       state,
       pincode,
     } = query;
@@ -320,8 +321,12 @@ export class OrdersService {
       });
     }
 
-    if (locality) {
-      patientFilter.locality = { $regex: locality.trim(), $options: 'i' };
+    if (city) {
+      patientFilter.city = { $regex: city.trim(), $options: 'i' };
+    }
+
+    if (district) {
+      patientFilter.district = { $regex: district.trim(), $options: 'i' };
     }
 
     if (state) {
