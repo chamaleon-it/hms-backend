@@ -20,7 +20,10 @@ export class GetCustomersDto {
   alreadyPurchase?: 'true' | 'false' = 'true';
 
   @IsOptional()
-  q?: string; // phone number / patiner name / address / patient id
+  q?: string; // phone number / patiner name / patient id
+
+  @IsOptional()
+  address?: string;
 
   @IsOptional()
   gender?: string; // Female, Male

@@ -494,6 +494,7 @@ export class ReportService implements OnModuleInit {
       from,
       to,
       age,
+      address,
     } = query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -506,7 +507,6 @@ export class ReportService implements OnModuleInit {
       patientMatch.$or = [
         { name: searchRegex },
         { phoneNumber: searchRegex },
-        { address: searchRegex },
         { mrn: searchRegex },
       ];
       if (mongoose.isValidObjectId(q)) {
@@ -516,6 +516,22 @@ export class ReportService implements OnModuleInit {
 
     if (gender) {
       patientMatch.gender = gender;
+    }
+
+    if (address) {
+      const addressSearchTerm = address.trim();
+      patientMatch.$and = patientMatch.$and || [];
+      patientMatch.$and.push({
+        $or: [
+          { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
+          { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
+          { locality: { $regex: addressSearchTerm, $options: 'i' } },
+          { state: { $regex: addressSearchTerm, $options: 'i' } },
+          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
+          { country: { $regex: addressSearchTerm, $options: 'i' } },
+          { address: { $regex: addressSearchTerm, $options: 'i' } },
+        ],
+      });
     }
 
     if (age) {

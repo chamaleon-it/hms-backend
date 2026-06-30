@@ -17,4 +17,5 @@ export class GetPatientsDto {
 
   from?: string;
   to?: string;
+  address?: string;
 }

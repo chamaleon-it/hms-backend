@@ -82,6 +82,7 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     from,
     to,
     consultedOnly,
+    address,
   } = getPatientsDto as any;
 
   const skip = (page - 1) * limit;
@@ -129,6 +130,22 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     };
   }
 
+  if (address) {
+    const addressSearchTerm = address.trim();
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      $or: [
+        { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
+        { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
+        { locality: { $regex: addressSearchTerm, $options: 'i' } },
+        { state: { $regex: addressSearchTerm, $options: 'i' } },
+        { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
+        { country: { $regex: addressSearchTerm, $options: 'i' } },
+        { address: { $regex: addressSearchTerm, $options: 'i' } },
+      ],
+    });
+  }
+
   filter.status = status || { $ne: PatientStatus.DELETED };
 
   if (consultedOnly === 'true') {
@@ -158,7 +175,6 @@ async getPatient(getPatientsDto: GetPatientsDto) {
         { name: { $regex: searchTerm, $options: 'i' } },
         { mrn: { $regex: searchTerm, $options: 'i' } },
         { phoneNumber: { $regex: searchTerm, $options: 'i' } },
-        { address: { $regex: searchTerm, $options: 'i' } },
       ],
     })
     .populate('doctor')
@@ -168,7 +184,6 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     const name = (patient.name || '').toLowerCase().trim();
     const mrn = (patient.mrn || '').toLowerCase();
     const phone = (patient.phoneNumber || '').toLowerCase();
-    const address = (patient.address || '').toLowerCase();
 
     const words = name.split(/\s+/);
 
