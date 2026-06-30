@@ -282,6 +282,7 @@ export class OrdersService {
       from,
       to,
       age,
+      address,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -292,7 +293,6 @@ export class OrdersService {
       const orConditions: any[] = [
         { name: searchRegex },
         { phoneNumber: searchRegex },
-        { address: searchRegex },
         { mrn: searchRegex },
       ];
       if (mongoose.isValidObjectId(q)) {
@@ -303,6 +303,20 @@ export class OrdersService {
 
     if (gender) {
       patientFilter.gender = gender;
+    }
+
+    if (address) {
+      const addressSearchTerm = address.trim();
+      patientFilter.$and = patientFilter.$and || [];
+      patientFilter.$and.push({
+        $or: [
+          { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
+          { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
+          { state: { $regex: addressSearchTerm, $options: 'i' } },
+          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
+          { country: { $regex: addressSearchTerm, $options: 'i' } },
+        ],
+      });
     }
 
     if (doctor && alreadyPurchase === 'false') {
