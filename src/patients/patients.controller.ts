@@ -58,6 +58,18 @@ export class PatientsController {
     };
   }
 
+  @Get('unique-locations')
+  async getUniqueLocations(
+    @Query('field') field: string,
+    @Query('q') q: string,
+  ) {
+    const data = await this.patientsService.getUniqueLocations(field, q);
+    return {
+      data,
+      message: 'Unique locations retrieved successfully',
+    };
+  }
+
   @Get('statistics')
   async statistics() {
     const data = await this.patientsService.statistics();

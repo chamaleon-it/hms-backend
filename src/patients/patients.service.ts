@@ -68,6 +68,27 @@ export class PatientsService {
     return patient;
   }
 
+  async getUniqueLocations(field: string, q: string) {
+    if (!['city', 'district', 'state', 'pinCode', 'country'].includes(field)) {
+      throw new BadRequestException('Invalid field');
+    }
+
+    const matchQuery: any = { [field]: { $nin: [null, ''] } };
+    if (q && q.trim()) {
+      matchQuery[field] = { $regex: q.trim(), $options: 'i', $nin: [null, ''] };
+    }
+
+    const data = await this.patientModel.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: `$${field}` } },
+      { $limit: 20 },
+      { $project: { _id: 0, value: '$_id' } },
+      { $sort: { value: 1 } },
+    ]);
+
+    return data.map((d) => d.value).filter(Boolean);
+  }
+
 async getPatient(getPatientsDto: GetPatientsDto) {
   const {
     limit = 100,

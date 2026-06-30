@@ -18,4 +18,8 @@ export class GetPatientsDto {
   from?: string;
   to?: string;
   address?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
 }
