@@ -26,6 +26,15 @@ export class GetCustomersDto {
   address?: string;
 
   @IsOptional()
+  locality?: string;
+
+  @IsOptional()
+  state?: string;
+
+  @IsOptional()
+  pincode?: string;
+
+  @IsOptional()
   gender?: string; // Female, Male
 
   @IsOptional()

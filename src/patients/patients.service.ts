@@ -83,6 +83,9 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     to,
     consultedOnly,
     address,
+    locality,
+    state,
+    pincode,
   } = getPatientsDto as any;
 
   const skip = (page - 1) * limit;
@@ -137,13 +140,21 @@ async getPatient(getPatientsDto: GetPatientsDto) {
       $or: [
         { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
         { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-        { locality: { $regex: addressSearchTerm, $options: 'i' } },
-        { state: { $regex: addressSearchTerm, $options: 'i' } },
-        { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
-        { country: { $regex: addressSearchTerm, $options: 'i' } },
         { address: { $regex: addressSearchTerm, $options: 'i' } },
       ],
     });
+  }
+
+  if (locality) {
+    filter.locality = { $regex: locality.trim(), $options: 'i' };
+  }
+
+  if (state) {
+    filter.state = { $regex: state.trim(), $options: 'i' };
+  }
+
+  if (pincode) {
+    filter.pinCode = { $regex: pincode.trim(), $options: 'i' };
   }
 
   filter.status = status || { $ne: PatientStatus.DELETED };

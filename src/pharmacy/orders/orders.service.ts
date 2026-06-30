@@ -283,6 +283,9 @@ export class OrdersService {
       to,
       age,
       address,
+      locality,
+      state,
+      pincode,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -312,13 +315,21 @@ export class OrdersService {
         $or: [
           { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
           { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-          { locality: { $regex: addressSearchTerm, $options: 'i' } },
-          { state: { $regex: addressSearchTerm, $options: 'i' } },
-          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
-          { country: { $regex: addressSearchTerm, $options: 'i' } },
           { address: { $regex: addressSearchTerm, $options: 'i' } },
         ],
       });
+    }
+
+    if (locality) {
+      patientFilter.locality = { $regex: locality.trim(), $options: 'i' };
+    }
+
+    if (state) {
+      patientFilter.state = { $regex: state.trim(), $options: 'i' };
+    }
+
+    if (pincode) {
+      patientFilter.pinCode = { $regex: pincode.trim(), $options: 'i' };
     }
 
     if (doctor && alreadyPurchase === 'false') {
