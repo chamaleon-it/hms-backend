@@ -83,7 +83,8 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     to,
     consultedOnly,
     address,
-    locality,
+    city,
+    district,
     state,
     pincode,
   } = getPatientsDto as any;
@@ -145,8 +146,12 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     });
   }
 
-  if (locality) {
-    filter.locality = { $regex: locality.trim(), $options: 'i' };
+  if (city) {
+    filter.city = { $regex: city.trim(), $options: 'i' };
+  }
+
+  if (district) {
+    filter.district = { $regex: district.trim(), $options: 'i' };
   }
 
   if (state) {

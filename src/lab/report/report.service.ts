@@ -495,7 +495,8 @@ export class ReportService implements OnModuleInit {
       to,
       age,
       address,
-      locality,
+      city,
+      district,
       state,
       pincode,
     } = query;
@@ -533,8 +534,12 @@ export class ReportService implements OnModuleInit {
       });
     }
 
-    if (locality) {
-      patientMatch.locality = { $regex: locality.trim(), $options: 'i' };
+    if (city) {
+      patientMatch.city = { $regex: city.trim(), $options: 'i' };
+    }
+
+    if (district) {
+      patientMatch.district = { $regex: district.trim(), $options: 'i' };
     }
 
     if (state) {
