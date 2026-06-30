@@ -73,36 +73,21 @@ export class BillingService {
         const paidAmount =
           (createBill.cash ?? 0) +
           (createBill.online ?? 0) +
-          (createBill.insurance ?? 0) +
-          (createBill.discount ?? 0);
-        order.paidAmount =
-          paidAmount >=
-            order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            ? order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            : paidAmount;
+          (createBill.insurance ?? 0);
+        
+        const totalAmount = order.items.reduce(
+          (total, item) => total + item.quantity * item.name.unitPrice,
+          0
+        );
+        const expectedAmount = Math.max(0, totalAmount - (createBill.discount ?? 0));
+
+        order.paidAmount = paidAmount >= expectedAmount ? expectedAmount : paidAmount;
+
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
-        } else if (
-          paidAmount <
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else if (paidAmount < expectedAmount) {
           order.paymentStatus = PaymentStatus.Partial;
-        } else if (
-          paidAmount >=
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else {
           order.paymentStatus = PaymentStatus.Paid;
         }
         await order.save();

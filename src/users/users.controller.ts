@@ -16,12 +16,17 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
 import mongoose from 'mongoose';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from './schemas/user.schema';
+import { RolesGuard } from 'src/auth/roles.guard';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   //create
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Post()
   async createUser(@Body() createUserDto: CreateUserDto) {
     const data = await this.usersService.createUser(createUserDto);
@@ -45,15 +50,14 @@ export class UsersController {
 
   @Post('forgot_password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    const data = await this.usersService.forgotPassword(forgotPasswordDto);
+    await this.usersService.forgotPassword(forgotPasswordDto);
     return {
-      data,
       message:
         'The password reset link has been successfully sent to your email address.',
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('doctors')
   async getAllDoctors() {
     const data = await this.usersService.getAllDoctors();
@@ -63,7 +67,7 @@ export class UsersController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('pharmacy_wholesaler')
   async getAllPharmacyWholesaler() {
     const data = await this.usersService.getAllPharmacyWholesaler();
