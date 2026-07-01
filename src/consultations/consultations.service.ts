@@ -78,4 +78,14 @@ export class ConsultationsService {
 
     return consultation.save();
   }
+
+  async saveRecordingUrl(id: mongoose.Types.ObjectId, recordingUrl: string): Promise<ConsultationDocument> {
+    const consultation = await this.consultationModel.findById(id);
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+
+    consultation.recordingUrl = recordingUrl;
+    return consultation.save();
+  }
 }

@@ -61,4 +61,17 @@ export class ConsultationsController {
       message: 'Consultation ended successfully',
     };
   }
+
+  // Webhook or API endpoint for Jibri to save the recording URL
+  @Patch(':id/recording')
+  async saveRecordingUrl(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body('recordingUrl') recordingUrl: string,
+  ) {
+    const data = await this.consultationsService.saveRecordingUrl(id, recordingUrl);
+    return {
+      data,
+      message: 'Consultation recording URL saved successfully',
+    };
+  }
 }

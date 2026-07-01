@@ -42,6 +42,9 @@ export class Consultation {
 
   @Prop({ default: null })
   endedAt: Date;
+
+  @Prop({ default: null })
+  recordingUrl: string;
 }
 
 export const ConsultationSchema = SchemaFactory.createForClass(Consultation);
