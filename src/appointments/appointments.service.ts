@@ -93,6 +93,7 @@ export class AppointmentsService {
                   phoneNumber: 1,
                   address: 1,
                   profilePic: 1,
+                  specialization: 1,
                 },
               },
             ],
