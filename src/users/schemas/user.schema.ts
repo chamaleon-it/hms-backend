@@ -111,6 +111,12 @@ export class User {
   specialization?: string;
 
   @Prop({ trim: true, default: null })
+  department?: string;
+
+  @Prop({ trim: true, default: null })
+  designation?: string;
+
+  @Prop({ trim: true, default: null })
   signature?: string;
 
   @Prop({ trim: true, default: null })
