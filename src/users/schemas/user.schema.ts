@@ -68,6 +68,16 @@ export class User {
     lowercase: true,
     trim: true,
     index: true,
+    match: [/^[a-z0-9]{3,}$/, 'Username must be at least 3 characters and contain only letters and numbers'],
+  })
+  username: string;
+
+  @Prop({
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    index: true,
     match: [/^\S+@\S+\.\S+$/, 'Invalid email address'],
   })
   email: string;

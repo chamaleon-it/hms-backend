@@ -21,7 +21,12 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.userModel
-      .findOne({ email: loginDto.email })
+      .findOne({
+        $or: [
+          { email: loginDto.emailOrUsername },
+          { username: loginDto.emailOrUsername },
+        ],
+      })
       .select('+password');
     if (!user) {
       throw new BadRequestException(

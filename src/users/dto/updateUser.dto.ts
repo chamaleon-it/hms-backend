@@ -4,6 +4,7 @@ import {
   IsOptional,
   MinLength,
   MaxLength,
+  Matches,
   IsEmail,
   IsDateString,
   ValidateNested,
@@ -52,6 +53,11 @@ export class UpdateUserDto {
   @MaxLength(50, { message: 'Name must be at most 50 characters' })
   @IsOptional()
   name?: string;
+
+  @IsString({ message: 'Username must be a string.' })
+  @Matches(/^[a-zA-Z0-9]{3,}$/, { message: 'Username must be at least 3 characters and contain only letters and numbers.' })
+  @IsOptional()
+  username?: string;
 
   @IsString({ message: 'Phone number must be a string' })
   @IsOptional()

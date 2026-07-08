@@ -3,6 +3,7 @@ import {
   IsString,
   IsEmail,
   MinLength,
+  Matches,
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -25,6 +26,11 @@ export class CreateUserDto {
   @IsString({ message: 'Name must be a string.' })
   @Transform(({ value }: { value: string }) => value.trim())
   name: string;
+
+  @IsString({ message: 'Username must be a string.' })
+  @Matches(/^[a-zA-Z0-9]{3,}$/, { message: 'Username must be at least 3 characters and contain only letters and numbers.' })
+  @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
+  username: string;
 
   @IsString({ message: 'Role must be a string.' })
   @Transform(({ value }: { value: string }) => value.trim())
