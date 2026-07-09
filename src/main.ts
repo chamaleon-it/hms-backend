@@ -4,22 +4,20 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // Increase payload limit for large uploads/prints
   const express = require('express');
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.enableCors({
-    origin: true,
-    // [
-    //   'http://localhost:3000',
-    //   'http://localhost:3001',
-    //   'http://localhost:3002',
-    //   'http://localhost:3003',
-    //   'http://localhost:3004',
-    //   'https://synapsehms.com',
-    // ],
+    origin: true, // Configurable later if needed
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -28,12 +26,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-
-// void (async () => {
-//   try {
-//     await bootstrap();
-//   } catch (error) {
-//     console.error('Bootstrap error:', error);
-//     process.exit(1);
-//   }
-// })();

@@ -20,11 +20,11 @@ import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('patients')
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async register(
     @Body() patientRegisterDto: PatientRegisterDto,
