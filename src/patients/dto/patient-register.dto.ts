@@ -62,10 +62,7 @@ export class PatientRegisterDto {
   @Transform(({ value }: { value: string }) => value.trim())
   blood?: string;
 
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  allergies?: string;
+
 
   @IsOptional()
   @IsString()
@@ -132,20 +129,7 @@ export class PatientRegisterDto {
   @Transform(({ value }: { value: string }) => value.trim())
   notes?: string;
 
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  guardian?: string;
 
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  guardianPhoneNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  guardianRelation?: string;
 
   @IsOptional()
   weight?: number;

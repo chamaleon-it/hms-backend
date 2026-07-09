@@ -244,7 +244,8 @@ async getPatient(getPatientsDto: GetPatientsDto) {
       return 5;
     }
 
-    if (address.includes(searchTerm)) {
+    const patientAddress = (patient.address || '').toLowerCase();
+    if (patientAddress.includes(searchTerm)) {
       return 6;
     }
 

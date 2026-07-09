@@ -39,8 +39,7 @@ export class Patient {
   @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] })
   blood: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 
-  @Prop()
-  allergies: string;
+
 
   @Prop()
   insurance: string;
@@ -99,14 +98,7 @@ export class Patient {
   @Prop({ default: null, type: Date })
   remarksDate: Date;
 
-  @Prop({ default: null, trim: true })
-  guardian: string;
 
-  @Prop({ default: null, trim: true })
-  guardianPhoneNumber: string;
-
-  @Prop({ default: null, trim: true })
-  guardianRelation: string;
 
   @Prop({ required: false})
   weight?: number; 
