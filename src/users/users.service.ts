@@ -24,12 +24,17 @@ export class UsersService {
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
-      email: createUserDto.email,
+      $or: [
+        { email: createUserDto.email },
+        { username: createUserDto.username }
+      ]
     });
     if (isUserExist) {
-      throw new BadRequestException(
-        'This email address is already registered with us.',
-      );
+      if (isUserExist.email === createUserDto.email) {
+        throw new BadRequestException('This email address is already registered with us.');
+      } else {
+        throw new BadRequestException('This username is already taken.');
+      }
     }
     createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     const user = await this.userModel.create(createUserDto);

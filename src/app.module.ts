@@ -25,7 +25,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
 import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
-
+import { InPatientsModule } from './in-patients/in-patients.module';
 
 @Module({
   imports: [
@@ -59,7 +59,7 @@ import { AdminModule } from './admin/admin.module';
     PharmacistModule,
     TechnicianModule,
     AdminModule,
-
+    InPatientsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

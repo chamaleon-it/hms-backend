@@ -9,11 +9,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
-
+import { InPatient, InPatientDocument, IPStatus } from '../in-patients/schemas/in-patient.schema';
 @Injectable()
 export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
+    @InjectModel(InPatient.name) private inPatientModel: Model<InPatientDocument>,
     private readonly usersService: UsersService,
   ) {}
 
@@ -249,6 +250,28 @@ export class AppointmentsService {
     if (!data) {
       throw new NotFoundException('Appointment not found');
     }
+
+    if (updateStatusDto.status === 'Admit' || updateStatusDto.status === 'Observation') {
+      const activeIP = await this.inPatientModel.findOne({
+        patientId: data.patient,
+        status: { $ne: IPStatus.DISCHARGED }
+      });
+
+      if (!activeIP) {
+        const admissionNumber = 'IP-' + Math.floor(100000 + Math.random() * 900000);
+        await this.inPatientModel.create({
+          patientId: data.patient,
+          doctorId: data.doctor,
+          admissionNumber,
+          room: 'TBD',
+          ward: 'TBD',
+          bed: 'TBD',
+          status: updateStatusDto.status === 'Observation' ? IPStatus.OBSERVATION : IPStatus.ADMITTED,
+          admissionDate: new Date(),
+        });
+      }
+    }
+
     return data;
   }
 

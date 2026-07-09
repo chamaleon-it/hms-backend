@@ -126,9 +126,12 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     if (minA > 0 || maxA < 100) {
       const minDate = new Date(now.getFullYear() - maxA - 1, now.getMonth(), now.getDate() + 1);
       const maxDate = new Date(now.getFullYear() - minA, now.getMonth(), now.getDate());
-      filter.dateOfBirth = {
-        $gte: minDate.toISOString().split('T')[0],
-        $lte: maxDate.toISOString().split('T')[0],
+      
+      filter.$expr = {
+        $and: [
+          { $gte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
+          { $lte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
+        ]
       };
     }
   }
@@ -195,12 +198,16 @@ async getPatient(getPatientsDto: GetPatientsDto) {
   }
 
   if (!query?.trim()) {
-    return this.patientModel
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
-      .populate('doctor')
-      .sort({ createdAt: -1 });
+    const [data, total] = await Promise.all([
+      this.patientModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate('doctor')
+        .sort({ createdAt: -1 }),
+      this.patientModel.countDocuments(filter)
+    ]);
+    return { data, total };
   }
 
   const searchTerm = query.trim().toLowerCase();
@@ -244,7 +251,8 @@ async getPatient(getPatientsDto: GetPatientsDto) {
       return 5;
     }
 
-    if (address.includes(searchTerm)) {
+    const patientAddress = (patient.address || '').toLowerCase();
+    if (patientAddress.includes(searchTerm)) {
       return 6;
     }
 
@@ -268,7 +276,10 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     })
     .map(({ _searchPriority, ...patient }) => patient);
 
-  return sortedPatients.slice(skip, skip + Number(limit));
+  return { 
+    data: sortedPatients.slice(skip, skip + Number(limit)),
+    total: sortedPatients.length 
+  };
 }
 
   async getSinglePatient(id: mongoose.Types.ObjectId) {
