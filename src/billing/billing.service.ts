@@ -111,7 +111,7 @@ export class BillingService {
     return data;
   }
 
-  async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
+  async getBills(user: mongoose.Types.ObjectId | null, getBillisDto: GetBillisDto) {
     const {
       page = 1,
       limit = 10,
@@ -127,7 +127,10 @@ export class BillingService {
 
     const pipeline: any[] = [];
 
-    const match: any = { user: new mongoose.Types.ObjectId(user) };
+    const match: any = {};
+    if (user) {
+      match.user = new mongoose.Types.ObjectId(user);
+    }
     const qEndFound = await this.billingModel.exists({
       mrn: qEnd?.toUpperCase(),
     });
