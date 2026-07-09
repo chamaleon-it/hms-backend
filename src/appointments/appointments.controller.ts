@@ -75,9 +75,9 @@ export class AppointmentsController {
 
   // @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
-  async calenderMonthly() {
+  async calenderMonthly(@Query('date') date?: string) {
     const data = await this.appointmentsService.calenderMonthly(
-      new Date().toString(),
+      date || new Date().toString(),
     );
     return {
       data,
