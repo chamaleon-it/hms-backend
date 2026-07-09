@@ -26,6 +26,10 @@ export class CreateUserDto {
   @Transform(({ value }: { value: string }) => value.trim())
   name: string;
 
+  @IsString({ message: 'Username must be a string.' })
+  @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
+  username: string;
+
   @IsString({ message: 'Role must be a string.' })
   @Transform(({ value }: { value: string }) => value.trim())
   role: string;
