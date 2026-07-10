@@ -73,6 +73,18 @@ export class UpdateUserDto {
   @IsOptional()
   profilePic?: string | null;
 
+  @IsString({ message: 'Qualification must be a string' })
+  @IsOptional()
+  qualification?: string | null;
+
+  @IsString({ message: 'License No must be a string' })
+  @IsOptional()
+  licenseNo?: string | null;
+
+  @IsString({ message: 'Designation must be a string' })
+  @IsOptional()
+  designation?: string | null;
+
   @IsString({ message: 'Signature must be a string' })
   @IsOptional()
   signature?: string | null;
@@ -81,4 +93,8 @@ export class UpdateUserDto {
   @ValidateNested()
   @Type(() => AvailabilityDto)
   availability?: AvailabilityDto;
+
+  @IsString({ message: 'Status must be a string' })
+  @IsOptional()
+  status?: string;
 }

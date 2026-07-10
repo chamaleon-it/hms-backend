@@ -63,6 +63,15 @@ export class UsersController {
     };
   }
 
+  @Get('role/:role')
+  async getUsersByRole(@Param('role') role: string) {
+    const data = await this.usersService.getUsersByRole(role);
+    return {
+      data,
+      message: `All ${role} data retrieved successfully`,
+    };
+  }
+
   // @UseGuards(JwtAuthGuard)
   @Get('pharmacy_wholesaler')
   async getAllPharmacyWholesaler() {
@@ -70,6 +79,21 @@ export class UsersController {
     return {
       data,
       message: 'All pharmacy wholesaler data retrived successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  async updateUserById(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const data = await this.usersService.updateUser(id, updateUserDto);
+    return {
+      message: data
+        ? 'User profile updated successfully.'
+        : 'Failed to update user profile. Please try again later.',
+      data,
     };
   }
 

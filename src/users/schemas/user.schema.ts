@@ -128,6 +128,12 @@ export class User {
   designation?: string;
 
   @Prop({ trim: true, default: null })
+  qualification?: string;
+
+  @Prop({ trim: true, default: null })
+  licenseNo?: string;
+
+  @Prop({ trim: true, default: null })
   signature?: string;
 
   @Prop({ trim: true, default: null })

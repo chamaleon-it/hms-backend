@@ -111,6 +111,15 @@ export class UsersService {
     return data;
   }
 
+  async getUsersByRole(role: string) {
+    const data = await this.userModel
+      .find({ role })
+      .select('name email phoneNumber address profilePic status availability specialization qualification licenseNo designation')
+      .sort({ name: 1 })
+      .lean();
+    return data;
+  }
+
   async getAllPharmacyWholesaler() {
     const data = await this.userModel
       .find({ role: UserRole.PHARMACY_WHOLESALER })

@@ -7,6 +7,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
+  IsOptional,
 } from 'class-validator';
 
 @ValidatorConstraint({ name: 'MatchPassword', async: false })
@@ -37,6 +38,18 @@ export class CreateUserDto {
   @IsEmail({}, { message: 'Email must be a valid email address.' })
   @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
   email: string;
+
+  @IsString({ message: 'Qualification must be a string.' })
+  @IsOptional()
+  qualification?: string;
+
+  @IsString({ message: 'License No must be a string.' })
+  @IsOptional()
+  licenseNo?: string;
+
+  @IsString({ message: 'Designation must be a string.' })
+  @IsOptional()
+  designation?: string;
 
   @IsString({ message: 'Password must be a string.' })
   @MinLength(6, { message: 'Password must be at least 6 characters long.' })
