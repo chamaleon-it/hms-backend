@@ -82,6 +82,11 @@ export class Appointment {
     default: false,
   })
   isRefunded: boolean;
+
+  @Prop({
+    default: true,
+  })
+  hasConsultationFee: boolean;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

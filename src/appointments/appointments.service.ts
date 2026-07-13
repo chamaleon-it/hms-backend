@@ -24,39 +24,68 @@ export class AppointmentsService {
     createAppointmentDto: CreateAppointmentDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
+    let shouldBillConsultation = true;
+
+    try {
+      // Find the most recent prior appointment for the same patient and doctor that had a consultation fee
+      const lastAppointment = await this.appointmentModel.findOne({
+        patient: createAppointmentDto.patient,
+        doctor: createAppointmentDto.doctor,
+        hasConsultationFee: { $ne: false },
+        isDeleted: { $ne: true },
+      }).sort({ date: -1 });
+
+      if (lastAppointment) {
+        const prevDate = new Date(lastAppointment.date);
+        const validityEnd = new Date(prevDate);
+        validityEnd.setDate(prevDate.getDate() + 10);
+        validityEnd.setHours(23, 59, 59, 999);
+
+        const newAppDate = new Date(createAppointmentDto.date);
+        if (newAppDate <= validityEnd) {
+          shouldBillConsultation = false;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to look up last appointment:', error);
+    }
+
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
+      hasConsultationFee: shouldBillConsultation,
       createdBy,
     });
 
     try {
-      // Fetch the doctor from database to retrieve their consultation fee
-      const doctorUser = await this.usersService.getUserById(appointment.doctor);
-      const consultationFee = doctorUser?.consultationFee ?? 0;
+      if (shouldBillConsultation) {
+        // Fetch the doctor from database to retrieve their consultation fee
+        const doctorUser = await this.usersService.getUserById(appointment.doctor);
+        const consultationFee = doctorUser?.consultationFee ?? 0;
 
-      // Construct a Draft bill containing the consultation fee
-      const createBillingDto = {
-        user: createdBy,
-        patient: appointment.patient,
-        doctor: appointment.doctor.toString(),
-        items: [
-          {
-            name: 'Consultation Fee',
-            quantity: 1,
-            unitPrice: consultationFee,
-            gst: 0,
-            discount: 0,
-            total: consultationFee,
-          },
-        ],
-        cash: 0,
-        online: 0,
-        insurance: 0,
-        discount: 0,
-        status: 'Draft',
-      };
+        // Construct a Draft bill containing the consultation fee
+        const createBillingDto = {
+          user: createdBy,
+          patient: appointment.patient,
+          doctor: appointment.doctor.toString(),
+          items: [
+            {
+              name: 'Consultation Fee',
+              quantity: 1,
+              unitPrice: consultationFee,
+              gst: 0,
+              discount: 0,
+              total: consultationFee,
+            },
+          ],
+          cash: 0,
+          online: 0,
+          insurance: 0,
+          discount: 0,
+          status: 'Draft',
+        };
 
-      await this.billingService.generateBill(createBillingDto as any);
+        await this.billingService.generateBill(createBillingDto as any);
+      }
     } catch (error) {
       console.error('Failed to create consultation fee bill for appointment:', error);
     }
