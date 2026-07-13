@@ -12,7 +12,22 @@ export class InPatientsService {
   ) {}
 
   async create(createInPatientDto: CreateInPatientDto, user: any) {
-    const admissionNumber = 'IP-' + Math.floor(100000 + Math.random() * 900000);
+    // Generate sequential admission number: IP-0001, IP-0002, ...
+    const last = await this.inPatientModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .select('admissionNumber')
+      .lean();
+
+    let nextSeq = 1;
+    if (last?.admissionNumber) {
+      const parts = last.admissionNumber.split('-');
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(num)) nextSeq = num + 1;
+    }
+
+    const admissionNumber = 'IP-' + String(nextSeq).padStart(4, '0');
+
     const newIP = new this.inPatientModel({
       ...createInPatientDto,
       admissionNumber,
@@ -22,6 +37,15 @@ export class InPatientsService {
     });
     return newIP.save();
   }
+
+  async addIpNote(id: string, noteData: any, user: any) {
+    const ip = await this.inPatientModel.findById(id);
+    if (!ip) throw new NotFoundException(`In-patient record #${id} not found`);
+    ip.ipNotes.push({ ...noteData, recordedBy: user?._id });
+    await ip.save();
+    return { data: ip, message: 'Note added successfully' };
+  }
+
 
   async findAll(query: any) {
     const filter: any = {};

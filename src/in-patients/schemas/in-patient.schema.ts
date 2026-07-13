@@ -12,6 +12,22 @@ export enum IPStatus {
   DISCHARGED = 'Discharged',
 }
 
+// ── Embedded sub-document for quick vitals + notes ──────────────────────────
+@Schema({ _id: true, timestamps: true })
+export class IpNote {
+  @Prop() temp: string;
+  @Prop() tempUnit: string;  // '°C' | '°F'
+  @Prop() bp: string;        // e.g. "120/80 mmHg"
+  @Prop() hr: string;        // heart rate bpm
+  @Prop() spo2: string;      // SpO2 %
+  @Prop() rr: string;        // respiratory rate
+  @Prop() weight: string;    // kg
+  @Prop() note: string;      // free-text nurse/doctor note
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' }) recordedBy: User;
+}
+export const IpNoteSchema = SchemaFactory.createForClass(IpNote);
+
+// ── Main InPatient schema ────────────────────────────────────────────────────
 @Schema({ timestamps: true })
 export class InPatient {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient', required: true })
@@ -46,6 +62,9 @@ export class InPatient {
 
   @Prop({ required: true, enum: IPStatus, default: IPStatus.ADMITTED })
   status: string;
+
+  @Prop({ type: [IpNoteSchema], default: [] })
+  ipNotes: IpNote[];
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   createdBy: User;

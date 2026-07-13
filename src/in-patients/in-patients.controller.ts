@@ -44,6 +44,16 @@ export class InPatientsController {
     return this.inPatientsService.update(id, updateInPatientDto, req.user);
   }
 
+  @Post(':id/notes')
+  addNote(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.inPatientsService.addIpNote(id, body, req.user);
+  }
+
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.inPatientsService.remove(id);
