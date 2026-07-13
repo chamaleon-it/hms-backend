@@ -145,6 +145,9 @@ export class User {
   @Prop({ type: String, default: null, select: false })
   consultationValues: string;
 
+  @Prop({ type: Number, default: 0 })
+  consultationFee: number;
+
   @Prop({ type: SchemaFactory.createForClass(Availability), default: null })
   availability?: Availability | null;
 

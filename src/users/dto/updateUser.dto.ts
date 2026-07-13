@@ -8,6 +8,7 @@ import {
   IsDateString,
   ValidateNested,
   IsArray,
+  IsNumber,
 } from 'class-validator';
 
 class AvailabilityDto {
@@ -97,4 +98,8 @@ export class UpdateUserDto {
   @IsString({ message: 'Status must be a string' })
   @IsOptional()
   status?: string;
+
+  @IsNumber({}, { message: 'Consultation fee must be a number' })
+  @IsOptional()
+  consultationFee?: number;
 }

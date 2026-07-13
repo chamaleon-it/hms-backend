@@ -8,6 +8,7 @@ import {
   ValidatorConstraintInterface,
   ValidationArguments,
   IsOptional,
+  IsNumber,
 } from 'class-validator';
 
 @ValidatorConstraint({ name: 'MatchPassword', async: false })
@@ -60,4 +61,8 @@ export class CreateUserDto {
   @Validate(MatchPasswordConstraint, { message: 'Passwords do not match.' })
   @Transform(({ value }: { value: string }) => value.trim())
   confirmPassword: string;
+
+  @IsNumber({}, { message: 'Consultation fee must be a number.' })
+  @IsOptional()
+  consultationFee?: number;
 }

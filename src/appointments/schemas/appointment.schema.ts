@@ -77,6 +77,11 @@ export class Appointment {
     default: false,
   })
   isDeleted: boolean;
+
+  @Prop({
+    default: false,
+  })
+  isRefunded: boolean;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

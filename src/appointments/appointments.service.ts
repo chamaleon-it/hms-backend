@@ -10,12 +10,14 @@ import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
 import { InPatient, InPatientDocument, IPStatus } from '../in-patients/schemas/in-patient.schema';
+import { BillingService } from 'src/billing/billing.service';
 @Injectable()
 export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     @InjectModel(InPatient.name) private inPatientModel: Model<InPatientDocument>,
     private readonly usersService: UsersService,
+    private readonly billingService: BillingService,
   ) {}
 
   async createAppointment(
@@ -26,6 +28,38 @@ export class AppointmentsService {
       ...createAppointmentDto,
       createdBy,
     });
+
+    try {
+      // Fetch the doctor from database to retrieve their consultation fee
+      const doctorUser = await this.usersService.getUserById(appointment.doctor);
+      const consultationFee = doctorUser?.consultationFee ?? 0;
+
+      // Construct a Draft bill containing the consultation fee
+      const createBillingDto = {
+        user: createdBy,
+        patient: appointment.patient,
+        doctor: appointment.doctor.toString(),
+        items: [
+          {
+            name: 'Consultation Fee',
+            quantity: 1,
+            unitPrice: consultationFee,
+            gst: 0,
+            discount: 0,
+            total: consultationFee,
+          },
+        ],
+        cash: 0,
+        online: 0,
+        insurance: 0,
+        discount: 0,
+        status: 'Draft',
+      };
+
+      await this.billingService.generateBill(createBillingDto as any);
+    } catch (error) {
+      console.error('Failed to create consultation fee bill for appointment:', error);
+    }
 
     return appointment;
   }
@@ -435,6 +469,49 @@ export class AppointmentsService {
       throw new BadRequestException('No appointment found');
     }
     return data;
+  }
+
+  async refundAppointment(id: mongoose.Types.ObjectId, userId: mongoose.Types.ObjectId) {
+    const appointment = await this.appointmentModel.findById(id);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+    if (appointment.isRefunded) {
+      throw new BadRequestException('This appointment has already been refunded');
+    }
+
+    const doctorUser = await this.usersService.getUserById(appointment.doctor);
+    const consultationFee = doctorUser?.consultationFee ?? 0;
+
+    const refundBill = await this.billingService.generateBill({
+      user: userId,
+      patient: appointment.patient,
+      doctor: appointment.doctor.toString(),
+      items: [
+        {
+          name: 'Consultation Fee Refund',
+          quantity: 1,
+          unitPrice: consultationFee,
+          gst: 0,
+          discount: 0,
+          total: consultationFee,
+        },
+      ],
+      cash: consultationFee,
+      online: 0,
+      insurance: 0,
+      discount: 0,
+      transactionType: 'Return',
+      status: 'Completed',
+    } as any);
+
+    appointment.isRefunded = true;
+    await appointment.save();
+
+    return {
+      appointment,
+      bill: refundBill,
+    };
   }
 }
 

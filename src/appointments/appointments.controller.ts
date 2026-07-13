@@ -184,4 +184,20 @@ export class AppointmentsController {
       message: 'Appointment recovered successfully.',
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('refund/:id')
+  async refundAppointment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.appointmentsService.refundAppointment(
+      id,
+      new mongoose.Types.ObjectId(user.id),
+    );
+    return {
+      data,
+      message: 'Appointment refunded successfully.',
+    };
+  }
 }

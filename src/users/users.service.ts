@@ -105,7 +105,7 @@ export class UsersService {
   async getAllDoctors() {
     const data = await this.userModel
       .find({ role: UserRole.DOCTOR })
-      .select('name email phoneNumber address profilePic')
+      .select('name email phoneNumber address profilePic consultationFee')
       .sort({ name: 1 })
       .lean();
     return data;
@@ -114,7 +114,7 @@ export class UsersService {
   async getUsersByRole(role: string) {
     const data = await this.userModel
       .find({ role })
-      .select('name email phoneNumber address profilePic status availability specialization qualification licenseNo designation')
+      .select('name email phoneNumber address profilePic status availability specialization qualification licenseNo designation consultationFee')
       .sort({ name: 1 })
       .lean();
     return data;
