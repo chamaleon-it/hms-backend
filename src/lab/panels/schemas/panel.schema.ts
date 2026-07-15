@@ -39,7 +39,7 @@ export class Panel {
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'Test', default: [] })
   tests: mongoose.Types.ObjectId[];
 
-  @Prop({ required: false })
+  @Prop({ type: String, required: false, trim: true })
   mainHeading: string;
 
   @Prop({ type: [String], default: [] })
@@ -47,6 +47,9 @@ export class Panel {
 
   @Prop({ type: Object, default: {} })
   testSubheadings: Record<string, string>;
+
+  @Prop({ required: false, default: null, trim: true })
+  department: string;
 }
 
 export const PanelSchema = SchemaFactory.createForClass(Panel);

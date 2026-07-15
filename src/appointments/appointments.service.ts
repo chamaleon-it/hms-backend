@@ -15,7 +15,7 @@ export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
@@ -93,7 +93,7 @@ export class AppointmentsService {
                   phoneNumber: 1,
                   address: 1,
                   profilePic: 1,
-                  specialization: 1
+                  specialization: 1,
                 },
               },
             ],
@@ -338,12 +338,12 @@ export class AppointmentsService {
       endTime?: string | null | undefined;
       days?: string[] | undefined;
       rounds?:
-      | {
-        label?: string | undefined;
-        start?: string | undefined;
-        end?: string | undefined;
-      }[]
-      | undefined;
+        | {
+            label?: string | undefined;
+            start?: string | undefined;
+            end?: string | undefined;
+          }[]
+        | undefined;
     }> = await this.usersService.getDoctorAvailability(doctor);
 
     const isAvailable = availability.days

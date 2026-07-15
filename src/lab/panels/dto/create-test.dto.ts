@@ -49,6 +49,10 @@ export class RangeItemDto {
 
   @IsOptional()
   @IsNumber()
+  upto?: number;
+
+  @IsOptional()
+  @IsNumber()
   fromAge?: number;
 
   @IsOptional()
@@ -117,11 +121,8 @@ export class CreateTestDto {
   @Type(() => RangeItemDto)
   range?: RangeItemDto[];
 
-  @IsOptional()
-  @IsString({ message: 'Note must be a string' })
-  note?: string;
 
-  @IsString()
   @IsOptional()
-  category?: string;
+  @IsString({ message: 'Department must be a string' })
+  department?: string;
 }

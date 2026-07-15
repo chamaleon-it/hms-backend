@@ -41,6 +41,7 @@ export class CreatePanelDto {
   tests?: string[];
 
   @IsOptional()
+  @IsString({ message: 'Main heading must be a string' })
   mainHeading?: string;
 
   @IsOptional()
@@ -51,6 +52,10 @@ export class CreatePanelDto {
   @IsOptional()
   @IsObject()
   testSubheadings?: Record<string, string>;
+
+  @IsOptional()
+  @IsString({ message: 'Department must be a string' })
+  department?: string;
 
   @IsEmpty()
   user: mongoose.Types.ObjectId;

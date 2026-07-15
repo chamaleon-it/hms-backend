@@ -18,6 +18,7 @@ import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { GetLabPatientsDto } from './dto/get-lab-patients.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
@@ -106,10 +107,13 @@ export class ReportController {
   }
 
   @Get('patients')
-  async getPatients() {
-    const data = await this.reportService.getPatients();
+  async getPatients(@Query() query: GetLabPatientsDto) {
+    const { data, total } = await this.reportService.getPatients(query);
     return {
       data,
+      total,
+      page: Number(query.page),
+      limit: Number(query.limit),
       message: 'All patient data retrived',
     };
   }

@@ -19,7 +19,7 @@ export class ReturnService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async create(createReturnDto: CreateReturnDto) {
     createReturnDto.billNo = `R-${createReturnDto.billNo}`;
@@ -51,7 +51,10 @@ export class ReturnService {
       ),
       mrn: createReturnDto.billNo,
       transactionType: 'Return',
-      cash: createReturnDto.items.reduce((acc, item) => acc + Number(item.unitPrice) * Number(item.quantity), 0),
+      cash: createReturnDto.items.reduce(
+        (acc, item) => acc + Number(item.unitPrice) * Number(item.quantity),
+        0,
+      ),
     });
 
     const validReasonForQuantityAdd = [
@@ -71,7 +74,6 @@ export class ReturnService {
 
     return data;
   }
-
 
   async findAll() {
     const data = await this.returnModel

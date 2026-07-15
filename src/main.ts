@@ -5,7 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
-  
+
   // Increase payload limit for large uploads/prints
   const express = require('express');
   app.use(express.json({ limit: '50mb' }));

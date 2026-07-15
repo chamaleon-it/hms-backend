@@ -25,7 +25,7 @@ import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) { }
+  constructor(private readonly billingService: BillingService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)

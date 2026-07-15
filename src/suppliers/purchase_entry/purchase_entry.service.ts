@@ -14,7 +14,7 @@ export class PurchaseEntryService {
     private purchaseEntryModel: Model<PurchaseEntry>,
     private readonly itemsService: ItemsService,
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
-  ) { }
+  ) {}
 
   async create(createPurchaseEntryDto: CreatePurchaseEntryDto) {
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {
@@ -35,14 +35,17 @@ export class PurchaseEntryService {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
-      await this.itemsService.addBatchItems(item.item, {
-        batchNumber: item.batch,
-        quantity: item.quantity,
-        expiryDate: item.expiryDate,
-        purchasePrice: item.purchasePrice,
-        supplier: supplier?.name || '-',
-      }, item.unitPrice / item.pack,
-        item.unitPrice
+      await this.itemsService.addBatchItems(
+        item.item,
+        {
+          batchNumber: item.batch,
+          quantity: item.quantity,
+          expiryDate: item.expiryDate,
+          purchasePrice: item.purchasePrice,
+          supplier: supplier?.name || '-',
+        },
+        item.unitPrice / item.pack,
+        item.unitPrice,
       );
     }
     return data;
