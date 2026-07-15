@@ -500,7 +500,7 @@ export class AppointmentsService {
     return data;
   }
 
-  async refundAppointment(id: mongoose.Types.ObjectId, userId: mongoose.Types.ObjectId) {
+  async refundAppointment(id: mongoose.Types.ObjectId, userId: mongoose.Types.ObjectId, reason?: string) {
     const appointment = await this.appointmentModel.findById(id);
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -532,9 +532,11 @@ export class AppointmentsService {
       discount: 0,
       transactionType: 'Return',
       status: 'Completed',
+      note: reason || undefined,
     } as any);
 
     appointment.isRefunded = true;
+    if (reason) appointment.refundReason = reason;
     await appointment.save();
 
     return {

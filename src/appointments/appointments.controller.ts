@@ -190,10 +190,12 @@ export class AppointmentsController {
   async refundAppointment(
     @Param('id') id: mongoose.Types.ObjectId,
     @GetUser() user: JWTUserInterface,
+    @Body() body: { reason?: string },
   ) {
     const data = await this.appointmentsService.refundAppointment(
       id,
       new mongoose.Types.ObjectId(user.id),
+      body.reason,
     );
     return {
       data,

@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateInPatientDto } from './dto/create-in-patient.dto';
 import { UpdateInPatientDto } from './dto/update-in-patient.dto';
-import { InPatient, InPatientDocument } from './schemas/in-patient.schema';
+import { InPatient, InPatientDocument, IPStatus } from './schemas/in-patient.schema';
 
 @Injectable()
 export class InPatientsService {
@@ -12,6 +12,18 @@ export class InPatientsService {
   ) {}
 
   async create(createInPatientDto: CreateInPatientDto, user: any) {
+    // Check if the patient already has an active (non-Discharged) IP record
+    const existingActive = await this.inPatientModel.findOne({
+      patientId: new Types.ObjectId(createInPatientDto.patientId),
+      status: { $ne: IPStatus.DISCHARGED },
+    }).lean();
+
+    if (existingActive) {
+      throw new ConflictException(
+        `Patient already admitted (IP: ${existingActive.admissionNumber}, Status: ${existingActive.status})`,
+      );
+    }
+
     // Generate sequential admission number: IP-0001, IP-0002, ...
     const last = await this.inPatientModel
       .findOne()

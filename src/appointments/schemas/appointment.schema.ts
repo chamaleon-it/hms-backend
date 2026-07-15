@@ -83,6 +83,9 @@ export class Appointment {
   })
   isRefunded: boolean;
 
+  @Prop({ type: String, required: false, default: null })
+  refundReason?: string;
+
   @Prop({
     default: true,
   })
