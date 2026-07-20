@@ -4,11 +4,13 @@ import { Model, Types } from 'mongoose';
 import { CreateInPatientDto } from './dto/create-in-patient.dto';
 import { UpdateInPatientDto } from './dto/update-in-patient.dto';
 import { InPatient, InPatientDocument, IPStatus } from './schemas/in-patient.schema';
+import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 
 @Injectable()
 export class InPatientsService {
   constructor(
     @InjectModel(InPatient.name) private inPatientModel: Model<InPatientDocument>,
+    @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
   ) {}
 
   async create(createInPatientDto: CreateInPatientDto, user: any) {
@@ -62,10 +64,28 @@ export class InPatientsService {
   async findAll(query: any) {
     const filter: any = {};
     if (query.q) {
-      // Assuming you might want to filter by status or admission number
+      const searchRegex = new RegExp(query.q, 'i');
+
+      const matchingPatients = await this.patientModel
+        .find({
+          $or: [
+            { name: searchRegex },
+            { mrn: searchRegex },
+            { phoneNumber: searchRegex },
+          ],
+        })
+        .select('_id')
+        .lean();
+
+      const patientIds = matchingPatients.map((p) => p._id);
+
       filter.$or = [
-        { status: new RegExp(query.q, 'i') },
-        { admissionNumber: new RegExp(query.q, 'i') },
+        { status: searchRegex },
+        { admissionNumber: searchRegex },
+        { ward: searchRegex },
+        { room: searchRegex },
+        { bed: searchRegex },
+        { patientId: { $in: patientIds } },
       ];
     }
 
