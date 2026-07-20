@@ -11,16 +11,16 @@ export class CreateInPatientDto {
   doctorId: string;
 
   @IsString()
-  @IsNotEmpty()
-  room: string;
+  @IsOptional()
+  room?: string;
 
   @IsString()
-  @IsNotEmpty()
-  ward: string;
+  @IsOptional()
+  ward?: string;
 
   @IsString()
-  @IsNotEmpty()
-  bed: string;
+  @IsOptional()
+  bed?: string;
 
   @IsString()
   @IsOptional()

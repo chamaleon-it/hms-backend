@@ -39,13 +39,13 @@ export class InPatient {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   doctorId: User;
 
-  @Prop({ required: true })
+  @Prop()
   room: string;
 
-  @Prop({ required: true })
+  @Prop()
   ward: string;
 
-  @Prop({ required: true })
+  @Prop()
   bed: string;
 
   @Prop()
