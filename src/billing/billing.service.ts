@@ -63,6 +63,21 @@ export class BillingService {
       createBill.user,
     );
     createBill.mrn = await this.generateUniqueMRN(prefix);
+
+    const itemsTotal = (createBill.items ?? []).reduce(
+      (sum, item) => sum + (item.total ?? (item.quantity ?? 1) * (item.unitPrice ?? 0)),
+      0,
+    );
+    const totalPaid =
+      (createBill.cash ?? 0) +
+      (createBill.online ?? 0) +
+      (createBill.insurance ?? 0) +
+      (createBill.discount ?? 0);
+
+    if (!createBill.status) {
+      createBill.status = totalPaid >= itemsTotal ? 'Completed' : 'Draft';
+    }
+
     const data = await this.billingModel.create(createBill);
     if (createBill.rxId) {
       const order: any = await this.orderModel
@@ -459,6 +474,14 @@ export class BillingService {
       .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
       .lean()
       .exec();
+    for (const bill of data) {
+      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
+        const doc = await this.usersService.getUserById(bill.doctor);
+        if (doc) {
+          (bill as any).doctor = doc;
+        }
+      }
+    }
     return data;
   }
 }

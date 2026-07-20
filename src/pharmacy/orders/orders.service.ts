@@ -617,6 +617,19 @@ export class OrdersService {
     };
   }
 
+  async getOrdersByPatient(patientId: mongoose.Types.ObjectId) {
+    const data = await this.orderModel
+      .find({ patient: patientId, isDeleted: false })
+      .populate('patient')
+      .populate('doctor', 'name phoneNumber specialization')
+      .populate('items.name')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    return data;
+  }
+
   updateOrder(dto: UpdateOrderDto) {
     const order = this.orderModel
       .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })

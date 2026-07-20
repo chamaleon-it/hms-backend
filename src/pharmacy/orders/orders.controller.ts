@@ -121,6 +121,19 @@ export class OrdersController {
     };
   }
 
+  @Get('patient/:patient')
+  async getOrdersByPatient(@Param('patient') patient: string) {
+    if (!mongoose.isValidObjectId(patient))
+      throw new BadRequestException('Please provide a valid patient id');
+    const data = await this.ordersService.getOrdersByPatient(
+      new mongoose.Types.ObjectId(patient),
+    );
+    return {
+      data,
+      message: 'Patient pharmacy orders retrieved successfully.',
+    };
+  }
+
   @Patch('update')
   async updateOrder(@Body() dto: UpdateOrderDto) {
     const data = await this.ordersService.updateOrder(dto);
