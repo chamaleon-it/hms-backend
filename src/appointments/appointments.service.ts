@@ -11,6 +11,38 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
 import { InPatient, InPatientDocument, IPStatus } from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
+
+function parseDateBounds(dateInput?: string | Date) {
+  if (!dateInput) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const ymd = `${year}-${month}-${day}`;
+    return {
+      startOfDay: new Date(`${ymd}T00:00:00.000Z`),
+      endOfDay: new Date(`${ymd}T23:59:59.999Z`),
+    };
+  }
+
+  const dateStr = typeof dateInput === 'string' ? dateInput : dateInput.toISOString();
+  const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    const ymd = match[1];
+    return {
+      startOfDay: new Date(`${ymd}T00:00:00.000Z`),
+      endOfDay: new Date(`${ymd}T23:59:59.999Z`),
+    };
+  }
+
+  const d = new Date(dateInput);
+  const startOfDay = new Date(d);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(d);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+  return { startOfDay, endOfDay };
+}
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -104,27 +136,29 @@ export class AppointmentsService {
     date: string;
     activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
   }) {
-    let startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    let endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    let startOfDay: Date;
+    let endOfDay: Date;
 
     if (activeDate === 'Today') {
-      const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setHours(23, 59, 59, 999));
-    }
-    if (activeDate === '7 days') {
-      const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setDate(today.getDate() + 7));
-      endOfDay.setHours(23, 59, 59, 999);
-    }
-    if (activeDate === '30 days') {
-      const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setDate(today.getDate() + 30));
-      endOfDay.setHours(23, 59, 59, 999);
+      const bounds = parseDateBounds();
+      startOfDay = bounds.startOfDay;
+      endOfDay = bounds.endOfDay;
+    } else if (activeDate === '7 days') {
+      const todayBounds = parseDateBounds();
+      startOfDay = todayBounds.startOfDay;
+      endOfDay = new Date(todayBounds.startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 7);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+    } else if (activeDate === '30 days') {
+      const todayBounds = parseDateBounds();
+      startOfDay = todayBounds.startOfDay;
+      endOfDay = new Date(todayBounds.startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 30);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+    } else {
+      const bounds = parseDateBounds(date);
+      startOfDay = bounds.startOfDay;
+      endOfDay = bounds.endOfDay;
     }
 
     const $match: Record<string, any> = {
@@ -205,11 +239,7 @@ export class AppointmentsService {
   }
 
   async getStatistics() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const { startOfDay, endOfDay } = parseDateBounds();
 
     const results: { count: number; _id: AppointmentStatus }[] =
       await this.appointmentModel.aggregate([
@@ -353,14 +383,14 @@ export class AppointmentsService {
   }
 
   async calenderWeekly(date: string) {
-    const now = new Date(date);
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
+    const { startOfDay } = parseDateBounds(date);
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getUTCDay());
+    startOfWeek.setUTCHours(0, 0, 0, 0);
 
-    const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
-    endOfWeek.setHours(23, 59, 59, 999);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setUTCHours(23, 59, 59, 999);
 
     const data = await this.appointmentModel
       .find({
@@ -374,16 +404,13 @@ export class AppointmentsService {
     return data;
   }
 
-  async getBookedSlot(date: Date, doctor?: mongoose.Types.ObjectId) {
+  async getBookedSlot(date: Date | string, doctor?: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(doctor))
       throw new BadRequestException(
         'Doctor id is not valid, Please selected valid doctor id',
       );
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { startOfDay, endOfDay } = parseDateBounds(date);
 
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
