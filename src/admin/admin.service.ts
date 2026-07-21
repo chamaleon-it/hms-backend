@@ -51,12 +51,12 @@ export class AdminService {
       const b = bill as any;
       // Check if bill is from today
       if (b.createdAt >= startOfToday && b.createdAt <= endOfToday) {
-        todaysRevenue += ((bill.cash || 0) + (bill.online || 0) + (bill.insurance || 0)) * multiplier;
+        todaysRevenue += ((bill.cash || 0) + (bill.card || 0) + (bill.upi || 0)) * multiplier;
       }
 
       // Check if bill is from this month
       if (b.createdAt >= startOfMonth && b.createdAt <= endOfToday) {
-        monthlyRevenue += ((bill.cash || 0) + (bill.online || 0) + (bill.insurance || 0)) * multiplier;
+        monthlyRevenue += ((bill.cash || 0) + (bill.card || 0) + (bill.upi || 0)) * multiplier;
       }
 
       // Calculate due amount
@@ -68,7 +68,7 @@ export class AdminService {
       const decimal = parts[1] ? Number("0." + parts[1]) : 0;
       const roundOffVal = bill.roundOff ? decimal * multiplier : 0;
       
-      const billPaid = ((bill.cash || 0) + (bill.online || 0) + (bill.insurance || 0) + (bill.discount || 0)) * multiplier;
+      const billPaid = ((bill.cash || 0) + (bill.card || 0) + (bill.upi || 0) + (bill.discount || 0)) * multiplier;
       outstandingPayments += (billTotal - roundOffVal - billPaid);
     });
 
@@ -161,7 +161,7 @@ export class AdminService {
       });
 
       if (trendDict[dateStr]) {
-        trendDict[dateStr].revenue += ((b.cash || 0) + (b.online || 0) + (b.insurance || 0)) * multiplier;
+        trendDict[dateStr].revenue += ((b.cash || 0) + (b.card || 0) + (b.upi || 0)) * multiplier;
       }
     });
 

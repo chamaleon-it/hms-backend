@@ -76,13 +76,13 @@ export class CreateBillingDto {
   @Type(() => Number)
   @Min(0)
   @IsOptional()
-  online?: number;
+  card?: number;
 
   @IsNumber()
   @Type(() => Number)
   @Min(0)
   @IsOptional()
-  insurance?: number;
+  upi?: number;
 
   @IsNumber()
   @Type(() => Number)
@@ -90,21 +90,7 @@ export class CreateBillingDto {
   @IsOptional()
   discount?: number;
 
-  @IsString()
-  @IsOptional()
-  payer?: string;
 
-  @IsString()
-  @IsOptional()
-  policyNo?: string;
-
-  @IsString()
-  @IsOptional()
-  tpa?: string;
-
-  @IsString()
-  @IsOptional()
-  preAuthNo?: string;
 
   @IsString()
   @IsOptional()
@@ -121,6 +107,10 @@ export class CreateBillingDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @IsString()
+  @IsOptional()
+  transactionType?: 'Sale' | 'Return' | 'Refund';
 
   @IsMongoId()
   @IsOptional()

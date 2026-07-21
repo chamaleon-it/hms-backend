@@ -43,25 +43,15 @@ export class Billing {
   cash: number;
 
   @Prop({ type: Number, default: 0 })
-  online: number;
+  card: number;
 
   @Prop({ type: Number, default: 0 })
-  insurance: number;
+  upi: number;
 
   @Prop({ type: Number, default: 0 })
   discount: number;
 
-  @Prop({ type: String, required: false })
-  payer?: string;
 
-  @Prop({ type: String, required: false })
-  policyNo?: string;
-
-  @Prop({ type: String, required: false })
-  tpa?: string;
-
-  @Prop({ type: String, required: false })
-  preAuthNo?: string;
 
   @Prop({ type: String, required: false })
   note?: string;
@@ -74,10 +64,10 @@ export class Billing {
 
   @Prop({
     type: String,
-    enum: ['Sale', 'Return'],
+    enum: ['Sale', 'Return', 'Refund'],
     default: 'Sale',
   })
-  transactionType: 'Sale' | 'Return';
+  transactionType: 'Sale' | 'Return' | 'Refund';
 
   @Prop({ type: String, required: false })
   salesMRN?: string;

@@ -592,7 +592,7 @@ export class OrdersService {
 
     const totalPaid = bills.reduce((acc, bill) => {
       return (
-        acc + (bill.cash ?? 0) + (bill.online ?? 0) + (bill.insurance ?? 0)
+        acc + (bill.cash ?? 0) + (bill.card ?? 0) + (bill.upi ?? 0)
       );
     }, 0);
 

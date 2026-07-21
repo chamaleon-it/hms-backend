@@ -70,8 +70,8 @@ export class BillingService {
     );
     const totalPaid =
       (createBill.cash ?? 0) +
-      (createBill.online ?? 0) +
-      (createBill.insurance ?? 0) +
+      (createBill.card ?? 0) +
+      (createBill.upi ?? 0) +
       (createBill.discount ?? 0);
 
     if (!createBill.status) {
@@ -87,8 +87,8 @@ export class BillingService {
         order.billNo = data.mrn;
         const paidAmount =
           (createBill.cash ?? 0) +
-          (createBill.online ?? 0) +
-          (createBill.insurance ?? 0) +
+          (createBill.card ?? 0) +
+          (createBill.upi ?? 0) +
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
@@ -137,15 +137,13 @@ export class BillingService {
       startDate,
       endDate,
       activeDate,
+      userRole,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
     const match: any = {};
-    if (user) {
-      match.user = new mongoose.Types.ObjectId(user);
-    }
     const qEndFound = await this.billingModel.exists({
       mrn: qEnd?.toUpperCase(),
     });
@@ -164,14 +162,36 @@ export class BillingService {
     if (method) {
       if (method === 'Cash') {
         match.cash = { $ne: 0 };
-      } else if (method === 'Insurance') {
-        match.insurance = { $ne: 0 };
-      } else if (method === 'Online') {
-        match.online = { $ne: 0 };
+      } else if (method === 'UPI') {
+        match.upi = { $ne: 0 };
+      } else if (method === 'Card') {
+        match.card = { $ne: 0 };
       }
     }
 
     pipeline.push({ $match: match });
+
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'user',
+        foreignField: '_id',
+        as: 'creator',
+      },
+    });
+    pipeline.push({
+      $unwind: { path: '$creator', preserveNullAndEmptyArrays: true },
+    });
+
+    if (userRole) {
+      pipeline.push({
+        $match: { 'creator.role': new RegExp(`^${userRole}$`, 'i') },
+      });
+    } else if (user) {
+      pipeline.push({
+        $match: { user: new mongoose.Types.ObjectId(user) },
+      });
+    }
 
     // Add calculations for status filtering
     pipeline.push({
@@ -179,9 +199,9 @@ export class BillingService {
         itemsTotal: { $sum: '$items.total' },
         totalPaid: {
           $add: [
-            '$cash',
-            '$online',
-            '$insurance',
+            { $ifNull: ['$cash', 0] },
+            { $ifNull: ['$card', 0] },
+            { $ifNull: ['$upi', 0] },
             { $ifNull: ['$discount', 0] },
           ],
         },
@@ -438,8 +458,8 @@ export class BillingService {
       {
         $set: {
           cash: addPaymentDto.cash,
-          insurance: addPaymentDto.insurance,
-          online: addPaymentDto.online,
+          upi: addPaymentDto.upi,
+          card: addPaymentDto.card,
         },
       },
       { new: true },
