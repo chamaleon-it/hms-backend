@@ -116,6 +116,24 @@ class TestDto {
   panels: string[];
 }
 
+class MedicalParametersDto {
+  @IsOptional()
+  @IsString()
+  sleep?: null | string;
+
+  @IsOptional()
+  @IsString()
+  bowelMovement?: null | string;
+
+  @IsOptional()
+  @IsString()
+  urineMovement?: null | string;
+
+  @IsOptional()
+  @IsString()
+  appetite?: null | string;
+}
+
 export class ConsultingDto {
   @ValidateNested()
   @Type(() => ConsultationNotesDto)
@@ -125,10 +143,19 @@ export class ConsultingDto {
   @Type(() => ExaminationNoteDto)
   examinationNote: ExaminationNoteDto;
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MedicalParametersDto)
+  medicalParameters?: MedicalParametersDto;
+
   @IsArray({ message: 'Medicines must be an array.' })
   @ValidateNested({ each: true })
   @Type(() => MedicineDto)
   medicines: MedicineDto[];
+
+  @IsOptional()
+  @IsString({ message: 'Treatment must be a string or null.' })
+  treatment: null | string;
 
   @IsOptional()
   @IsString({ message: 'Advice must be a string or null.' })

@@ -57,6 +57,22 @@ export class Consulting {
     otherNotes: string | null;
   };
 
+  @Prop({
+    type: {
+      sleep: { type: String, default: null },
+      bowelMovement: { type: String, default: null },
+      urineMovement: { type: String, default: null },
+      appetite: { type: String, default: null },
+    },
+    required: false,
+  })
+  medicalParameters?: {
+    sleep: string | null;
+    bowelMovement: string | null;
+    urineMovement: string | null;
+    appetite: string | null;
+  };
+
   @Prop([
     {
       name: { type: Types.ObjectId, ref: 'Item', required: true },
@@ -75,6 +91,9 @@ export class Consulting {
     duration: string;
     quantity: number;
   }[];
+
+  @Prop({ type: String, default: null })
+  treatment: string | null;
 
   @Prop({ type: String, default: null })
   advice: string | null;
