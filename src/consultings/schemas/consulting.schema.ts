@@ -128,6 +128,141 @@ export class Consulting {
     lab: mongoose.Types.ObjectId;
     priority: string;
   }[];
+
+  @Prop({ type: String, default: 'standard' })
+  consultationType?: string;
+
+  @Prop({
+    type: {
+      complaints: [{ type: String }],
+      other: { type: String, default: null },
+      duration: { type: String, default: null },
+      painScore: { type: Number, default: null },
+    },
+    required: false,
+  })
+  chiefComplaints?: {
+    complaints: string[];
+    other: string | null;
+    duration: string | null;
+    painScore: number | null;
+  };
+
+  @Prop({
+    type: {
+      sleep: { type: String, default: null },
+      bowel: { type: String, default: null },
+      appetite: { type: String, default: null },
+      stress: { type: String, default: null },
+      exercise: { type: String, default: null },
+      smoking: { type: String, default: null },
+      alcohol: { type: String, default: null },
+    },
+    required: false,
+  })
+  lifestyle?: {
+    sleep: string | null;
+    bowel: string | null;
+    appetite: string | null;
+    stress: string | null;
+    exercise: string | null;
+    smoking: string | null;
+    alcohol: string | null;
+  };
+
+  @Prop({
+    type: {
+      clinicalDiagnosis: { type: String, default: null },
+      treatmentPrinciple: { type: String, default: null },
+    },
+    required: false,
+  })
+  acupunctureAssessment?: {
+    clinicalDiagnosis: string | null;
+    treatmentPrinciple: string | null;
+  };
+
+  @Prop({
+    type: {
+      sessions: { type: String, default: null },
+      frequency: { type: String, default: null },
+      homeCare: [{ type: String }],
+    },
+    required: false,
+  })
+  treatmentPlan?: {
+    sessions: string | null;
+    frequency: string | null;
+    homeCare: string[];
+  };
+
+  @Prop({
+    type: {
+      medHistory: [{ type: String }],
+      otherMedHistory: { type: String, default: null },
+      currentMedications: { type: String, default: null },
+      allergies: { type: String, default: null },
+    },
+    required: false,
+  })
+  medicalHistoryDetails?: {
+    medHistory: string[];
+    otherMedHistory: string | null;
+    currentMedications: string | null;
+    allergies: string | null;
+  };
+
+  @Prop({
+    type: {
+      bp: { type: String, default: null },
+      pulse: { type: String, default: null },
+      weight: { type: String, default: null },
+      tenderness: { type: String, default: null },
+      rom: { type: String, default: null },
+      posture: { type: String, default: null },
+      specialFindings: { type: String, default: null },
+    },
+    required: false,
+  })
+  acupunctureExamination?: {
+    bp: string | null;
+    pulse: string | null;
+    weight: string | null;
+    tenderness: string | null;
+    rom: string | null;
+    posture: string | null;
+    specialFindings: string | null;
+  };
+
+  @Prop({
+    type: {
+      treatments: [{ type: String }],
+      acuPoints: { type: String, default: null },
+      retentionTime: { type: String, default: null },
+    },
+    required: false,
+  })
+  treatmentGiven?: {
+    treatments: string[];
+    acuPoints: string | null;
+    retentionTime: string | null;
+  };
+
+  @Prop({
+    type: {
+      nextAppt: { type: Date, default: null },
+      feedback: { type: String, default: null },
+      additionalNotes: { type: String, default: null },
+      signature: { type: String, default: null },
+    },
+    required: false,
+  })
+  followUpDetails?: {
+    nextAppt: Date | null;
+    feedback: string | null;
+    additionalNotes: string | null;
+    signature: string | null;
+  };
 }
 
 export const ConsultingSchema = SchemaFactory.createForClass(Consulting);

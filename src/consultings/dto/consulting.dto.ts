@@ -175,4 +175,74 @@ export class ConsultingDto {
   @ValidateNested({ each: true })
   @Type(() => TestDto)
   test: TestDto[];
+
+  @IsOptional()
+  @IsString()
+  consultationType?: string;
+
+  @IsOptional()
+  chiefComplaints?: {
+    complaints: string[];
+    other: string | null;
+    duration: string | null;
+    painScore: number | null;
+  };
+
+  @IsOptional()
+  lifestyle?: {
+    sleep: string | null;
+    bowel: string | null;
+    appetite: string | null;
+    stress: string | null;
+    exercise: string | null;
+    smoking: string | null;
+    alcohol: string | null;
+  };
+
+  @IsOptional()
+  acupunctureAssessment?: {
+    clinicalDiagnosis: string | null;
+    treatmentPrinciple: string | null;
+  };
+
+  @IsOptional()
+  treatmentPlan?: {
+    sessions: string | null;
+    frequency: string | null;
+    homeCare: string[];
+  };
+
+  @IsOptional()
+  medicalHistoryDetails?: {
+    medHistory: string[];
+    otherMedHistory: string | null;
+    currentMedications: string | null;
+    allergies: string | null;
+  };
+
+  @IsOptional()
+  acupunctureExamination?: {
+    bp: string | null;
+    pulse: string | null;
+    weight: string | null;
+    tenderness: string | null;
+    rom: string | null;
+    posture: string | null;
+    specialFindings: string | null;
+  };
+
+  @IsOptional()
+  treatmentGiven?: {
+    treatments: string[];
+    acuPoints: string | null;
+    retentionTime: string | null;
+  };
+
+  @IsOptional()
+  followUpDetails?: {
+    nextAppt: Date | null;
+    feedback: string | null;
+    additionalNotes: string | null;
+    signature: string | null;
+  };
 }
