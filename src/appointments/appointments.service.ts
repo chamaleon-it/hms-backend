@@ -272,7 +272,8 @@ export class AppointmentsService {
   }
 
   async calenderMonthly(date: string) {
-    const now = new Date();
+    const parsedDate = new Date(date);
+    const now = !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
 
@@ -284,14 +285,14 @@ export class AppointmentsService {
         date: { $gte: startDate, $lte: endDate },
         isDeleted: false,
       })
-      .select('date patientName type status')
+      .select('date patient type status')
       .sort({ date: 1 })
-      .populate('patient')
+      .populate('patient', 'name mrn')
       .lean();
 
     const data = appointments.map((a) => ({
       ...a,
-      date: a.date.toISOString().split('T')[0],
+      date: a.date instanceof Date ? a.date.toISOString().split('T')[0] : new Date(a.date).toISOString().split('T')[0],
     }));
 
     return data;
