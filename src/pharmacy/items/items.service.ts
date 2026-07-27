@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -323,15 +323,9 @@ export class ItemsService {
     item.quantity += batchData.quantity;
     item.unitPrice = unitPrice ? unitPrice : 0;
     item.mrp = mrp ? mrp : 0;
-    if (
-      !item.expiryDate ||
-      new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-      new Date() > new Date(item.expiryDate)
-    ) {
-      item.expiryDate = batchData.expiryDate;
-      item.purchasePrice = batchData.purchasePrice;
-      item.supplier = batchData.supplier;
-    }
+    item.expiryDate = batchData.expiryDate;
+    item.purchasePrice = batchData.purchasePrice;
+    item.supplier = batchData.supplier;
     await item.save();
 
     return item;
