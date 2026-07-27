@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
@@ -22,9 +23,26 @@ export const storage = diskStorage({
   },
 });
 
-// No type filter (accept anything). Add size cap if you want.
+// File type filter for security
+const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
+  const allowedMimeTypes = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'application/pdf',
+    'text/csv',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new BadRequestException(`File type ${file.mimetype} is not allowed.`), false);
+  }
+};
+
 export const multerOptions = {
   storage,
-  // Example size cap: 50 MB
   limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter,
 };

@@ -18,11 +18,11 @@ import { GetListDto } from './dto/get-list.dto';
 import mongoose from 'mongoose';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('appointments')
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async createAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
@@ -38,7 +38,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('list')
   async getAppointments(@Query() getListDto: GetListDto) {
     const data = await this.appointmentsService.getAppointments({
@@ -53,7 +52,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('single/:id')
   async getSingleAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getSingleAppointment(id);
@@ -63,7 +61,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('statistics')
   async getStatistics() {
     const data = await this.appointmentsService.getStatistics();
@@ -73,7 +70,6 @@ export class AppointmentsController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
   async calenderMonthly() {
     const data = await this.appointmentsService.calenderMonthly(
@@ -96,7 +92,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('update_status/:id')
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,

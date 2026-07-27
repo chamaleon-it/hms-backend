@@ -90,11 +90,11 @@ export class AuthService {
         throw new BadRequestException('User not found');
       }
 
-      // const isRefreshTokenMatching =
-      //   user?.refreshToken === getRefreshTokenDto.refreshToken;
+      const isRefreshTokenMatching =
+        user?.refreshToken === getRefreshTokenDto.refreshToken;
 
-      // if (!isRefreshTokenMatching)
-      //   throw new UnauthorizedException('Refresh token is not matching.');
+      if (!isRefreshTokenMatching)
+        throw new UnauthorizedException('Refresh token is not matching.');
 
       const accessToken = await this.jwtService.signAsync(
         { id: user._id, email: user.email, role: user.role },
