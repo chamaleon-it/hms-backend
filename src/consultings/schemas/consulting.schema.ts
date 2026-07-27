@@ -93,7 +93,7 @@ export class Consulting {
   }[];
 
   @Prop({ type: String, default: null })
-  treatment: string | null;
+  therapy: string | null;
 
   @Prop({ type: String, default: null })
   advice: string | null;

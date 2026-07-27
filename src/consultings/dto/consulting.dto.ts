@@ -154,8 +154,8 @@ export class ConsultingDto {
   medicines: MedicineDto[];
 
   @IsOptional()
-  @IsString({ message: 'Treatment must be a string or null.' })
-  treatment: null | string;
+  @IsString({ message: 'Therapy must be a string or null.' })
+  therapy: null | string;
 
   @IsOptional()
   @IsString({ message: 'Advice must be a string or null.' })
