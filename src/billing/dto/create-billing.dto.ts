@@ -45,6 +45,13 @@ export class CreateBillingItemDto {
   @Min(0)
   @IsOptional()
   total?: number;
+
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsOptional()
+  expiryDate?: Date;
 }
 
 export class CreateBillingDto {

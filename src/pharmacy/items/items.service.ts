@@ -307,8 +307,14 @@ export class ItemsService {
     batchData: {
       batchNumber: string;
       quantity: number;
+      pack?: number;
+      noOfPack?: number;
+      mrp?: number;
       expiryDate: Date;
       purchasePrice: number;
+      free?: number;
+      schemaAmt?: number;
+      total?: number;
       supplier: string;
     },
     unitPrice?: number,
@@ -319,13 +325,68 @@ export class ItemsService {
       throw new BadRequestException('Item is not available');
     }
 
-    item.batches.push({ ...batchData, createdAt: new Date() });
+    const newBatchId = new mongoose.Types.ObjectId();
+    item.batches.push({
+      _id: newBatchId,
+      ...batchData,
+      pack: batchData.pack ?? item.packing ?? 0,
+      noOfPack: batchData.noOfPack ?? 0,
+      mrp: batchData.mrp ?? mrp ?? item.mrp ?? 0,
+      free: batchData.free ?? 0,
+      schemaAmt: batchData.schemaAmt ?? 0,
+      total: batchData.total ?? 0,
+      createdAt: new Date(),
+    } as any);
     item.quantity += batchData.quantity;
-    item.unitPrice = unitPrice ? unitPrice : 0;
-    item.mrp = mrp ? mrp : 0;
+    if (batchData.pack) item.packing = batchData.pack;
+    if (batchData.noOfPack) item.noOfPacking = batchData.noOfPack;
+    if (unitPrice) item.unitPrice = unitPrice;
+    if (mrp) item.mrp = mrp;
+    if (batchData.mrp) item.mrp = batchData.mrp;
     item.expiryDate = batchData.expiryDate;
     item.purchasePrice = batchData.purchasePrice;
     item.supplier = batchData.supplier;
+
+    // Auto-set active batch: nearest future expiry (skip expired batches)
+    const now = new Date();
+    let nearestBatch: any = null;
+    let nearestExpiry: Date | null = null;
+
+    for (const batch of item.batches as any[]) {
+      const exp = new Date(batch.expiryDate);
+      if (exp > now) {
+        if (!nearestExpiry || exp < nearestExpiry) {
+          nearestExpiry = exp;
+          nearestBatch = batch;
+        }
+      }
+    }
+
+    const lastBatch = item.batches.length
+      ? (item.batches[item.batches.length - 1] as any)
+      : null;
+    item.activeBatch = nearestBatch?._id ?? lastBatch?._id ?? null;
+
+    await item.save();
+
+    return item;
+  }
+
+  async setActiveBatch(
+    itemId: mongoose.Types.ObjectId,
+    batchId: mongoose.Types.ObjectId,
+  ) {
+    const item = await this.itemModel.findById(itemId);
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    const batch = (item.batches as any).id(batchId);
+    if (!batch) {
+      throw new BadRequestException('Batch not found in this item.');
+    }
+
+    item.activeBatch = batchId;
     await item.save();
 
     return item;

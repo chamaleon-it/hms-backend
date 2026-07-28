@@ -18,12 +18,15 @@ import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
+import { Item } from 'src/pharmacy/items/schemas/item.schema';
+
 @Injectable()
 export class BillingService {
   constructor(
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
   ) {}
 
@@ -52,6 +55,54 @@ export class BillingService {
       createBill.user,
     );
     createBill.mrn = await this.generateUniqueMRN(prefix);
+
+    // Auto-populate batchNumber & expiryDate for items at time of sale if not provided
+    for (const item of createBill.items || []) {
+      const cleanB = item.batchNumber?.trim();
+      if (!cleanB || cleanB === '-' || cleanB === '—') {
+        const escapedName = item.name
+          .trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const foundItem = await this.itemModel
+          .findOne({
+            name: { $regex: `^${escapedName}$`, $options: 'i' },
+          })
+          .lean();
+
+        if (foundItem) {
+          let activeBatchData = foundItem.activeBatch
+            ? foundItem.batches?.find(
+                (b: any) => String(b._id) === String(foundItem.activeBatch),
+              )
+            : null;
+
+          if (!activeBatchData && foundItem.batches?.length) {
+            const now = new Date();
+            const futureBatches = foundItem.batches
+              .filter((b: any) => new Date(b.expiryDate) > now)
+              .sort(
+                (a: any, b: any) =>
+                  new Date(a.expiryDate).getTime() -
+                  new Date(b.expiryDate).getTime(),
+              );
+            activeBatchData =
+              futureBatches[0] ||
+              foundItem.batches[foundItem.batches.length - 1];
+          }
+
+          if (activeBatchData) {
+            item.batchNumber =
+              activeBatchData.batchNumber || (activeBatchData as any).batch || '';
+            item.expiryDate =
+              activeBatchData.expiryDate || foundItem.expiryDate;
+          } else {
+            item.batchNumber = (foundItem as any).batchNumber || '';
+            item.expiryDate = foundItem.expiryDate;
+          }
+        }
+      }
+    }
+
     const data = await this.billingModel.create(createBill);
     if (createBill.rxId) {
       const order: any = await this.orderModel

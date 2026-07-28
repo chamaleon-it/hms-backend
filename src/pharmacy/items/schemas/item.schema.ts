@@ -124,13 +124,22 @@ export class Item {
   })
   status: ItemStatus;
 
+  @Prop({ type: mongoose.Schema.Types.ObjectId, default: null })
+  activeBatch: mongoose.Types.ObjectId;
+
   @Prop({
     type: [
       {
         batchNumber: { type: String, required: true },
         quantity: { type: Number, required: true },
+        pack: { type: Number, default: 0 },
+        noOfPack: { type: Number, default: 0 },
+        mrp: { type: Number, default: 0 },
         expiryDate: { type: Date, required: true },
         purchasePrice: { type: Number, required: true },
+        free: { type: Number, default: 0 },
+        schemaAmt: { type: Number, default: 0 },
+        total: { type: Number, default: 0 },
         supplier: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
       },
@@ -140,8 +149,14 @@ export class Item {
   batches: {
     batchNumber: string;
     quantity: number;
+    pack?: number;
+    noOfPack?: number;
+    mrp?: number;
     expiryDate: Date;
     purchasePrice: number;
+    free?: number;
+    schemaAmt?: number;
+    total?: number;
     supplier: string;
     createdAt: Date;
   }[];

@@ -33,6 +33,10 @@ export class PurchaseItemDto {
   pack: number;
 
   @IsNumber()
+  @IsOptional()
+  noOfPack?: number;
+
+  @IsNumber()
   @IsNotEmpty()
   unitPrice: number;
 
@@ -55,6 +59,14 @@ export class PurchaseItemDto {
   @IsNumber()
   @IsNotEmpty()
   free: number;
+
+  @IsNumber()
+  @IsOptional()
+  schemaAmt?: number;
+
+  @IsNumber()
+  @IsOptional()
+  total?: number;
 }
 
 export class CreatePurchaseEntryDto {

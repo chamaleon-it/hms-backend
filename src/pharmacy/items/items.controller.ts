@@ -101,8 +101,14 @@ export class ItemsController {
     batchData: {
       batchNumber: string;
       quantity: number;
+      pack?: number;
+      noOfPack?: number;
+      mrp?: number;
       expiryDate: Date;
       purchasePrice: number;
+      free?: number;
+      schemaAmt?: number;
+      total?: number;
       supplier: string;
     },
   ) {
@@ -110,6 +116,19 @@ export class ItemsController {
     return {
       data,
       message: 'Batch items added successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/active-batch')
+  async setActiveBatch(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body('batchId') batchId: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.itemsService.setActiveBatch(id, batchId);
+    return {
+      data,
+      message: 'Active batch updated successfully',
     };
   }
 

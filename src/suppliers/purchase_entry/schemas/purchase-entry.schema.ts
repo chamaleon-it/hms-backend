@@ -38,12 +38,15 @@ export class PurchaseEntry {
       batch: { type: String, required: true },
       quantity: { type: Number, required: true },
       pack: { type: Number, required: true },
+      noOfPack: { type: Number, default: 0 },
       unitPrice: { type: Number, required: true },
       expiryDate: { type: Date, required: true },
       purchasePrice: { type: Number, required: true },
       gst: { type: Number, required: true },
       discount: { type: Number, required: true },
       free: { type: Number, required: true },
+      schemaAmt: { type: Number, default: 0 },
+      total: { type: Number, default: 0 },
     },
   ])
   items: Array<{
@@ -51,12 +54,15 @@ export class PurchaseEntry {
     batch: string;
     quantity: number;
     pack: number;
+    noOfPack?: number;
     unitPrice: number;
     expiryDate: Date;
     purchasePrice: number;
     gst: number;
     discount: number;
     free: number;
+    schemaAmt?: number;
+    total?: number;
   }>;
 
   @Prop({ default: 0 })

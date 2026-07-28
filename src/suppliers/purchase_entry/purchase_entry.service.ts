@@ -40,11 +40,17 @@ export class PurchaseEntryService {
         {
           batchNumber: item.batch,
           quantity: item.quantity,
+          pack: item.pack,
+          noOfPack: item.noOfPack,
+          mrp: item.unitPrice,
           expiryDate: item.expiryDate,
           purchasePrice: item.purchasePrice,
+          free: item.free,
+          schemaAmt: item.schemaAmt ?? ((item.free || 0) * (item.purchasePrice || 0)),
+          total: item.total,
           supplier: supplier?.name || '-',
         },
-        item.unitPrice / item.pack,
+        item.pack ? item.unitPrice / item.pack : item.unitPrice,
         item.unitPrice,
       );
     }
