@@ -255,6 +255,7 @@ export class ItemsService {
     id: mongoose.Types.ObjectId,
     quantity: number,
     user: mongoose.Types.ObjectId,
+    batchIdOrNumber?: mongoose.Types.ObjectId | string,
   ) {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
@@ -269,25 +270,73 @@ export class ItemsService {
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
-      await item.save();
+    }
+
+    if (item.batches && item.batches.length > 0 && quantity > 0) {
+      let targetBatch: any = null;
+
+      if (batchIdOrNumber) {
+        const targetStr = String(batchIdOrNumber).trim();
+        targetBatch = item.batches.find(
+          (b: any) =>
+            (b._id && String(b._id) === targetStr) ||
+            (b.batchNumber && b.batchNumber.trim() === targetStr),
+        );
+      }
+
+      if (!targetBatch && item.activeBatch) {
+        targetBatch = item.batches.find(
+          (b: any) => b._id && String(b._id) === String(item.activeBatch),
+        );
+      }
+
+      if (!targetBatch) {
+        targetBatch =
+          item.batches.find((b: any) => b.quantity > 0) || item.batches[0];
+      }
+
+      let remainingToDeduct = quantity;
+      if (targetBatch) {
+        const deduct = allowNegativeStock
+          ? remainingToDeduct
+          : Math.min(targetBatch.quantity, remainingToDeduct);
+        targetBatch.quantity = Math.max(targetBatch.quantity - deduct, 0);
+        remainingToDeduct -= deduct;
+      }
+
+      if (remainingToDeduct > 0 && !allowNegativeStock) {
+        for (const b of item.batches as any[]) {
+          if (remainingToDeduct <= 0) break;
+          if (b !== targetBatch && b.quantity > 0) {
+            const deduct = Math.min(b.quantity, remainingToDeduct);
+            b.quantity -= deduct;
+            remainingToDeduct -= deduct;
+          }
+        }
+      }
     }
 
     if (quantity > 0 && newQuantity >= 0) {
-      const newSoldQuantity = item.soldQuantity + quantity;
+      const newSoldQuantity = (item.soldQuantity || 0) + quantity;
       item.soldQuantity = newSoldQuantity;
+      if (!item.soldHistory) item.soldHistory = [];
       item.soldHistory.push({
         date: new Date(),
         quantity,
         unitPrice: item.unitPrice,
         total: item.unitPrice * quantity,
       });
-      await item.save();
     }
 
+    await item.save();
     return item;
   }
 
-  async increaseItem(id: mongoose.Types.ObjectId, quantity: number) {
+  async increaseItem(
+    id: mongoose.Types.ObjectId,
+    quantity: number,
+    batchIdOrNumber?: mongoose.Types.ObjectId | string,
+  ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
@@ -296,9 +345,35 @@ export class ItemsService {
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
-      await item.save();
     }
 
+    if (item.batches && item.batches.length > 0 && quantity > 0) {
+      let targetBatch: any = null;
+      if (batchIdOrNumber) {
+        const targetStr = String(batchIdOrNumber).trim();
+        targetBatch = item.batches.find(
+          (b: any) =>
+            (b._id && String(b._id) === targetStr) ||
+            (b.batchNumber && b.batchNumber.trim() === targetStr),
+        );
+      }
+
+      if (!targetBatch && item.activeBatch) {
+        targetBatch = item.batches.find(
+          (b: any) => b._id && String(b._id) === String(item.activeBatch),
+        );
+      }
+
+      if (!targetBatch) {
+        targetBatch = item.batches[0];
+      }
+
+      if (targetBatch) {
+        targetBatch.quantity += quantity;
+      }
+    }
+
+    await item.save();
     return item;
   }
 

@@ -60,6 +60,16 @@ export class ItemsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getItem(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.itemsService.getItem(id);
+    return {
+      data,
+      message: 'Item retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateItem(
     @Body() addItemDto: AddItemDto,

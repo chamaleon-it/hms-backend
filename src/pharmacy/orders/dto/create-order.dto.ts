@@ -36,6 +36,13 @@ export class OrderItemDto {
   @IsNumber()
   @IsNotEmpty({ message: 'Duration cannot be empty.' })
   quantity: number;
+
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsOptional()
+  batchId?: string;
 }
 
 export class CreateOrderDto {

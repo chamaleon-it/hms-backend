@@ -45,6 +45,12 @@ export class OrderItem {
   @Prop({ required: true })
   quantity: number;
 
+  @Prop({ default: null })
+  batchNumber?: string;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, default: null })
+  batchId?: Types.ObjectId;
+
   @Prop({ required: true, default: false })
   isPacked: boolean;
 }

@@ -209,9 +209,10 @@ export class OrdersService {
       order.status = OrderStatus.Ready;
       await order.save();
     }
-    const qty =
-      order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
-    await this.itemsService.decreaseItem(item, qty, user);
+    const orderItem = order.items.find((e) => String(e.name) === String(item));
+    const qty = orderItem?.quantity ?? 0;
+    const batchRef = (orderItem as any)?.batchId || (orderItem as any)?.batchNumber;
+    await this.itemsService.decreaseItem(item, qty, user, batchRef);
   }
 
   async markAllAsPacked(
@@ -229,8 +230,13 @@ export class OrdersService {
 
     if (unpacked.length > 0) {
       await Promise.all(
-        unpacked.map((it) =>
-          this.itemsService.decreaseItem(it.name, it.quantity, user),
+        unpacked.map((it: any) =>
+          this.itemsService.decreaseItem(
+            it.name,
+            it.quantity,
+            user,
+            it.batchId || it.batchNumber,
+          ),
         ),
       );
     }
