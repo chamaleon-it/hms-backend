@@ -94,6 +94,7 @@ export class AppointmentsService {
                   address: 1,
                   profilePic: 1,
                   specialization: 1,
+                  qualification: 1,
                 },
               },
             ],
@@ -320,7 +321,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel
       .find({ patient })
       .populate('patient')
-      .populate('doctor', 'name specialization')
+      .populate('doctor', 'name specialization qualification')
       .sort({ date: -1 })
       .lean();
     return data;

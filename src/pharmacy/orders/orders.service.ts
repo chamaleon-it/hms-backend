@@ -129,7 +129,7 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .populate('patient')
-        .populate('doctor', 'name phoneNumber specialization')
+        .populate('doctor', 'name phoneNumber specialization qualification')
         .populate('items.name')
         .sort({ createdAt: -1 })
         .exec(),
@@ -173,7 +173,7 @@ export class OrdersService {
     const data = await this.orderModel
       .findOne(filter)
       .populate('patient')
-      .populate('doctor', 'name phoneNumber specialization')
+      .populate('doctor', 'name phoneNumber specialization qualification')
       .populate('items.name')
       .lean();
 
@@ -641,7 +641,7 @@ export class OrdersService {
     const data = await this.orderModel
       .findByIdAndUpdate(dto.orderId, dto, { new: true, runValidators: true })
       .populate('patient')
-      .populate('doctor', 'name phoneNumber specialization')
+      .populate('doctor', 'name phoneNumber specialization qualification')
       .populate('items.name')
       .lean();
 

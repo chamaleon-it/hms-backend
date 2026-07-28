@@ -211,7 +211,7 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     }
     const patient = await this.patientModel
       .findById(id)
-      .populate('doctor', 'name specialization');
+      .populate('doctor', 'name specialization qualification');
     return patient;
   }
 

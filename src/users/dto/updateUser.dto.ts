@@ -75,6 +75,10 @@ export class UpdateUserDto {
   @IsOptional()
   specialization?: string | null;
 
+  @IsString({ message: 'Qualification must be a string' })
+  @IsOptional()
+  qualification?: string | null;
+
   @IsString({ message: 'Profile picture must be a string' })
   @IsOptional()
   profilePic?: string | null;

@@ -231,7 +231,7 @@ export class ReportService implements OnModuleInit {
 
     const data = await this.reportModel
       .find(match)
-      .populate('doctor', 'name specialization')
+      .populate('doctor', 'name specialization qualification')
       .populate('lab', 'name specialization')
       .populate('patient')
       .populate({
@@ -471,7 +471,7 @@ export class ReportService implements OnModuleInit {
       throw new BadRequestException('Please provide a valid patient id.');
     const report = await this.reportModel
       .find({ patient, isDeleted: false })
-      .populate('doctor', 'name specialization')
+      .populate('doctor', 'name specialization qualification')
       .populate('lab', 'name')
       .populate('test.name')
       .sort({ createdAt: -1 })

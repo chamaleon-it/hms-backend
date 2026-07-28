@@ -78,7 +78,7 @@ export class ConsultingsService {
       .find({ patient: patientId })
       .populate('patient')
       .populate('appointment')
-      .populate('doctor', 'name email specialization')
+      .populate('doctor', 'name email specialization qualification')
       .populate('medicines.name', 'name')
       .sort({ createdAt: -1 })
       .lean();
