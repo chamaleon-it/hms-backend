@@ -104,27 +104,42 @@ export class AppointmentsService {
     date: string;
     activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
   }) {
-    let startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    let endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    let dateStr = date || new Date().toISOString().split('T')[0];
+    if (dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+
+    let startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    let endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+
+    if (isNaN(startOfDay.getTime())) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
+      endOfDay = new Date(`${todayStr}T23:59:59.999Z`);
+    }
 
     if (activeDate === 'Today') {
-      const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setHours(23, 59, 59, 999));
+      const todayStr = new Date().toISOString().split('T')[0];
+      startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
+      endOfDay = new Date(`${todayStr}T23:59:59.999Z`);
     }
     if (activeDate === '7 days') {
       const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setDate(today.getDate() + 7));
-      endOfDay.setHours(23, 59, 59, 999);
+      const todayStr = today.toISOString().split('T')[0];
+      startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
+      const endDateObj = new Date(today);
+      endDateObj.setDate(today.getDate() + 7);
+      const endStr = endDateObj.toISOString().split('T')[0];
+      endOfDay = new Date(`${endStr}T23:59:59.999Z`);
     }
     if (activeDate === '30 days') {
       const today = new Date();
-      startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      endOfDay = new Date(today.setDate(today.getDate() + 30));
-      endOfDay.setHours(23, 59, 59, 999);
+      const todayStr = today.toISOString().split('T')[0];
+      startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
+      const endDateObj = new Date(today);
+      endDateObj.setDate(today.getDate() + 30);
+      const endStr = endDateObj.toISOString().split('T')[0];
+      endOfDay = new Date(`${endStr}T23:59:59.999Z`);
     }
 
     const $match: Record<string, any> = {
@@ -205,11 +220,9 @@ export class AppointmentsService {
   }
 
   async getStatistics() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${todayStr}T23:59:59.999Z`);
 
     const results: { count: number; _id: AppointmentStatus }[] =
       await this.appointmentModel.aggregate([
@@ -272,13 +285,17 @@ export class AppointmentsService {
   }
 
   async calenderMonthly(date: string) {
-    const parsedDate = new Date(date);
+    let dateStr = date || new Date().toISOString().split('T')[0];
+    if (dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    const parsedDate = new Date(`${dateStr}T00:00:00.000Z`);
     const now = !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
 
-    const startDate = new Date(year, month, 1, 0, 0, 0, 0);
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    const startDate = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 
     const appointments = await this.appointmentModel
       .find({
@@ -354,14 +371,18 @@ export class AppointmentsService {
   }
 
   async calenderWeekly(date: string) {
-    const now = new Date(date);
+    let dateStr = date || new Date().toISOString().split('T')[0];
+    if (dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    const now = (dateStr && !isNaN(new Date(`${dateStr}T00:00:00.000Z`).getTime())) ? new Date(`${dateStr}T00:00:00.000Z`) : new Date();
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setUTCDate(now.getUTCDate() - now.getUTCDay());
+    startOfWeek.setUTCHours(0, 0, 0, 0);
 
     const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() + (6 - now.getDay()));
-    endOfWeek.setHours(23, 59, 59, 999);
+    endOfWeek.setUTCDate(now.getUTCDate() + (6 - now.getUTCDay()));
+    endOfWeek.setUTCHours(23, 59, 59, 999);
 
     const data = await this.appointmentModel
       .find({
@@ -375,16 +396,18 @@ export class AppointmentsService {
     return data;
   }
 
-  async getBookedSlot(date: Date, doctor?: mongoose.Types.ObjectId) {
+  async getBookedSlot(date: Date | string, doctor?: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(doctor))
       throw new BadRequestException(
         'Doctor id is not valid, Please selected valid doctor id',
       );
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    let dateStr = typeof date === 'string' ? date : date.toISOString();
+    if (dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
 
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
