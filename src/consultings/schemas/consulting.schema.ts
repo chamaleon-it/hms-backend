@@ -157,6 +157,7 @@ export class Consulting {
       exercise: { type: String, default: null },
       smoking: { type: String, default: null },
       alcohol: { type: String, default: null },
+      micturition: { type: String, default: null },
     },
     required: false,
   })
@@ -168,6 +169,7 @@ export class Consulting {
     exercise: string | null;
     smoking: string | null;
     alcohol: string | null;
+    micturition: string | null;
   };
 
   @Prop({
@@ -216,7 +218,6 @@ export class Consulting {
     type: {
       bp: { type: String, default: null },
       pulse: { type: String, default: null },
-      weight: { type: String, default: null },
       tenderness: { type: String, default: null },
       rom: { type: String, default: null },
       posture: { type: String, default: null },
@@ -227,7 +228,6 @@ export class Consulting {
   acupunctureExamination?: {
     bp: string | null;
     pulse: string | null;
-    weight: string | null;
     tenderness: string | null;
     rom: string | null;
     posture: string | null;

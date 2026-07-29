@@ -197,6 +197,7 @@ export class ConsultingDto {
     exercise: string | null;
     smoking: string | null;
     alcohol: string | null;
+    micturition: string | null;
   };
 
   @IsOptional()
@@ -224,7 +225,6 @@ export class ConsultingDto {
   acupunctureExamination?: {
     bp: string | null;
     pulse: string | null;
-    weight: string | null;
     tenderness: string | null;
     rom: string | null;
     posture: string | null;
