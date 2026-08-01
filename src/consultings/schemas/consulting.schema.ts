@@ -75,7 +75,9 @@ export class Consulting {
 
   @Prop([
     {
-      name: { type: Types.ObjectId, ref: 'Item', required: true },
+      name: { type: Types.ObjectId, ref: 'Item', required: false, default: null },
+      referralName: { type: String, default: '' },
+      isCustom: { type: Boolean, default: false },
       dosage: { type: String, required: true },
       frequency: { type: String, required: true },
       food: { type: String, required: true },
@@ -84,7 +86,9 @@ export class Consulting {
     },
   ])
   medicines: {
-    name: Types.ObjectId;
+    name?: Types.ObjectId | null;
+    referralName?: string;
+    isCustom?: boolean;
     dosage: string;
     frequency: string;
     food: string;

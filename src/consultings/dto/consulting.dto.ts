@@ -8,8 +8,10 @@ import {
   IsDateString,
   IsMongoId,
   IsNumber,
+  IsBoolean,
+  ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import mongoose from 'mongoose';
 
 class ConsultationNotesDto {
@@ -72,9 +74,19 @@ class ExaminationNoteDto {
 }
 
 class MedicineDto {
-  @IsString({ message: 'Drug name is required and must be a string.' })
-  @IsNotEmpty({ message: 'Drug name cannot be empty.' })
-  name: mongoose.Types.ObjectId;
+  @IsOptional()
+  @ValidateIf((o, val) => val !== null && val !== undefined && val !== '')
+  @Transform(({ value }) => (value === '' ? null : value))
+  @IsMongoId({ message: 'Drug name must be a valid Mongo ID if provided.' })
+  name?: mongoose.Types.ObjectId | null;
+
+  @IsOptional()
+  @IsString()
+  referralName?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isCustom?: boolean;
 
   @IsString({ message: 'Dosage is required and must be a string.' })
   @IsNotEmpty({ message: 'Dosage cannot be empty.' })
@@ -93,7 +105,7 @@ class MedicineDto {
   duration: string;
 
   @IsNumber()
-  @IsNotEmpty({ message: 'Duration cannot be empty.' })
+  @IsNotEmpty({ message: 'Quantity cannot be empty.' })
   quantity: number;
 }
 

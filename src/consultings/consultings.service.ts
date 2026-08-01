@@ -29,10 +29,14 @@ export class ConsultingsService {
       doctor: doctorId,
     });
 
-    if (consultingDto.medicines.length) {
+    const inventoryMedicines = consultingDto.medicines.filter(
+      (m) => !m.isCustom && m.name && mongoose.isValidObjectId(m.name),
+    );
+
+    if (inventoryMedicines.length) {
       await this.ordersService.createOrder({
         doctor: doctorId,
-        items: consultingDto.medicines,
+        items: inventoryMedicines as any,
         patient: consultingDto.patient,
         priority: OrderPriority.Normal,
         status: OrderStatus.Pending,
