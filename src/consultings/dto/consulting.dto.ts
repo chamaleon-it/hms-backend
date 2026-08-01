@@ -158,6 +158,10 @@ export class ConsultingDto {
   therapy: null | string;
 
   @IsOptional()
+  @IsString({ message: 'Therapy notes must be a string or null.' })
+  therapyNotes: null | string;
+
+  @IsOptional()
   @IsString({ message: 'Advice must be a string or null.' })
   advice: null | string;
 

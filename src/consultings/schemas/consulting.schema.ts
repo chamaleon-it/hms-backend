@@ -96,6 +96,9 @@ export class Consulting {
   therapy: string | null;
 
   @Prop({ type: String, default: null })
+  therapyNotes: string | null;
+
+  @Prop({ type: String, default: null })
   advice: string | null;
 
   @Prop({ type: Date, default: null })
