@@ -40,12 +40,18 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('list')
-  async getAppointments(@Query() getListDto: GetListDto) {
+  async getAppointments(
+    @Query() getListDto: GetListDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const doctorFilter =
+      getListDto.doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
       status: getListDto.status ? getListDto.status : [],
       date: getListDto.date || new Date().toString(),
       activeDate: getListDto.activeDate,
+      doctor: doctorFilter,
     });
     return {
       data,
@@ -65,19 +71,29 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('statistics')
-  async getStatistics() {
-    const data = await this.appointmentsService.getStatistics();
+  async getStatistics(
+    @GetUser() user: JWTUserInterface,
+    @Query('doctor') doctor?: string,
+  ) {
+    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+    const data = await this.appointmentsService.getStatistics(doctorFilter);
     return {
       data,
       message: 'Appointment statistics retrived successfully',
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
-  async calenderMonthly(@Query('date') date?: string) {
+  async calenderMonthly(
+    @GetUser() user: JWTUserInterface,
+    @Query('date') date?: string,
+    @Query('doctor') doctor?: string,
+  ) {
+    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.calenderMonthly(
       date || new Date().toString(),
+      doctorFilter,
     );
     return {
       data,
@@ -85,10 +101,17 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/calender/weekly')
-  async calenderWeekly(@Query('date') date?: string) {
+  async calenderWeekly(
+    @GetUser() user: JWTUserInterface,
+    @Query('date') date?: string,
+    @Query('doctor') doctor?: string,
+  ) {
+    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.calenderWeekly(
       date || new Date().toString(),
+      doctorFilter,
     );
     return {
       message: 'Weekly calander fetched',

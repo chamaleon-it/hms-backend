@@ -98,11 +98,13 @@ export class AppointmentsService {
     status,
     date,
     activeDate,
+    doctor,
   }: {
     query?: string;
     status?: string[];
     date: string;
     activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
+    doctor?: string;
   }) {
     let dateStr = date || new Date().toISOString().split('T')[0];
     if (dateStr.includes('T')) {
@@ -145,6 +147,9 @@ export class AppointmentsService {
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
     };
+    if (doctor && mongoose.isValidObjectId(doctor)) {
+      $match.doctor = new mongoose.Types.ObjectId(doctor);
+    }
     if (query && query.trim())
       $match.patientName = { $regex: new RegExp(safeRegex(query.trim()), 'i') };
     if (status?.length) {
@@ -219,18 +224,23 @@ export class AppointmentsService {
       .option({ allowDiskUse: true });
   }
 
-  async getStatistics() {
+  async getStatistics(doctor?: string) {
     const todayStr = new Date().toISOString().split('T')[0];
     const startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
     const endOfDay = new Date(`${todayStr}T23:59:59.999Z`);
 
+    const matchCondition: Record<string, any> = {
+      date: { $gte: startOfDay, $lte: endOfDay },
+      isDeleted: false,
+    };
+    if (doctor && mongoose.isValidObjectId(doctor)) {
+      matchCondition.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
     const results: { count: number; _id: AppointmentStatus }[] =
       await this.appointmentModel.aggregate([
         {
-          $match: {
-            date: { $gte: startOfDay, $lte: endOfDay },
-            isDeleted: false,
-          },
+          $match: matchCondition,
         },
         {
           $group: {
@@ -284,7 +294,7 @@ export class AppointmentsService {
     return stats;
   }
 
-  async calenderMonthly(date: string) {
+  async calenderMonthly(date: string, doctor?: string) {
     let dateStr = date || new Date().toISOString().split('T')[0];
     if (dateStr.includes('T')) {
       dateStr = dateStr.split('T')[0];
@@ -297,11 +307,16 @@ export class AppointmentsService {
     const startDate = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
     const endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 
+    const filter: Record<string, any> = {
+      date: { $gte: startDate, $lte: endDate },
+      isDeleted: false,
+    };
+    if (doctor && mongoose.isValidObjectId(doctor)) {
+      filter.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
     const appointments = await this.appointmentModel
-      .find({
-        date: { $gte: startDate, $lte: endDate },
-        isDeleted: false,
-      })
+      .find(filter)
       .select('date patient type status')
       .sort({ date: 1 })
       .populate('patient', 'name mrn')
@@ -319,37 +334,36 @@ export class AppointmentsService {
     id: mongoose.Types.ObjectId,
     updateStatusDto: UpdateStatusDto,
   ) {
-    if (!mongoose.isValidObjectId(id))
-      throw new BadRequestException('id not valid');
-
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { status: updateStatusDto.status },
-      { new: true, runValidators: true },
+      { new: true },
     );
 
-    if (!data) {
-      throw new NotFoundException('Appointment not found');
-    }
+    if (
+      updateStatusDto.status === 'Observation' ||
+      updateStatusDto.status === 'Admit'
+    ) {
+      const patientId = data?.patient;
+      const doctorId = data?.doctor;
 
-    if (updateStatusDto.status === 'Admit' || updateStatusDto.status === 'Observation') {
-      const activeIP = await this.inPatientModel.findOne({
-        patientId: data.patient,
-        status: { $ne: IPStatus.DISCHARGED }
-      });
-
-      if (!activeIP) {
-        const admissionNumber = 'IP-' + Math.floor(100000 + Math.random() * 900000);
-        await this.inPatientModel.create({
-          patientId: data.patient,
-          doctorId: data.doctor,
-          admissionNumber,
-          room: 'TBD',
-          ward: 'TBD',
-          bed: 'TBD',
-          status: updateStatusDto.status === 'Observation' ? IPStatus.OBSERVATION : IPStatus.ADMITTED,
-          admissionDate: new Date(),
+      if (patientId && doctorId) {
+        const existingIP = await this.inPatientModel.findOne({
+          patientId: patientId.toString(),
+          status: { $ne: IPStatus.DISCHARGED },
         });
+
+        if (!existingIP) {
+          await this.inPatientModel.create({
+            patientId: patientId.toString(),
+            doctorId: doctorId.toString(),
+            status:
+              updateStatusDto.status === 'Observation'
+                ? IPStatus.OBSERVATION
+                : IPStatus.ADMITTED,
+            admissionDate: new Date(),
+          });
+        }
       }
     }
 
@@ -370,7 +384,7 @@ export class AppointmentsService {
     return data;
   }
 
-  async calenderWeekly(date: string) {
+  async calenderWeekly(date: string, doctor?: string) {
     let dateStr = date || new Date().toISOString().split('T')[0];
     if (dateStr.includes('T')) {
       dateStr = dateStr.split('T')[0];
@@ -384,11 +398,16 @@ export class AppointmentsService {
     endOfWeek.setUTCDate(now.getUTCDate() + (6 - now.getUTCDay()));
     endOfWeek.setUTCHours(23, 59, 59, 999);
 
+    const filter: Record<string, any> = {
+      date: { $gte: startOfWeek, $lte: endOfWeek },
+      isDeleted: false,
+    };
+    if (doctor && mongoose.isValidObjectId(doctor)) {
+      filter.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
     const data = await this.appointmentModel
-      .find({
-        date: { $gte: startOfWeek, $lte: endOfWeek },
-        isDeleted: false,
-      })
+      .find(filter)
       .select('date status')
       .populate('patient', 'name')
       .lean();
