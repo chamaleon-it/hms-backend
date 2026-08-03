@@ -14,7 +14,7 @@ export class PurchaseEntryService {
     private purchaseEntryModel: Model<PurchaseEntry>,
     private readonly itemsService: ItemsService,
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
-  ) {}
+  ) { }
 
   async create(createPurchaseEntryDto: CreatePurchaseEntryDto) {
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {

@@ -407,6 +407,7 @@ export class ItemsService {
       pack: batchData.pack ?? item.packing ?? 0,
       noOfPack: batchData.noOfPack ?? 0,
       mrp: batchData.mrp ?? mrp ?? item.mrp ?? 0,
+      unitPrice: unitPrice,
       free: batchData.free ?? 0,
       schemaAmt: batchData.schemaAmt ?? 0,
       total: batchData.total ?? 0,

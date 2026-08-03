@@ -130,11 +130,13 @@ export class Item {
   @Prop({
     type: [
       {
+
         batchNumber: { type: String, required: true },
         quantity: { type: Number, required: true },
         pack: { type: Number, default: 0 },
         noOfPack: { type: Number, default: 0 },
         mrp: { type: Number, default: 0 },
+        unitPrice: { type: Number, default: 0 },
         expiryDate: { type: Date, required: true },
         purchasePrice: { type: Number, required: true },
         free: { type: Number, default: 0 },
@@ -147,6 +149,7 @@ export class Item {
     default: [],
   })
   batches: {
+    unitPrice: number;
     batchNumber: string;
     quantity: number;
     pack?: number;
