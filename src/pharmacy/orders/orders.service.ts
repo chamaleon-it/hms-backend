@@ -276,12 +276,15 @@ export class OrdersService {
       limit = 10,
       alreadyPurchase = 'true',
       q,
+      query: queryParam,
       gender,
       doctor,
       lastVisit,
       from,
       to,
       age,
+      minAge,
+      maxAge,
       address,
       city,
       district,
@@ -290,17 +293,38 @@ export class OrdersService {
     } = query;
     const skip = (page - 1) * limit;
 
+    const searchTerm = (q || queryParam || '').trim();
+
+    let minA: number | undefined;
+    let maxA: number | undefined;
+    if (age && typeof age === 'string') {
+      const [m1, m2] = age.split('-').map(Number);
+      if (!isNaN(m1)) minA = m1;
+      if (!isNaN(m2)) maxA = m2;
+    }
+    if (minAge !== undefined && minAge !== '') {
+      const parsed = Number(minAge);
+      if (!isNaN(parsed)) minA = parsed;
+    }
+    if (maxAge !== undefined && maxAge !== '') {
+      const parsed = Number(maxAge);
+      if (!isNaN(parsed)) maxA = parsed;
+    }
+
     const patientFilter: any = { status: { $ne: PatientStatus.DELETED } };
 
-    if (q) {
-      const searchRegex = { $regex: q, $options: 'i' };
+    if (searchTerm) {
+      const searchRegex = { $regex: searchTerm, $options: 'i' };
       const orConditions: any[] = [
         { name: searchRegex },
         { phoneNumber: searchRegex },
         { mrn: searchRegex },
+        { addressLine1: searchRegex },
+        { addressLine2: searchRegex },
+        { address: searchRegex },
       ];
-      if (mongoose.isValidObjectId(q)) {
-        orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
+      if (mongoose.isValidObjectId(searchTerm)) {
+        orConditions.push({ _id: new mongoose.Types.ObjectId(searchTerm) });
       }
       patientFilter.$or = orConditions;
     }
@@ -341,31 +365,28 @@ export class OrdersService {
       patientFilter.doctor = new mongoose.Types.ObjectId(doctor);
     }
 
-    if (age) {
-      const [minAge, maxAge] = age.split('-').map(Number);
-      if (!isNaN(minAge) && !isNaN(maxAge)) {
-        if (minAge > 0 || maxAge < 100) {
-          const now = new Date();
-          const minDate = new Date(
-            now.getFullYear() - maxAge - 1,
-            now.getMonth(),
-            now.getDate() + 1,
-          );
-          const maxDate = new Date(
-            now.getFullYear() - minAge,
-            now.getMonth(),
-            now.getDate(),
-          );
-          patientFilter.dateOfBirth = { 
-            $gte: minDate.toISOString().split('T')[0], 
-            $lte: maxDate.toISOString().split('T')[0] 
-          };
-        }
+    if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+      if (minA > 0 || maxA < 100) {
+        const now = new Date();
+        const minDate = new Date(
+          now.getFullYear() - maxA - 1,
+          now.getMonth(),
+          now.getDate() + 1,
+        );
+        const maxDate = new Date(
+          now.getFullYear() - minA,
+          now.getMonth(),
+          now.getDate(),
+          23, 59, 59, 999
+        );
+        patientFilter.$expr = {
+          $and: [
+            { $gte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
+            { $lte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
+          ]
+        };
       }
     }
-
-    let patientIds: mongoose.Types.ObjectId[] | null = null;
-    let total = 0;
 
     const billingMatch: any = {
       patient: { $exists: true, $ne: null },
@@ -373,23 +394,32 @@ export class OrdersService {
     };
 
     if (lastVisit) {
-      let dateLimit: Date | null = null;
       const now = new Date();
       if (lastVisit === '7') {
-        dateLimit = new Date(now.setDate(now.getDate() - 7));
-      } else if (lastVisit === '30') {
-        dateLimit = new Date(now.setDate(now.getDate() - 30));
-      } else if (lastVisit === 'Custom' && from && to) {
-        billingMatch.createdAt = {
-          $gte: new Date(from),
-          $lte: new Date(to),
-        };
-      }
-
-      if (dateLimit) {
+        const dateLimit = new Date(now.setDate(now.getDate() - 7));
         billingMatch.createdAt = { $gte: dateLimit };
+      } else if (lastVisit === '30') {
+        const dateLimit = new Date(now.setDate(now.getDate() - 30));
+        billingMatch.createdAt = { $gte: dateLimit };
+      } else if (lastVisit === 'Custom' && (from || to)) {
+        const dateMatch: any = {};
+        if (from) dateMatch.$gte = new Date(from);
+        if (to) {
+          const toDate = new Date(to);
+          toDate.setHours(23, 59, 59, 999);
+          dateMatch.$lte = toDate;
+        }
+        billingMatch.createdAt = dateMatch;
       }
     }
+
+    if (alreadyPurchase === 'false' && lastVisit) {
+      const purchasedPatientIds = await this.billingModel.distinct('patient', billingMatch);
+      patientFilter._id = { $in: purchasedPatientIds };
+    }
+
+    let patientIds: mongoose.Types.ObjectId[] | null = null;
+    let total = 0;
 
     if (alreadyPurchase === 'true') {
       const aggregationPipeline: any[] = [
@@ -420,26 +450,24 @@ export class OrdersService {
         });
       }
 
-      if (q) {
-        const searchRegex = { $regex: q, $options: 'i' };
-        aggregationPipeline.push({
-          $match: {
-            $or: [
-              { 'patientDetail.name': searchRegex },
-              { 'patientDetail.phoneNumber': searchRegex },
-              { 'patientDetail.address': searchRegex },
-              { 'patientDetail.mrn': searchRegex },
-            ],
-          },
-        });
-        if (mongoose.isValidObjectId(q)) {
-          (
-            aggregationPipeline[aggregationPipeline.length - 1].$match
-              .$or as any[]
-          ).push({
-            'patientDetail._id': new mongoose.Types.ObjectId(q),
+      if (searchTerm) {
+        const searchRegex = { $regex: searchTerm, $options: 'i' };
+        const orConditions: any[] = [
+          { 'patientDetail.name': searchRegex },
+          { 'patientDetail.phoneNumber': searchRegex },
+          { 'patientDetail.addressLine1': searchRegex },
+          { 'patientDetail.addressLine2': searchRegex },
+          { 'patientDetail.address': searchRegex },
+          { 'patientDetail.mrn': searchRegex },
+        ];
+        if (mongoose.isValidObjectId(searchTerm)) {
+          orConditions.push({
+            'patientDetail._id': new mongoose.Types.ObjectId(searchTerm),
           });
         }
+        aggregationPipeline.push({
+          $match: { $or: orConditions },
+        });
       }
 
       if (gender) {
@@ -448,30 +476,67 @@ export class OrdersService {
         });
       }
 
-      if (age) {
-        const [minAge, maxAge] = age.split('-').map(Number);
-        if (!isNaN(minAge) && !isNaN(maxAge)) {
-          if (minAge > 0 || maxAge < 100) {
-            const now = new Date();
-            const minDate = new Date(
-              now.getFullYear() - maxAge - 1,
-              now.getMonth(),
-              now.getDate() + 1,
-            );
-            const maxDate = new Date(
-              now.getFullYear() - minAge,
-              now.getMonth(),
-              now.getDate(),
-            );
-            aggregationPipeline.push({
-              $match: {
-                'patientDetail.dateOfBirth': { 
-                  $gte: minDate.toISOString().split('T')[0], 
-                  $lte: maxDate.toISOString().split('T')[0] 
-                },
-              },
-            });
-          }
+      if (address) {
+        const addressSearchTerm = address.trim();
+        aggregationPipeline.push({
+          $match: {
+            $or: [
+              { 'patientDetail.addressLine1': { $regex: addressSearchTerm, $options: 'i' } },
+              { 'patientDetail.addressLine2': { $regex: addressSearchTerm, $options: 'i' } },
+              { 'patientDetail.address': { $regex: addressSearchTerm, $options: 'i' } },
+            ],
+          },
+        });
+      }
+
+      if (city) {
+        aggregationPipeline.push({
+          $match: { 'patientDetail.city': { $regex: city.trim(), $options: 'i' } },
+        });
+      }
+
+      if (district) {
+        aggregationPipeline.push({
+          $match: { 'patientDetail.district': { $regex: district.trim(), $options: 'i' } },
+        });
+      }
+
+      if (state) {
+        aggregationPipeline.push({
+          $match: { 'patientDetail.state': { $regex: state.trim(), $options: 'i' } },
+        });
+      }
+
+      if (pincode) {
+        aggregationPipeline.push({
+          $match: { 'patientDetail.pinCode': { $regex: pincode.trim(), $options: 'i' } },
+        });
+      }
+
+      if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+        if (minA > 0 || maxA < 100) {
+          const now = new Date();
+          const minDate = new Date(
+            now.getFullYear() - maxA - 1,
+            now.getMonth(),
+            now.getDate() + 1,
+          );
+          const maxDate = new Date(
+            now.getFullYear() - minA,
+            now.getMonth(),
+            now.getDate(),
+            23, 59, 59, 999
+          );
+          aggregationPipeline.push({
+            $match: {
+              $expr: {
+                $and: [
+                  { $gte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
+                  { $lte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
+                ]
+              }
+            },
+          });
         }
       }
 

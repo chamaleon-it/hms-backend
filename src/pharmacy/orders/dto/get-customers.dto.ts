@@ -23,6 +23,9 @@ export class GetCustomersDto {
   q?: string; // phone number / patiner name / patient id
 
   @IsOptional()
+  query?: string;
+
+  @IsOptional()
   address?: string;
 
   @IsOptional()
@@ -53,7 +56,13 @@ export class GetCustomersDto {
   to?: string; // date if custom
 
   @IsOptional()
-  age: string; // `${filter.age[0]}-${filter.age[1]}`
+  age?: string; // `${filter.age[0]}-${filter.age[1]}`
+
+  @IsOptional()
+  minAge?: string;
+
+  @IsOptional()
+  maxAge?: string;
 }
 
 //sample
