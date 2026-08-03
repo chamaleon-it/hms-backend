@@ -16,6 +16,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { AddItemDto } from './dto/add-items.dto';
 import { GetItemsDto } from './dto/get-items.dto';
+import { UpdateBatchDto } from './dto/update-batch.dto';
 import mongoose from 'mongoose';
 import type { Response } from 'express';
 
@@ -139,6 +140,24 @@ export class ItemsController {
     return {
       data,
       message: 'Active batch updated successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/batches/:batchId')
+  async updateBatchItem(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: mongoose.Types.ObjectId,
+    @Body() updateBatchDto: UpdateBatchDto,
+  ) {
+    const data = await this.itemsService.updateBatchItem(
+      id,
+      batchId,
+      updateBatchDto,
+    );
+    return {
+      data,
+      message: 'Batch updated successfully',
     };
   }
 

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import mongoose, { Model } from 'mongoose';
 import { AddItemDto } from './dto/add-items.dto';
+import { UpdateBatchDto } from './dto/update-batch.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Item, ItemStatus } from './schemas/item.schema';
 import { GetItemsDto } from './dto/get-items.dto';
@@ -465,6 +466,53 @@ export class ItemsService {
     item.activeBatch = batchId;
     await item.save();
 
+    return item;
+  }
+
+  async updateBatchItem(
+    itemId: mongoose.Types.ObjectId,
+    batchId: mongoose.Types.ObjectId,
+    updateBatchDto: UpdateBatchDto,
+  ) {
+    const item = await this.itemModel.findById(itemId);
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    const batch = (item.batches as any).id(batchId);
+    if (!batch) {
+      throw new BadRequestException('Batch not found in this item.');
+    }
+
+    if (updateBatchDto.batchNumber !== undefined) batch.batchNumber = updateBatchDto.batchNumber;
+    if (updateBatchDto.pack !== undefined) batch.pack = updateBatchDto.pack;
+    if (updateBatchDto.noOfPack !== undefined) batch.noOfPack = updateBatchDto.noOfPack;
+    if (updateBatchDto.quantity !== undefined) batch.quantity = updateBatchDto.quantity;
+    if (updateBatchDto.mrp !== undefined) batch.mrp = updateBatchDto.mrp;
+    if (updateBatchDto.unitPrice !== undefined) batch.unitPrice = updateBatchDto.unitPrice;
+    if (updateBatchDto.purchasePrice !== undefined) batch.purchasePrice = updateBatchDto.purchasePrice;
+    if (updateBatchDto.expiryDate !== undefined) batch.expiryDate = updateBatchDto.expiryDate;
+    if (updateBatchDto.free !== undefined) batch.free = updateBatchDto.free;
+    if (updateBatchDto.schemaAmt !== undefined) batch.schemaAmt = updateBatchDto.schemaAmt;
+    if (updateBatchDto.total !== undefined) batch.total = updateBatchDto.total;
+    if (updateBatchDto.supplier !== undefined) batch.supplier = updateBatchDto.supplier;
+
+    // Recalculate total item quantity from all batches
+    item.quantity = item.batches.reduce((sum, b: any) => sum + (b.quantity || 0), 0);
+
+    // If edited batch is active batch or sole batch, sync item-level fields
+    const isActive = item.activeBatch && String(item.activeBatch) === String(batchId);
+    if (isActive || item.batches.length === 1) {
+      if (updateBatchDto.pack !== undefined) item.packing = updateBatchDto.pack;
+      if (updateBatchDto.noOfPack !== undefined) item.noOfPacking = updateBatchDto.noOfPack;
+      if (updateBatchDto.unitPrice !== undefined) item.unitPrice = updateBatchDto.unitPrice;
+      if (updateBatchDto.mrp !== undefined) item.mrp = updateBatchDto.mrp;
+      if (updateBatchDto.expiryDate !== undefined) item.expiryDate = updateBatchDto.expiryDate;
+      if (updateBatchDto.purchasePrice !== undefined) item.purchasePrice = updateBatchDto.purchasePrice;
+      if (updateBatchDto.supplier !== undefined) item.supplier = updateBatchDto.supplier;
+    }
+
+    await item.save();
     return item;
   }
 
