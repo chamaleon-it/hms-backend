@@ -47,9 +47,9 @@ export class PatientRegisterDto {
     if (!str) return undefined;
     return str.includes(',')
       ? str
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [str];
   })
   @IsArray()
@@ -61,8 +61,6 @@ export class PatientRegisterDto {
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
   blood?: string;
-
-
 
   @IsOptional()
   @IsString()
@@ -128,8 +126,6 @@ export class PatientRegisterDto {
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
   notes?: string;
-
-
 
   @IsOptional()
   weight?: number;

@@ -36,13 +36,18 @@ export class PurchaseEntryService {
         .findById(createPurchaseEntryDto.supplier)
         .exec();
 
-      await this.itemsService.addBatchItems(item.item, {
-        batchNumber: item.batch,
-        quantity: item.quantity,
-        expiryDate: item.expiryDate,
-        purchasePrice: item.purchasePrice,
-        supplier: supplier?.name || '-',
-      },item.unitPrice/item.pack,item.unitPrice);
+      await this.itemsService.addBatchItems(
+        item.item,
+        {
+          batchNumber: item.batch,
+          quantity: item.quantity,
+          expiryDate: item.expiryDate,
+          purchasePrice: item.purchasePrice,
+          supplier: supplier?.name || '-',
+        },
+        item.unitPrice / item.pack,
+        item.unitPrice,
+      );
     }
     return data;
   }

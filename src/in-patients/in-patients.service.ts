@@ -1,24 +1,35 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateInPatientDto } from './dto/create-in-patient.dto';
 import { UpdateInPatientDto } from './dto/update-in-patient.dto';
-import { InPatient, InPatientDocument, IPStatus } from './schemas/in-patient.schema';
+import {
+  InPatient,
+  InPatientDocument,
+  IPStatus,
+} from './schemas/in-patient.schema';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 
 @Injectable()
 export class InPatientsService {
   constructor(
-    @InjectModel(InPatient.name) private inPatientModel: Model<InPatientDocument>,
+    @InjectModel(InPatient.name)
+    private inPatientModel: Model<InPatientDocument>,
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
   ) {}
 
   async create(createInPatientDto: CreateInPatientDto, user: any) {
     // Check if the patient already has an active (non-Discharged) IP record
-    const existingActive = await this.inPatientModel.findOne({
-      patientId: new Types.ObjectId(createInPatientDto.patientId),
-      status: { $ne: IPStatus.DISCHARGED },
-    }).lean();
+    const existingActive = await this.inPatientModel
+      .findOne({
+        patientId: new Types.ObjectId(createInPatientDto.patientId),
+        status: { $ne: IPStatus.DISCHARGED },
+      })
+      .lean();
 
     if (existingActive) {
       throw new ConflictException(
@@ -59,7 +70,6 @@ export class InPatientsService {
     await ip.save();
     return { data: ip, message: 'Note added successfully' };
   }
-
 
   async findAll(query: any) {
     const filter: any = {};

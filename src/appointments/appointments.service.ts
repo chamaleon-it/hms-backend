@@ -9,13 +9,18 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
-import { InPatient, InPatientDocument, IPStatus } from '../in-patients/schemas/in-patient.schema';
+import {
+  InPatient,
+  InPatientDocument,
+  IPStatus,
+} from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
 @Injectable()
 export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
-    @InjectModel(InPatient.name) private inPatientModel: Model<InPatientDocument>,
+    @InjectModel(InPatient.name)
+    private inPatientModel: Model<InPatientDocument>,
     private readonly usersService: UsersService,
     private readonly billingService: BillingService,
   ) {}
@@ -28,12 +33,14 @@ export class AppointmentsService {
 
     try {
       // Find the most recent prior appointment for the same patient and doctor that had a consultation fee
-      const lastAppointment = await this.appointmentModel.findOne({
-        patient: createAppointmentDto.patient,
-        doctor: createAppointmentDto.doctor,
-        hasConsultationFee: { $ne: false },
-        isDeleted: { $ne: true },
-      }).sort({ date: -1 });
+      const lastAppointment = await this.appointmentModel
+        .findOne({
+          patient: createAppointmentDto.patient,
+          doctor: createAppointmentDto.doctor,
+          hasConsultationFee: { $ne: false },
+          isDeleted: { $ne: true },
+        })
+        .sort({ date: -1 });
 
       if (lastAppointment) {
         const prevDate = new Date(lastAppointment.date);
@@ -59,7 +66,9 @@ export class AppointmentsService {
     try {
       if (shouldBillConsultation) {
         // Fetch the doctor from database to retrieve their consultation fee
-        const doctorUser = await this.usersService.getUserById(appointment.doctor);
+        const doctorUser = await this.usersService.getUserById(
+          appointment.doctor,
+        );
         const consultationFee = doctorUser?.consultationFee ?? 0;
 
         // Construct a Draft bill containing the consultation fee
@@ -84,10 +93,13 @@ export class AppointmentsService {
           status: 'Draft',
         };
 
-        await this.billingService.generateBill(createBillingDto as any);
+        await this.billingService.generateBill(createBillingDto);
       }
     } catch (error) {
-      console.error('Failed to create consultation fee bill for appointment:', error);
+      console.error(
+        'Failed to create consultation fee bill for appointment:',
+        error,
+      );
     }
 
     return appointment;
@@ -324,7 +336,10 @@ export class AppointmentsService {
 
     const data = appointments.map((a) => ({
       ...a,
-      date: a.date instanceof Date ? a.date.toISOString().split('T')[0] : new Date(a.date).toISOString().split('T')[0],
+      date:
+        a.date instanceof Date
+          ? a.date.toISOString().split('T')[0]
+          : new Date(a.date).toISOString().split('T')[0],
     }));
 
     return data;
@@ -389,7 +404,10 @@ export class AppointmentsService {
     if (dateStr.includes('T')) {
       dateStr = dateStr.split('T')[0];
     }
-    const now = (dateStr && !isNaN(new Date(`${dateStr}T00:00:00.000Z`).getTime())) ? new Date(`${dateStr}T00:00:00.000Z`) : new Date();
+    const now =
+      dateStr && !isNaN(new Date(`${dateStr}T00:00:00.000Z`).getTime())
+        ? new Date(`${dateStr}T00:00:00.000Z`)
+        : new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setUTCDate(now.getUTCDate() - now.getUTCDay());
     startOfWeek.setUTCHours(0, 0, 0, 0);
@@ -543,13 +561,19 @@ export class AppointmentsService {
     return data;
   }
 
-  async refundAppointment(id: mongoose.Types.ObjectId, userId: mongoose.Types.ObjectId, reason?: string) {
+  async refundAppointment(
+    id: mongoose.Types.ObjectId,
+    userId: mongoose.Types.ObjectId,
+    reason?: string,
+  ) {
     const appointment = await this.appointmentModel.findById(id);
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
     if (appointment.isRefunded) {
-      throw new BadRequestException('This appointment has already been refunded');
+      throw new BadRequestException(
+        'This appointment has already been refunded',
+      );
     }
 
     const doctorUser = await this.usersService.getUserById(appointment.doctor);

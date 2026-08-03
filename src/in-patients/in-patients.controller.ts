@@ -45,14 +45,9 @@ export class InPatientsController {
   }
 
   @Post(':id/notes')
-  addNote(
-    @Param('id') id: string,
-    @Body() body: any,
-    @Req() req: any,
-  ) {
+  addNote(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     return this.inPatientsService.addIpNote(id, body, req.user);
   }
-
 
   @Delete(':id')
   remove(@Param('id') id: string) {

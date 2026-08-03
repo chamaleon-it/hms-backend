@@ -109,10 +109,9 @@ export class PanelsService {
   }
 
   async deletePanel(id: string) {
-    await this.panelModel.findByIdAndUpdate(
-      id,
-      { status: PanelStatus.DELETED },
-    );
+    await this.panelModel.findByIdAndUpdate(id, {
+      status: PanelStatus.DELETED,
+    });
   }
 
   async createTest(dto: CreateTestDto) {

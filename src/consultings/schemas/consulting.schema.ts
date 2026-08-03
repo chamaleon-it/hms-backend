@@ -75,7 +75,12 @@ export class Consulting {
 
   @Prop([
     {
-      name: { type: Types.ObjectId, ref: 'Item', required: false, default: null },
+      name: {
+        type: Types.ObjectId,
+        ref: 'Item',
+        required: false,
+        default: null,
+      },
       referralName: { type: String, default: '' },
       isCustom: { type: Boolean, default: false },
       dosage: { type: String, required: true },

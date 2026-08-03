@@ -45,7 +45,8 @@ export class AppointmentsController {
     @GetUser() user: JWTUserInterface,
   ) {
     const doctorFilter =
-      getListDto.doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+      getListDto.doctor ||
+      (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
       status: getListDto.status ? getListDto.status : [],
@@ -75,7 +76,8 @@ export class AppointmentsController {
     @GetUser() user: JWTUserInterface,
     @Query('doctor') doctor?: string,
   ) {
-    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+    const doctorFilter =
+      doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.getStatistics(doctorFilter);
     return {
       data,
@@ -90,7 +92,8 @@ export class AppointmentsController {
     @Query('date') date?: string,
     @Query('doctor') doctor?: string,
   ) {
-    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+    const doctorFilter =
+      doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.calenderMonthly(
       date || new Date().toString(),
       doctorFilter,
@@ -108,7 +111,8 @@ export class AppointmentsController {
     @Query('date') date?: string,
     @Query('doctor') doctor?: string,
   ) {
-    const doctorFilter = doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+    const doctorFilter =
+      doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
     const data = await this.appointmentsService.calenderWeekly(
       date || new Date().toString(),
       doctorFilter,

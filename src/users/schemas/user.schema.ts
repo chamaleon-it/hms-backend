@@ -69,7 +69,10 @@ export class User {
     trim: true,
     index: true,
     minlength: 3,
-    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain alphanumeric characters and underscores'],
+    match: [
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain alphanumeric characters and underscores',
+    ],
   })
   username: string;
 

@@ -42,7 +42,8 @@ export class PatientsController {
 
   @Get()
   async getPatient(@Query() getPatientsDto: GetPatientsDto) {
-    const { data, total } = await this.patientsService.getPatient(getPatientsDto);
+    const { data, total } =
+      await this.patientsService.getPatient(getPatientsDto);
     return {
       data,
       total,

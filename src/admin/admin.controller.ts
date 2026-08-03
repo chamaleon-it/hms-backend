@@ -14,12 +14,15 @@ import { Query } from '@nestjs/common';
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
-    private readonly billingService: BillingService
+    private readonly billingService: BillingService,
   ) {}
 
   @Get('billing')
   async getAllBills(@Query() getBillisDto: GetBillisDto) {
-    const { data, total } = await this.billingService.getBills(null, getBillisDto);
+    const { data, total } = await this.billingService.getBills(
+      null,
+      getBillisDto,
+    );
     return {
       message: 'All bills retrieved successfully.',
       data,

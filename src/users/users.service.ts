@@ -26,12 +26,14 @@ export class UsersService {
     const isUserExist = await this.userModel.findOne({
       $or: [
         { email: createUserDto.email },
-        { username: createUserDto.username }
-      ]
+        { username: createUserDto.username },
+      ],
     });
     if (isUserExist) {
       if (isUserExist.email === createUserDto.email) {
-        throw new BadRequestException('This email address is already registered with us.');
+        throw new BadRequestException(
+          'This email address is already registered with us.',
+        );
       } else {
         throw new BadRequestException('This username is already taken.');
       }
@@ -98,7 +100,6 @@ export class UsersService {
       },
     );
 
-
     return token;
   }
 
@@ -114,7 +115,9 @@ export class UsersService {
   async getUsersByRole(role: string) {
     const data = await this.userModel
       .find({ role })
-      .select('name email phoneNumber address profilePic status availability specialization qualification licenseNo designation consultationFee')
+      .select(
+        'name email phoneNumber address profilePic status availability specialization qualification licenseNo designation consultationFee',
+      )
       .sort({ name: 1 })
       .lean();
     return data;

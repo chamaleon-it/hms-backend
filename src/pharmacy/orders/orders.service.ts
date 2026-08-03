@@ -29,7 +29,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     const prefix = 'ORD-';
@@ -92,7 +92,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
-        doctor: order.doctorName || "Self",
+        doctor: order.doctorName || 'Self',
       });
 
       data.billNo = bill.mrn;
@@ -362,7 +362,12 @@ export class OrdersService {
       patientFilter.doctor = new mongoose.Types.ObjectId(doctor);
     }
 
-    if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+    if (
+      minA !== undefined &&
+      maxA !== undefined &&
+      !isNaN(minA) &&
+      !isNaN(maxA)
+    ) {
       if (minA > 0 || maxA < 100) {
         const now = new Date();
         const minDate = new Date(
@@ -374,13 +379,40 @@ export class OrdersService {
           now.getFullYear() - minA,
           now.getMonth(),
           now.getDate(),
-          23, 59, 59, 999
+          23,
+          59,
+          59,
+          999,
         );
         patientFilter.$expr = {
           $and: [
-            { $gte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
-            { $lte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
-          ]
+            {
+              $gte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                minDate,
+              ],
+            },
+            {
+              $lte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                maxDate,
+              ],
+            },
+          ],
         };
       }
     }
@@ -411,7 +443,10 @@ export class OrdersService {
     }
 
     if (alreadyPurchase === 'false' && lastVisit) {
-      const purchasedPatientIds = await this.billingModel.distinct('patient', billingMatch);
+      const purchasedPatientIds = await this.billingModel.distinct(
+        'patient',
+        billingMatch,
+      );
       patientFilter._id = { $in: purchasedPatientIds };
     }
 
@@ -475,9 +510,24 @@ export class OrdersService {
         aggregationPipeline.push({
           $match: {
             $or: [
-              { 'patientDetail.addressLine1': { $regex: addressSearchTerm, $options: 'i' } },
-              { 'patientDetail.addressLine2': { $regex: addressSearchTerm, $options: 'i' } },
-              { 'patientDetail.address': { $regex: addressSearchTerm, $options: 'i' } },
+              {
+                'patientDetail.addressLine1': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
+              {
+                'patientDetail.addressLine2': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
+              {
+                'patientDetail.address': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
             ],
           },
         });
@@ -485,29 +535,45 @@ export class OrdersService {
 
       if (city) {
         aggregationPipeline.push({
-          $match: { 'patientDetail.city': { $regex: city.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.city': { $regex: city.trim(), $options: 'i' },
+          },
         });
       }
 
       if (district) {
         aggregationPipeline.push({
-          $match: { 'patientDetail.district': { $regex: district.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.district': {
+              $regex: district.trim(),
+              $options: 'i',
+            },
+          },
         });
       }
 
       if (state) {
         aggregationPipeline.push({
-          $match: { 'patientDetail.state': { $regex: state.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.state': { $regex: state.trim(), $options: 'i' },
+          },
         });
       }
 
       if (pincode) {
         aggregationPipeline.push({
-          $match: { 'patientDetail.pinCode': { $regex: pincode.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.pinCode': { $regex: pincode.trim(), $options: 'i' },
+          },
         });
       }
 
-      if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+      if (
+        minA !== undefined &&
+        maxA !== undefined &&
+        !isNaN(minA) &&
+        !isNaN(maxA)
+      ) {
         if (minA > 0 || maxA < 100) {
           const now = new Date();
           const minDate = new Date(
@@ -519,16 +585,43 @@ export class OrdersService {
             now.getFullYear() - minA,
             now.getMonth(),
             now.getDate(),
-            23, 59, 59, 999
+            23,
+            59,
+            59,
+            999,
           );
           aggregationPipeline.push({
             $match: {
               $expr: {
                 $and: [
-                  { $gte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
-                  { $lte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
-                ]
-              }
+                  {
+                    $gte: [
+                      {
+                        $convert: {
+                          input: '$patientDetail.dateOfBirth',
+                          to: 'date',
+                          onError: null,
+                          onNull: null,
+                        },
+                      },
+                      minDate,
+                    ],
+                  },
+                  {
+                    $lte: [
+                      {
+                        $convert: {
+                          input: '$patientDetail.dateOfBirth',
+                          to: 'date',
+                          onError: null,
+                          onNull: null,
+                        },
+                      },
+                      maxDate,
+                    ],
+                  },
+                ],
+              },
             },
           });
         }
@@ -650,9 +743,7 @@ export class OrdersService {
     const lastPurchase: Date | null = (salesOnly[0] as any)?.createdAt ?? null;
 
     const totalPaid = bills.reduce((acc, bill) => {
-      return (
-        acc + (bill.cash ?? 0) + (bill.card ?? 0) + (bill.upi ?? 0)
-      );
+      return acc + (bill.cash ?? 0) + (bill.card ?? 0) + (bill.upi ?? 0);
     }, 0);
 
     const itemsTotal = salesOnly.reduce(
@@ -711,9 +802,11 @@ export class OrdersService {
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
-
     const bill = await this.billingModel.findById(id).lean().exec();
-    const existOrder = await this.orderModel.findOne({ billNo: bill?.mrn }).lean().exec();
+    const existOrder = await this.orderModel
+      .findOne({ billNo: bill?.mrn })
+      .lean()
+      .exec();
 
     if (!existOrder) {
       throw new NotFoundException('Order not found');
@@ -734,7 +827,6 @@ export class OrdersService {
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
-
 
     if (true) {
       const items = await Promise.all(
@@ -760,7 +852,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
-        doctor: existOrder.doctorName || "Self",
+        doctor: existOrder.doctorName || 'Self',
       });
     }
 

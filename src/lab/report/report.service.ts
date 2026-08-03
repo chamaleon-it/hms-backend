@@ -38,10 +38,9 @@ export class ReportService implements OnModuleInit {
     try {
       const result = await this.reportModel.updateMany(
         { status: 'Sample Collected' },
-        { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } },
       );
       if (result.modifiedCount > 0) {
-
       }
     } catch (e) {
       console.error('[Migration] Error migrating reports:', e);
@@ -82,13 +81,13 @@ export class ReportService implements OnModuleInit {
 
       if (dto.panels && dto.panels.length > 0) {
         userReport.panels.push(
-          ...dto.panels.filter((p) => !userReport.panels.includes(p))
+          ...dto.panels.filter((p) => !userReport.panels.includes(p)),
         );
       }
       if (dto.groups && dto.groups.length > 0) {
         if (!userReport.groups) userReport.groups = [];
         userReport.groups.push(
-          ...dto.groups.filter((g) => !userReport.groups.includes(g))
+          ...dto.groups.filter((g) => !userReport.groups.includes(g)),
         );
       }
       await userReport.save();
@@ -102,7 +101,9 @@ export class ReportService implements OnModuleInit {
     let total = 0;
 
     if (report.groups && report.groups.length > 0) {
-      const groupsData = await this.groupModel.find({ name: { $in: report.groups } });
+      const groupsData = await this.groupModel.find({
+        name: { $in: report.groups },
+      });
       for (const group of groupsData) {
         items.push({
           name: group.name,
@@ -117,14 +118,20 @@ export class ReportService implements OnModuleInit {
     }
 
     if (report.panels && report.panels.length > 0) {
-      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
-      
+      const panelsData = await this.panelModel.find({
+        name: { $in: report.panels },
+      });
+
       let groupPanelNames: string[] = [];
       if (report.groups && report.groups.length > 0) {
-        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('panels');
-        groupPanelNames = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+        const groupsData = await this.groupModel
+          .find({ name: { $in: report.groups } })
+          .populate('panels');
+        groupPanelNames = groupsData
+          .flatMap((g) => g.panels || [])
+          .map((p: any) => p.name || p.toString());
       }
-      
+
       for (const panel of panelsData) {
         if (!groupPanelNames.includes(panel.name)) {
           items.push({
@@ -141,28 +148,48 @@ export class ReportService implements OnModuleInit {
     }
 
     if (report.test && report.test.length > 0) {
-      const testIds = report.test.map(t => t.name);
+      const testIds = report.test.map((t) => t.name);
       const testsData = await this.testModel.find({ _id: { $in: testIds } });
-      
+
       let panelTestIds: string[] = [];
       let groupTestIds: string[] = [];
-      
+
       if (report.panels && report.panels.length > 0) {
-        const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
-        panelTestIds = panelsData.flatMap(p => p.tests || []).map(id => id.toString());
+        const panelsData = await this.panelModel.find({
+          name: { $in: report.panels },
+        });
+        panelTestIds = panelsData
+          .flatMap((p) => p.tests || [])
+          .map((id) => id.toString());
       }
-      
+
       if (report.groups && report.groups.length > 0) {
-        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('tests').populate('panels');
-        groupTestIds = groupsData.flatMap(g => g.tests || []).map((t: any) => t._id?.toString() || t.toString());
-        
-        const groupPanelIds = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
-        const groupPanelsData = await this.panelModel.find({ name: { $in: groupPanelIds } });
-        groupTestIds.push(...groupPanelsData.flatMap(p => p.tests || []).map(id => id.toString()));
+        const groupsData = await this.groupModel
+          .find({ name: { $in: report.groups } })
+          .populate('tests')
+          .populate('panels');
+        groupTestIds = groupsData
+          .flatMap((g) => g.tests || [])
+          .map((t: any) => t._id?.toString() || t.toString());
+
+        const groupPanelIds = groupsData
+          .flatMap((g) => g.panels || [])
+          .map((p: any) => p.name || p.toString());
+        const groupPanelsData = await this.panelModel.find({
+          name: { $in: groupPanelIds },
+        });
+        groupTestIds.push(
+          ...groupPanelsData
+            .flatMap((p) => p.tests || [])
+            .map((id) => id.toString()),
+        );
       }
 
       for (const test of testsData) {
-        if (!panelTestIds.includes(test._id.toString()) && !groupTestIds.includes(test._id.toString())) {
+        if (
+          !panelTestIds.includes(test._id.toString()) &&
+          !groupTestIds.includes(test._id.toString())
+        ) {
           items.push({
             name: test.name,
             quantity: 1,
@@ -179,8 +206,10 @@ export class ReportService implements OnModuleInit {
     // Try to find existing bill for this report
     let existingBill;
     try {
-      existingBill = await this.billingService['billingModel'].findOne({ reportId: report._id });
-    } catch(e) {
+      existingBill = await this.billingService['billingModel'].findOne({
+        reportId: report._id,
+      });
+    } catch (e) {
       console.error('Error generating report items PDF:', e);
     }
 
@@ -290,7 +319,10 @@ export class ReportService implements OnModuleInit {
 
     await report.save();
     if (allFilled || dto.status === 'Completed') {
-      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+      await this.billingService.updateBillStatusByReportId(
+        report._id,
+        'Completed',
+      );
     }
 
     // Forcefully override locked timestamp behavior directly in Mongo
@@ -459,7 +491,10 @@ export class ReportService implements OnModuleInit {
     await report.save();
 
     if (allFilled) {
-      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+      await this.billingService.updateBillStatusByReportId(
+        report._id,
+        'Completed',
+      );
     }
 
     return {
@@ -576,7 +611,12 @@ export class ReportService implements OnModuleInit {
       patientMatch.doctor = new mongoose.Types.ObjectId(doctor);
     }
 
-    if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+    if (
+      minA !== undefined &&
+      maxA !== undefined &&
+      !isNaN(minA) &&
+      !isNaN(maxA)
+    ) {
       if (minA > 0 || maxA < 100) {
         const now = new Date();
         const minDate = new Date(
@@ -588,13 +628,40 @@ export class ReportService implements OnModuleInit {
           now.getFullYear() - minA,
           now.getMonth(),
           now.getDate(),
-          23, 59, 59, 999
+          23,
+          59,
+          59,
+          999,
         );
         patientMatch.$expr = {
           $and: [
-            { $gte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
-            { $lte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
-          ]
+            {
+              $gte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                minDate,
+              ],
+            },
+            {
+              $lte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                maxDate,
+              ],
+            },
+          ],
         };
       }
     }
@@ -625,7 +692,10 @@ export class ReportService implements OnModuleInit {
     }
 
     if (alreadyPurchase === 'false' && lastVisit) {
-      const testedPatientIds = await this.reportModel.distinct('patient', reportMatch);
+      const testedPatientIds = await this.reportModel.distinct(
+        'patient',
+        reportMatch,
+      );
       patientMatch._id = { $in: testedPatientIds };
     }
 
@@ -653,8 +723,13 @@ export class ReportService implements OnModuleInit {
             as: 'patientDetail',
           },
         },
-        { $unwind: { path: '$patientDetail', preserveNullAndEmptyArrays: false } },
-        { $match: { 'patientDetail.status': { $ne: 'Deleted' } } }
+        {
+          $unwind: {
+            path: '$patientDetail',
+            preserveNullAndEmptyArrays: false,
+          },
+        },
+        { $match: { 'patientDetail.status': { $ne: 'Deleted' } } },
       ];
 
       if (searchTerm) {
@@ -683,9 +758,24 @@ export class ReportService implements OnModuleInit {
         pipeline.push({
           $match: {
             $or: [
-              { 'patientDetail.addressLine1': { $regex: addressSearchTerm, $options: 'i' } },
-              { 'patientDetail.addressLine2': { $regex: addressSearchTerm, $options: 'i' } },
-              { 'patientDetail.address': { $regex: addressSearchTerm, $options: 'i' } },
+              {
+                'patientDetail.addressLine1': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
+              {
+                'patientDetail.addressLine2': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
+              {
+                'patientDetail.address': {
+                  $regex: addressSearchTerm,
+                  $options: 'i',
+                },
+              },
             ],
           },
         });
@@ -693,29 +783,45 @@ export class ReportService implements OnModuleInit {
 
       if (city) {
         pipeline.push({
-          $match: { 'patientDetail.city': { $regex: city.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.city': { $regex: city.trim(), $options: 'i' },
+          },
         });
       }
 
       if (district) {
         pipeline.push({
-          $match: { 'patientDetail.district': { $regex: district.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.district': {
+              $regex: district.trim(),
+              $options: 'i',
+            },
+          },
         });
       }
 
       if (state) {
         pipeline.push({
-          $match: { 'patientDetail.state': { $regex: state.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.state': { $regex: state.trim(), $options: 'i' },
+          },
         });
       }
 
       if (pincode) {
         pipeline.push({
-          $match: { 'patientDetail.pinCode': { $regex: pincode.trim(), $options: 'i' } },
+          $match: {
+            'patientDetail.pinCode': { $regex: pincode.trim(), $options: 'i' },
+          },
         });
       }
 
-      if (minA !== undefined && maxA !== undefined && !isNaN(minA) && !isNaN(maxA)) {
+      if (
+        minA !== undefined &&
+        maxA !== undefined &&
+        !isNaN(minA) &&
+        !isNaN(maxA)
+      ) {
         if (minA > 0 || maxA < 100) {
           const now = new Date();
           const minDate = new Date(
@@ -727,31 +833,61 @@ export class ReportService implements OnModuleInit {
             now.getFullYear() - minA,
             now.getMonth(),
             now.getDate(),
-            23, 59, 59, 999
+            23,
+            59,
+            59,
+            999,
           );
           pipeline.push({
             $match: {
               $expr: {
                 $and: [
-                  { $gte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
-                  { $lte: [{ $convert: { input: "$patientDetail.dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
-                ]
-              }
+                  {
+                    $gte: [
+                      {
+                        $convert: {
+                          input: '$patientDetail.dateOfBirth',
+                          to: 'date',
+                          onError: null,
+                          onNull: null,
+                        },
+                      },
+                      minDate,
+                    ],
+                  },
+                  {
+                    $lte: [
+                      {
+                        $convert: {
+                          input: '$patientDetail.dateOfBirth',
+                          to: 'date',
+                          onError: null,
+                          onNull: null,
+                        },
+                      },
+                      maxDate,
+                    ],
+                  },
+                ],
+              },
             },
           });
         }
       }
 
-      const countResult = await this.reportModel.aggregate([...pipeline, { $count: 'total' }]);
+      const countResult = await this.reportModel.aggregate([
+        ...pipeline,
+        { $count: 'total' },
+      ]);
       total = countResult[0]?.total ?? 0;
 
       const result = await this.reportModel.aggregate([
         ...pipeline,
         { $sort: { lastVisit: -1 } },
-        ...(limitNum > 0 ? [{ $skip: skip }, { $limit: limitNum }] : [])
+        ...(limitNum > 0 ? [{ $skip: skip }, { $limit: limitNum }] : []),
       ]);
 
-      patientIds = result.map(item => item._id);
+      patientIds = result.map((item) => item._id);
     } else {
       total = await this.patientModel.countDocuments(patientMatch);
     }
@@ -760,9 +896,16 @@ export class ReportService implements OnModuleInit {
 
     if (alreadyPurchase === 'true') {
       if (patientIds && patientIds.length > 0) {
-        const patientsUnordered = await this.patientModel.find({ _id: { $in: patientIds } }).lean().exec();
-        const patientMap = new Map(patientsUnordered.map(p => [p._id.toString(), p]));
-        patients = patientIds.map(id => patientMap.get(id.toString())).filter(p => !!p);
+        const patientsUnordered = await this.patientModel
+          .find({ _id: { $in: patientIds } })
+          .lean()
+          .exec();
+        const patientMap = new Map(
+          patientsUnordered.map((p) => [p._id.toString(), p]),
+        );
+        patients = patientIds
+          .map((id) => patientMap.get(id.toString()))
+          .filter((p) => !!p);
       } else {
         return { data: [], total: 0 };
       }
@@ -778,15 +921,20 @@ export class ReportService implements OnModuleInit {
 
     const reports = await this.reportModel
       .find({
-        patient: { $in: patients.map(e => e._id) },
-        isDeleted: false
+        patient: { $in: patients.map((e) => e._id) },
+        isDeleted: false,
       })
       .lean()
       .exec();
 
     const data = patients.map((e) => {
-      const patientReports = reports.filter(i => i.patient.toString() === e._id.toString()) as any[];
-      patientReports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const patientReports = reports.filter(
+        (i) => i.patient.toString() === e._id.toString(),
+      ) as any[];
+      patientReports.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
 
       return {
         visits: patientReports.length,
@@ -828,11 +976,10 @@ export class ReportService implements OnModuleInit {
     data.testStartedAt = new Date();
     data.sampleId = dto.sampleId;
     data.sampleType = dto?.sampleType || '';
-    
+
     await data.save();
     return data;
   }
-
 
   async startTest(id: mongoose.Types.ObjectId) {
     const data = await this.reportModel.findById(id);
@@ -967,7 +1114,7 @@ export class ReportService implements OnModuleInit {
       data.test = dto.test.map((t) => ({
         name: t.name,
         value: t.value ?? '',
-      })) as any;
+      }));
     }
     if (dto.panels) {
       data.panels = dto.panels;

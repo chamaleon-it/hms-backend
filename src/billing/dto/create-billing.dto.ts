@@ -90,8 +90,6 @@ export class CreateBillingDto {
   @IsOptional()
   discount?: number;
 
-
-
   @IsString()
   @IsOptional()
   note?: string;

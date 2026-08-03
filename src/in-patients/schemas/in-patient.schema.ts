@@ -16,13 +16,13 @@ export enum IPStatus {
 @Schema({ _id: true, timestamps: true })
 export class IpNote {
   @Prop() temp: string;
-  @Prop() tempUnit: string;  // '°C' | '°F'
-  @Prop() bp: string;        // e.g. "120/80 mmHg"
-  @Prop() hr: string;        // heart rate bpm
-  @Prop() spo2: string;      // SpO2 %
-  @Prop() rr: string;        // respiratory rate
-  @Prop() weight: string;    // kg
-  @Prop() note: string;      // free-text nurse/doctor note
+  @Prop() tempUnit: string; // '°C' | '°F'
+  @Prop() bp: string; // e.g. "120/80 mmHg"
+  @Prop() hr: string; // heart rate bpm
+  @Prop() spo2: string; // SpO2 %
+  @Prop() rr: string; // respiratory rate
+  @Prop() weight: string; // kg
+  @Prop() note: string; // free-text nurse/doctor note
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' }) recordedBy: User;
 }
 export const IpNoteSchema = SchemaFactory.createForClass(IpNote);

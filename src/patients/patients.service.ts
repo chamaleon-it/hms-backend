@@ -18,7 +18,7 @@ export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(): Promise<string> {
     const lastRecord = await this.patientModel
@@ -89,198 +89,231 @@ export class PatientsService {
     return data.map((d) => d.value).filter(Boolean);
   }
 
-async getPatient(getPatientsDto: GetPatientsDto) {
-  const {
-    limit = 100,
-    page = 1,
-    query = '',
-    gender,
-    conditions,
-    minAge,
-    maxAge,
-    doctor,
-    status,
-    from,
-    to,
-    consultedOnly,
-    address,
-    city,
-    district,
-    state,
-    pincode,
-  } = getPatientsDto as any;
+  async getPatient(getPatientsDto: GetPatientsDto) {
+    const {
+      limit = 100,
+      page = 1,
+      query = '',
+      gender,
+      conditions,
+      minAge,
+      maxAge,
+      doctor,
+      status,
+      from,
+      to,
+      consultedOnly,
+      address,
+      city,
+      district,
+      state,
+      pincode,
+    } = getPatientsDto as any;
 
-  const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-  const filter: any = {};
+    const filter: any = {};
 
-  if (gender) {
-    filter.gender = gender;
-  }
+    if (gender) {
+      filter.gender = gender;
+    }
 
-  const now = new Date();
-  const minA = Number(minAge);
-  const maxA = Number(maxAge);
+    const now = new Date();
+    const minA = Number(minAge);
+    const maxA = Number(maxAge);
 
-  if (Number.isFinite(minA) && Number.isFinite(maxA)) {
-    if (minA > 0 || maxA < 100) {
-      const minDate = new Date(now.getFullYear() - maxA - 1, now.getMonth(), now.getDate() + 1);
-      const maxDate = new Date(now.getFullYear() - minA, now.getMonth(), now.getDate());
-      
-      filter.$expr = {
-        $and: [
-          { $gte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, minDate] },
-          { $lte: [{ $convert: { input: "$dateOfBirth", to: "date", onError: null, onNull: null } }, maxDate] }
-        ]
+    if (Number.isFinite(minA) && Number.isFinite(maxA)) {
+      if (minA > 0 || maxA < 100) {
+        const minDate = new Date(
+          now.getFullYear() - maxA - 1,
+          now.getMonth(),
+          now.getDate() + 1,
+        );
+        const maxDate = new Date(
+          now.getFullYear() - minA,
+          now.getMonth(),
+          now.getDate(),
+        );
+
+        filter.$expr = {
+          $and: [
+            {
+              $gte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                minDate,
+              ],
+            },
+            {
+              $lte: [
+                {
+                  $convert: {
+                    input: '$dateOfBirth',
+                    to: 'date',
+                    onError: null,
+                    onNull: null,
+                  },
+                },
+                maxDate,
+              ],
+            },
+          ],
+        };
+      }
+    }
+
+    if (doctor) {
+      filter.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
+    if (conditions) {
+      const parsedConditions: string[] =
+        typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
+
+      if (parsedConditions.length > 0) {
+        filter.conditions = { $in: parsedConditions };
+      }
+    }
+
+    if (from && to) {
+      filter.createdAt = {
+        $gte: new Date(from),
+        $lt: new Date(to),
       };
     }
-  }
 
-  if (doctor) {
-    filter.doctor = new mongoose.Types.ObjectId(doctor);
-  }
-
-  if (conditions) {
-    const parsedConditions: string[] =
-      typeof conditions === 'string'
-        ? JSON.parse(conditions)
-        : conditions;
-
-    if (parsedConditions.length > 0) {
-      filter.conditions = { $in: parsedConditions };
-    }
-  }
-
-  if (from && to) {
-    filter.createdAt = {
-      $gte: new Date(from),
-      $lt: new Date(to),
-    };
-  }
-
-  if (address) {
-    const addressSearchTerm = address.trim();
-    filter.$and = filter.$and || [];
-    filter.$and.push({
-      $or: [
-        { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
-        { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-        { address: { $regex: addressSearchTerm, $options: 'i' } },
-      ],
-    });
-  }
-
-  if (city) {
-    filter.city = { $regex: city.trim(), $options: 'i' };
-  }
-
-  if (district) {
-    filter.district = { $regex: district.trim(), $options: 'i' };
-  }
-
-  if (state) {
-    filter.state = { $regex: state.trim(), $options: 'i' };
-  }
-
-  if (pincode) {
-    filter.pinCode = { $regex: pincode.trim(), $options: 'i' };
-  }
-
-  filter.status = status || { $ne: PatientStatus.DELETED };
-
-  if (consultedOnly === 'true') {
-    const appointmentMatch: any = { isDeleted: false };
-    if (doctor) {
-      appointmentMatch.doctor = new mongoose.Types.ObjectId(doctor);
-    }
-    const patientsWithAppts = await this.appointmentModel.distinct('patient', appointmentMatch);
-    filter._id = { $in: patientsWithAppts };
-  }
-
-  if (!query?.trim()) {
-    const [data, total] = await Promise.all([
-      this.patientModel
-        .find(filter)
-        .skip(skip)
-        .limit(limit)
-        .populate('doctor')
-        .sort({ createdAt: -1 }),
-      this.patientModel.countDocuments(filter)
-    ]);
-    return { data, total };
-  }
-
-  const searchTerm = query.trim().toLowerCase();
-
-  const patients = await this.patientModel
-    .find({
-      ...filter,
-      $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { mrn: { $regex: searchTerm, $options: 'i' } },
-        { phoneNumber: { $regex: searchTerm, $options: 'i' } },
-      ],
-    })
-    .populate('doctor')
-    .lean();
-
-  const getPriority = (patient: any): number => {
-    const name = (patient.name || '').toLowerCase().trim();
-    const mrn = (patient.mrn || '').toLowerCase();
-    const phone = (patient.phoneNumber || '').toLowerCase();
-
-    const words = name.split(/\s+/);
-
-    if (name.startsWith(searchTerm)) {
-      return 1;
+    if (address) {
+      const addressSearchTerm = address.trim();
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
+          { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
+          { address: { $regex: addressSearchTerm, $options: 'i' } },
+        ],
+      });
     }
 
-    if (words.some((word) => word.startsWith(searchTerm))) {
-      return 2;
+    if (city) {
+      filter.city = { $regex: city.trim(), $options: 'i' };
     }
 
-    if (words.some((word) => word.endsWith(searchTerm))) {
-      return 3;
+    if (district) {
+      filter.district = { $regex: district.trim(), $options: 'i' };
     }
 
-    if (mrn.includes(searchTerm)) {
-      return 4;
+    if (state) {
+      filter.state = { $regex: state.trim(), $options: 'i' };
     }
 
-    if (phone.includes(searchTerm)) {
-      return 5;
+    if (pincode) {
+      filter.pinCode = { $regex: pincode.trim(), $options: 'i' };
     }
 
-    const patientAddress = (patient.address || '').toLowerCase();
-    if (patientAddress.includes(searchTerm)) {
-      return 6;
+    filter.status = status || { $ne: PatientStatus.DELETED };
+
+    if (consultedOnly === 'true') {
+      const appointmentMatch: any = { isDeleted: false };
+      if (doctor) {
+        appointmentMatch.doctor = new mongoose.Types.ObjectId(doctor);
+      }
+      const patientsWithAppts = await this.appointmentModel.distinct(
+        'patient',
+        appointmentMatch,
+      );
+      filter._id = { $in: patientsWithAppts };
     }
 
-    return 999;
-  };
+    if (!query?.trim()) {
+      const [data, total] = await Promise.all([
+        this.patientModel
+          .find(filter)
+          .skip(skip)
+          .limit(limit)
+          .populate('doctor')
+          .sort({ createdAt: -1 }),
+        this.patientModel.countDocuments(filter),
+      ]);
+      return { data, total };
+    }
 
-  const sortedPatients = patients
-    .map((patient) => ({
-      ...patient,
-      _searchPriority: getPriority(patient),
-    }))
-    .filter((patient) => patient._searchPriority !== 999)
-    .sort((a, b) => {
-      if (a._searchPriority !== b._searchPriority) {
-        return a._searchPriority - b._searchPriority;
+    const searchTerm = query.trim().toLowerCase();
+
+    const patients = await this.patientModel
+      .find({
+        ...filter,
+        $or: [
+          { name: { $regex: searchTerm, $options: 'i' } },
+          { mrn: { $regex: searchTerm, $options: 'i' } },
+          { phoneNumber: { $regex: searchTerm, $options: 'i' } },
+        ],
+      })
+      .populate('doctor')
+      .lean();
+
+    const getPriority = (patient: any): number => {
+      const name = (patient.name || '').toLowerCase().trim();
+      const mrn = (patient.mrn || '').toLowerCase();
+      const phone = (patient.phoneNumber || '').toLowerCase();
+
+      const words = name.split(/\s+/);
+
+      if (name.startsWith(searchTerm)) {
+        return 1;
       }
 
-      return (a.name || '').localeCompare(b.name || '', undefined, {
-        sensitivity: 'base',
-      });
-    })
-    .map(({ _searchPriority, ...patient }) => patient);
+      if (words.some((word) => word.startsWith(searchTerm))) {
+        return 2;
+      }
 
-  return { 
-    data: sortedPatients.slice(skip, skip + Number(limit)),
-    total: sortedPatients.length 
-  };
-}
+      if (words.some((word) => word.endsWith(searchTerm))) {
+        return 3;
+      }
+
+      if (mrn.includes(searchTerm)) {
+        return 4;
+      }
+
+      if (phone.includes(searchTerm)) {
+        return 5;
+      }
+
+      const patientAddress = (patient.address || '').toLowerCase();
+      if (patientAddress.includes(searchTerm)) {
+        return 6;
+      }
+
+      return 999;
+    };
+
+    const sortedPatients = patients
+      .map((patient) => ({
+        ...patient,
+        _searchPriority: getPriority(patient),
+      }))
+      .filter((patient) => patient._searchPriority !== 999)
+      .sort((a, b) => {
+        if (a._searchPriority !== b._searchPriority) {
+          return a._searchPriority - b._searchPriority;
+        }
+
+        return (a.name || '').localeCompare(b.name || '', undefined, {
+          sensitivity: 'base',
+        });
+      })
+      .map(({ _searchPriority, ...patient }) => patient);
+
+    return {
+      data: sortedPatients.slice(skip, skip + Number(limit)),
+      total: sortedPatients.length,
+    };
+  }
 
   async getSinglePatient(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {

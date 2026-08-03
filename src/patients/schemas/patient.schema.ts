@@ -5,7 +5,7 @@ export type PatientDocument = HydratedDocument<Patient>;
 
 export enum Gender {
   MALE = 'Male',
-  FEMALE = 'Female'
+  FEMALE = 'Female',
 }
 
 export enum PatientStatus {
@@ -38,8 +38,6 @@ export class Patient {
 
   @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] })
   blood: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
-
-
 
   @Prop()
   insurance: string;
@@ -83,7 +81,12 @@ export class Patient {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false, default: null })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    default: null,
+  })
   doctor: mongoose.Types.ObjectId;
 
   @Prop({ enum: Object.values(PatientStatus), default: PatientStatus.ACTIVE })
@@ -98,10 +101,8 @@ export class Patient {
   @Prop({ default: null, type: Date })
   remarksDate: Date;
 
-
-
-  @Prop({ required: false})
-  weight?: number; 
+  @Prop({ required: false })
+  weight?: number;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);
