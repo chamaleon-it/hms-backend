@@ -11,6 +11,12 @@ import {
 const trim = ({ value }: { value: string }) =>
   typeof value === 'string' ? value.trim() : value;
 
+const roundNumber = ({ value }: { value: any }) => {
+  if (value === undefined || value === null || value === '') return value;
+  const num = Number(value);
+  return isNaN(num) ? value : Math.round(num * 100) / 100;
+};
+
 export class UpdateBatchDto {
   @IsOptional()
   @IsString({ message: 'Batch number must be a string.' })
@@ -37,6 +43,7 @@ export class UpdateBatchDto {
 
   @IsOptional()
   @Type(() => Number)
+  @Transform(roundNumber)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'MRP must be a number.' },
@@ -46,6 +53,7 @@ export class UpdateBatchDto {
 
   @IsOptional()
   @Type(() => Number)
+  @Transform(roundNumber)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Unit price must be a number.' },
@@ -55,6 +63,7 @@ export class UpdateBatchDto {
 
   @IsOptional()
   @Type(() => Number)
+  @Transform(roundNumber)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Purchase price must be a number.' },
@@ -74,6 +83,7 @@ export class UpdateBatchDto {
 
   @IsOptional()
   @Type(() => Number)
+  @Transform(roundNumber)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Schema amount must be a number.' },
@@ -83,6 +93,7 @@ export class UpdateBatchDto {
 
   @IsOptional()
   @Type(() => Number)
+  @Transform(roundNumber)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Total must be a number.' },
