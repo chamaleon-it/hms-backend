@@ -319,9 +319,6 @@ export class OrdersService {
         { name: searchRegex },
         { phoneNumber: searchRegex },
         { mrn: searchRegex },
-        { addressLine1: searchRegex },
-        { addressLine2: searchRegex },
-        { address: searchRegex },
       ];
       if (mongoose.isValidObjectId(searchTerm)) {
         orConditions.push({ _id: new mongoose.Types.ObjectId(searchTerm) });
@@ -455,9 +452,6 @@ export class OrdersService {
         const orConditions: any[] = [
           { 'patientDetail.name': searchRegex },
           { 'patientDetail.phoneNumber': searchRegex },
-          { 'patientDetail.addressLine1': searchRegex },
-          { 'patientDetail.addressLine2': searchRegex },
-          { 'patientDetail.address': searchRegex },
           { 'patientDetail.mrn': searchRegex },
         ];
         if (mongoose.isValidObjectId(searchTerm)) {
