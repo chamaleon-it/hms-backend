@@ -7,8 +7,6 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
-import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
@@ -129,10 +127,6 @@ export class OrdersService {
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
-    } else if (q === OrderStatus.Filling) {
-      filter.status = OrderStatus.Filling;
-    } else if (q === OrderStatus.Ready) {
-      filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
     } else if (q === 'Deleted') {
@@ -198,76 +192,6 @@ export class OrdersService {
     }
 
     return data;
-  }
-
-  async itemPacked(
-    packedDto: PackedDto,
-    user: mongoose.Types.ObjectId,
-  ): Promise<void> {
-    const { order: orderId, item } = packedDto;
-
-    const order = await this.orderModel
-      .findOneAndUpdate(
-        { _id: orderId, 'items.name': item },
-        { $set: { 'items.$.isPacked': true, status: OrderStatus.Filling } },
-        { new: true },
-      )
-      .exec();
-
-    if (!order) {
-      throw new NotFoundException(
-        'Order or item not found. Please check your details.',
-      );
-    }
-
-    const isFullyPacked = order.items.every((it) => Boolean(it.isPacked));
-    if (isFullyPacked && order.status !== OrderStatus.Ready) {
-      order.status = OrderStatus.Ready;
-      await order.save();
-    }
-    const qty =
-      order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
-    await this.itemsService.decreaseItem(item, qty, user);
-  }
-
-  async markAllAsPacked(
-    markAllAsPackedDto: MarkAllAsPackedDto,
-    user: mongoose.Types.ObjectId,
-  ): Promise<void> {
-    const orderId = markAllAsPackedDto.order;
-    const order = await this.orderModel.findById(orderId).lean().exec();
-    if (!order) {
-      throw new NotFoundException(
-        'Order not found. Please check your details.',
-      );
-    }
-    const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
-
-    if (unpacked.length > 0) {
-      await Promise.all(
-        unpacked.map((it) =>
-          this.itemsService.decreaseItem(it.name, it.quantity, user),
-        ),
-      );
-    }
-
-    const result = await this.orderModel
-      .updateOne(
-        { _id: orderId },
-        {
-          $set: {
-            'items.$[].isPacked': true,
-            status: OrderStatus.Ready,
-          },
-        },
-      )
-      .exec();
-
-    if (result.matchedCount === 0) {
-      throw new NotFoundException(
-        'Order not found. Please check your details.',
-      );
-    }
   }
 
   async getCustomers(query: GetCustomersDto) {
@@ -790,15 +714,36 @@ export class OrdersService {
     return order;
   }
 
-  async completeOrder(id: mongoose.Types.ObjectId) {
-    const data = await this.orderModel
-      .findByIdAndUpdate(id, { status: OrderStatus.Completed }, { new: true })
-      .lean();
-    if (!data) {
+  async completeOrder(
+    id: mongoose.Types.ObjectId,
+    userId?: mongoose.Types.ObjectId,
+  ) {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    return data;
+    if (order.status !== OrderStatus.Completed) {
+      const userObjId = userId
+        ? new mongoose.Types.ObjectId(userId)
+        : new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id);
+
+      for (const item of order.items) {
+        if (item.name && item.quantity > 0) {
+          const itemId = (item.name as any)?._id || item.name;
+          await this.itemsService.decreaseItem(
+            itemId as mongoose.Types.ObjectId,
+            item.quantity,
+            userObjId,
+          );
+        }
+      }
+
+      order.status = OrderStatus.Completed;
+      await order.save();
+    }
+
+    return order;
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
@@ -820,7 +765,6 @@ export class OrdersService {
     newOrder.items = existOrder.items.map((item) => {
       return {
         ...item,
-        isPacked: false,
       };
     });
     newOrder.priority = existOrder.priority;

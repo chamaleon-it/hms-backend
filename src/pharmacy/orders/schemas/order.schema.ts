@@ -12,8 +12,6 @@ export enum OrderPriority {
 
 export enum OrderStatus {
   Pending = 'Pending',
-  Filling = 'Filling',
-  Ready = 'Ready',
   Failed = 'Failed',
   Canceled = 'Canceled',
   Completed = 'Completed',
@@ -44,9 +42,6 @@ export class OrderItem {
 
   @Prop({ required: true })
   quantity: number;
-
-  @Prop({ required: true, default: false })
-  isPacked: boolean;
 }
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 

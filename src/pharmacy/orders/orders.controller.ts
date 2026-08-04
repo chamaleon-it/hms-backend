@@ -12,8 +12,6 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import mongoose from 'mongoose';
-import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -66,36 +64,6 @@ export class OrdersController {
       message: 'Successfully removed the order',
     };
   }
-
-  @Post('packed')
-  @UseGuards(JwtAuthGuard)
-  async itemPacked(
-    @Body() packedDto: PackedDto,
-    @GetUser() user: JWTUserInterface,
-  ) {
-    const data = await this.ordersService.itemPacked(packedDto, user.id);
-    return {
-      message: 'Item is packed',
-      data,
-    };
-  }
-
-  @Post('mark_all_as_packed')
-  @UseGuards(JwtAuthGuard)
-  async markAllAsPacked(
-    @Body() markAllAsPackedDto: MarkAllAsPackedDto,
-    @GetUser() user: JWTUserInterface,
-  ) {
-    const data = await this.ordersService.markAllAsPacked(
-      markAllAsPackedDto,
-      user.id,
-    );
-    return {
-      message: 'All item is packed',
-      data,
-    };
-  }
-
   @Get('customers')
   async getCustomers(@Query() query: GetCustomersDto) {
     const { data, total } = await this.ordersService.getCustomers(query);
@@ -143,8 +111,12 @@ export class OrdersController {
     };
   }
   @Patch('complete/:id')
-  async completeOrder(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.ordersService.completeOrder(id);
+  @UseGuards(JwtAuthGuard)
+  async completeOrder(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.ordersService.completeOrder(id, user?.id);
     return {
       message: 'Order completed successfully',
       data,

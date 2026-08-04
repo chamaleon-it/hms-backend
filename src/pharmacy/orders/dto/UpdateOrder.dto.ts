@@ -66,10 +66,6 @@ export class UpdateOrderItemDto {
   @IsNumber()
   @IsNotEmpty({ message: 'Quantity cannot be empty.' })
   quantity?: number;
-
-  @IsBoolean()
-  @IsOptional()
-  isPacked?: boolean;
 }
 
 export class UpdateOrderDto {
