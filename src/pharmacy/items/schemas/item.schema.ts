@@ -91,6 +91,11 @@ export class Item {
         quantity: { type: Number, required: true },
         unitPrice: { type: Number, required: true },
         total: { type: Number, required: true },
+        customerName: { type: String },
+        customerPhone: { type: String },
+        doctorName: { type: String },
+        pharmacistName: { type: String },
+        patientMrn: { type: String },
       },
     ],
     default: [],
@@ -101,6 +106,11 @@ export class Item {
     quantity: number;
     unitPrice: number;
     total: number;
+    customerName?: string;
+    customerPhone?: string;
+    doctorName?: string;
+    pharmacistName?: string;
+    patientMrn?: string;
   }[];
 
   @Prop({ type: Date })

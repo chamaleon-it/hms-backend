@@ -270,6 +270,11 @@ export class ItemsService {
     id: mongoose.Types.ObjectId,
     quantity: number,
     user: mongoose.Types.ObjectId,
+    customerName?: string,
+    customerPhone?: string,
+    doctorName?: string,
+    pharmacistName?: string,
+    patientMrn?: string,
   ) {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
@@ -295,6 +300,11 @@ export class ItemsService {
         quantity,
         unitPrice: item.unitPrice,
         total: item.unitPrice * quantity,
+        customerName,
+        customerPhone,
+        doctorName,
+        pharmacistName,
+        patientMrn,
       });
       await item.save();
     }

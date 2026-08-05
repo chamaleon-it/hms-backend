@@ -718,7 +718,7 @@ export class OrdersService {
     id: mongoose.Types.ObjectId,
     userId?: mongoose.Types.ObjectId,
   ) {
-    const order = await this.orderModel.findById(id).exec();
+    const order = await this.orderModel.findById(id).populate('patient').exec();
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -731,10 +731,16 @@ export class OrdersService {
       for (const item of order.items) {
         if (item.name && item.quantity > 0) {
           const itemId = (item.name as any)?._id || item.name;
+          const patientObj = order.patient as any;
           await this.itemsService.decreaseItem(
             itemId as mongoose.Types.ObjectId,
             item.quantity,
             userObjId,
+            patientObj?.name || (order as any).customerName,
+            patientObj?.phoneNumber || (order as any).customerPhone || patientObj?.phone,
+            (order as any).doctorName || (order as any).doctor,
+            (order as any).pharmacistName || (order as any).pharmacist,
+            patientObj?.mrn || (order as any).mrn,
           );
         }
       }
