@@ -101,8 +101,12 @@ export class Consulting {
     quantity: number;
   }[];
 
-  @Prop({ type: String, default: null })
-  therapy: string | null;
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Therapy' }],
+    default: [],
+  })
+  therapy: mongoose.Types.ObjectId[];
+
 
   @Prop({ type: String, default: null })
   therapyNotes: string | null;

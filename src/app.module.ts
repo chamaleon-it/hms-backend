@@ -26,6 +26,7 @@ import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
 import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
 import { InPatientsModule } from './in-patients/in-patients.module';
+import { TherapyModule } from './therapy/therapy.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { InPatientsModule } from './in-patients/in-patients.module';
     TechnicianModule,
     AdminModule,
     InPatientsModule,
+    TherapyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
