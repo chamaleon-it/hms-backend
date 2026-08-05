@@ -103,6 +103,24 @@ export class Patient {
 
   @Prop({ required: false })
   weight?: number;
+
+  @Prop({
+    type: [
+      {
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        originalName: { type: String },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  documents: Array<{
+    name: string;
+    url: string;
+    originalName?: string;
+    updatedAt?: Date;
+  }>;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

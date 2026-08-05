@@ -133,6 +133,18 @@ export class PatientsController {
     };
   }
 
+  @Patch('document/:id')
+  async uploadPatientDocument(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: { name: string; url: string; originalName?: string },
+  ) {
+    const data = await this.patientsService.uploadPatientDocument(id, dto);
+    return {
+      data,
+      message: 'Patient document updated successfully',
+    };
+  }
+
   @Get('patient_already_exists')
   async checkPatientAlreadyExists(
     @Query() checkPatientAlreadyExistsDto: CheckPatientAlreadyExistsDto,

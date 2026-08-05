@@ -19,6 +19,15 @@ export class UploadsController {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
+
+    const isAllowed =
+      file.mimetype.startsWith('image/') ||
+      file.mimetype === 'application/pdf' ||
+      /\.(pdf|jpg|jpeg|png|webp|gif|svg)$/i.test(file.originalname);
+
+    if (!isAllowed) {
+      throw new BadRequestException('Only PDF documents and image files are allowed.');
+    }
     return {
       message: 'File uploaded',
       data: {

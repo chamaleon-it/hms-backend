@@ -514,4 +514,38 @@ export class PatientsService {
       .exec();
     return data;
   }
+
+  async uploadPatientDocument(
+    id: mongoose.Types.ObjectId,
+    docData: { name: string; url: string; originalName?: string },
+  ) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid patient ID');
+    }
+    const patient = await this.patientModel.findById(id);
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+
+    if (!patient.documents) {
+      patient.documents = [];
+    }
+
+    const index = patient.documents.findIndex((d) => d.name === docData.name);
+    const newDoc = {
+      name: docData.name,
+      url: docData.url,
+      originalName: docData.originalName || '',
+      updatedAt: new Date(),
+    };
+
+    if (index >= 0) {
+      patient.documents[index] = newDoc;
+    } else {
+      patient.documents.push(newDoc);
+    }
+
+    await patient.save();
+    return patient;
+  }
 }
