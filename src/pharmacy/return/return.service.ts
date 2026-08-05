@@ -10,7 +10,6 @@ import mongoose, { Model } from 'mongoose';
 import { ItemsService } from '../items/items.service';
 import { Billing } from 'src/billing/schemas/billing.schema';
 import configuration from 'src/config/configuration';
-import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReturnService {
@@ -18,7 +17,6 @@ export class ReturnService {
     @InjectModel(Return.name) private returnModel: Model<Return>,
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
-    private readonly usersService: UsersService,
   ) {}
 
   async create(createReturnDto: CreateReturnDto) {

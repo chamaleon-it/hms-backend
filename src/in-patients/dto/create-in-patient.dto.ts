@@ -2,7 +2,6 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsDateString,
   IsEnum,
 } from 'class-validator';
 import { IPStatus } from '../schemas/in-patient.schema';

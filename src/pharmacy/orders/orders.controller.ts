@@ -20,7 +20,6 @@ import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
-import configuration from 'src/config/configuration';
 
 @Controller('pharmacy/orders')
 export class OrdersController {

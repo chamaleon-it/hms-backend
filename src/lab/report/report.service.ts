@@ -21,7 +21,6 @@ import { Patient } from '../../patients/schemas/patient.schema';
 import { Panel } from '../panels/schemas/panel.schema';
 import { Group } from '../panels/schemas/group.schema';
 import { BillingService } from '../../billing/billing.service';
-import { async } from 'rxjs';
 
 @Injectable()
 export class ReportService implements OnModuleInit {
