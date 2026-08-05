@@ -462,7 +462,7 @@ export class BillingService {
   async addPayment(
     id: mongoose.Types.ObjectId,
     addPaymentDto: AddPaymentDto,
-    user: mongoose.Types.ObjectId,
+    user?: mongoose.Types.ObjectId,
   ) {
     const data = await this.billingModel.findOneAndUpdate(
       { _id: id },

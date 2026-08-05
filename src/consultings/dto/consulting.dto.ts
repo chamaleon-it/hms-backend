@@ -75,7 +75,7 @@ class ExaminationNoteDto {
 
 class MedicineDto {
   @IsOptional()
-  @ValidateIf((o, val) => val !== null && val !== undefined && val !== '')
+  @ValidateIf((_o, val) => val !== null && val !== undefined && val !== '')
   @Transform(({ value }) => (value === '' ? null : value))
   @IsMongoId({ message: 'Drug name must be a valid Mongo ID if provided.' })
   name?: mongoose.Types.ObjectId | null;
