@@ -46,6 +46,7 @@ export class ItemsController {
       page: Number(query.page),
       limit: Number(query.limit),
       lowStockCount: data.lowStockCount,
+      slowMovingCount: data.slowMovingCount,
       message: 'All items were retrieved successfully',
     };
   }

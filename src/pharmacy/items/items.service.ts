@@ -117,6 +117,7 @@ export class ItemsService {
       stock,
       lowStockThreshold,
       lowStockItemsView,
+      slowMovingItemsView,
       sortBy = 'createdAt',
       orderBy = 'desc',
     } = query;
@@ -127,6 +128,7 @@ export class ItemsService {
       $or?: Array<Record<string, Record<string, string>>>;
       category?: string;
       quantity?: number | Record<string, number>;
+      soldQuantity?: number | Record<string, number>;
       expiryDate?: Record<string, Date>;
       status?: Record<string, string>;
       supplier?: string;
@@ -149,7 +151,7 @@ export class ItemsService {
       filter.category = category;
     }
 
-    if (stock && !lowStockItemsView) {
+    if (stock && !lowStockItemsView && !slowMovingItemsView) {
       const stockConditions: Record<string, number | Record<string, number>> = {
         Instock: { $gte: 20 },
         Low: { $gt: 0, $lt: 20 },
@@ -158,8 +160,14 @@ export class ItemsService {
 
       filter.quantity = stockConditions[stock];
     }
-    if (lowStockItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
+
+    if (lowStockItemsView && !slowMovingItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
       filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
+    }
+
+    if (slowMovingItemsView) {
+      filter.quantity = { $gt: 0 };
+      filter.soldQuantity = { $lte: 10 };
     }
 
     if (query.expiry) {
@@ -184,14 +192,20 @@ export class ItemsService {
       quantity: { $lte: Number(lowStockThreshold ?? 20) },
     };
 
-    const [items, total, lowStockCount] = await Promise.all([
+    const slowMovingFilter = {
+      status: { $ne: ItemStatus.Deleted },
+      quantity: { $gt: 0 },
+      soldQuantity: { $lte: 10 },
+    };
+
+    const sortOptions = slowMovingItemsView && !q
+      ? { soldQuantity: 1, quantity: -1 }
+      : (q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 });
+
+    const [items, total, lowStockCount, slowMovingCount] = await Promise.all([
       this.itemModel
         .find(filter)
-        .sort(
-          q
-            ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 }
-            : { [sortBy]: orderBy === 'asc' ? 1 : -1 },
-        ) // sort BEFORE skip/limit
+        .sort(sortOptions as any)
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -199,14 +213,10 @@ export class ItemsService {
       shouldCountLowStock
         ? this.itemModel.countDocuments(lowStockFilter)
         : Promise.resolve(0),
+      this.itemModel.countDocuments(slowMovingFilter),
     ]);
 
-    // const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
-    //   ...filter,
-    //   quantity: { $lte: Number(lowStockThreshold ?? 20) },
-    // }) : 0;
-
-    return { items, total, lowStockCount };
+    return { items, data: items, total, lowStockCount, slowMovingCount };
   }
 
   async getItem(id: mongoose.Types.ObjectId) {
