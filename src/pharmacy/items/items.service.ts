@@ -124,11 +124,25 @@ export class ItemsService {
 
     const skip = (page - 1) * limit;
 
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const computeSoldInLast30Days = (item: any) => {
+      if (!item.soldHistory || !Array.isArray(item.soldHistory)) return 0;
+      return item.soldHistory.reduce((sum: number, entry: any) => {
+        if (!entry || !entry.date) return sum;
+        const d = new Date(entry.date);
+        if (d >= thirtyDaysAgo) {
+          return sum + (Number(entry.quantity) || 0);
+        }
+        return sum;
+      }, 0);
+    };
+
     let filter: {
       $or?: Array<Record<string, Record<string, string>>>;
       category?: string;
       quantity?: number | Record<string, number>;
-      soldQuantity?: number | Record<string, number>;
       expiryDate?: Record<string, Date>;
       status?: Record<string, string>;
       supplier?: string;
@@ -141,8 +155,6 @@ export class ItemsService {
           { name: searchRegex },
           { sku: searchRegex },
           { generic: searchRegex },
-          // { supplier: searchRegex },
-          // { manufacturer: searchRegex },
         ],
       };
     }
@@ -163,11 +175,6 @@ export class ItemsService {
 
     if (lowStockItemsView && !slowMovingItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
       filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
-    }
-
-    if (slowMovingItemsView) {
-      filter.quantity = { $gt: 0 };
-      filter.soldQuantity = { $lte: 10 };
     }
 
     if (query.expiry) {
@@ -192,29 +199,70 @@ export class ItemsService {
       quantity: { $lte: Number(lowStockThreshold ?? 20) },
     };
 
-    const slowMovingFilter = {
-      status: { $ne: ItemStatus.Deleted },
-      quantity: { $gt: 0 },
-      soldQuantity: { $lte: 10 },
-    };
+    // Calculate slowMovingCount (items with quantity > 0 and soldInLast30Days <= 10)
+    const activeItemsForCount = await this.itemModel.find(
+      { status: { $ne: ItemStatus.Deleted }, quantity: { $gt: 0 } },
+      { soldHistory: 1, quantity: 1 },
+    ).lean();
+    const slowMovingCount = activeItemsForCount.filter(
+      (it) => computeSoldInLast30Days(it) <= 10,
+    ).length;
 
-    const sortOptions = slowMovingItemsView && !q
-      ? { soldQuantity: 1, quantity: -1 }
-      : (q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 });
+    let items: any[] = [];
+    let total = 0;
 
-    const [items, total, lowStockCount, slowMovingCount] = await Promise.all([
-      this.itemModel
-        .find(filter)
-        .sort(sortOptions as any)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      this.itemModel.countDocuments(filter),
-      shouldCountLowStock
-        ? this.itemModel.countDocuments(lowStockFilter)
-        : Promise.resolve(0),
-      this.itemModel.countDocuments(slowMovingFilter),
-    ]);
+    if (slowMovingItemsView) {
+      // Find all in-stock items matching filters
+      const candidateFilter = {
+        ...filter,
+        quantity: { $gt: 0 },
+      };
+      const candidateItems = await this.itemModel
+        .find(candidateFilter)
+        .lean();
+
+      const mappedCandidates = candidateItems
+        .map((it) => ({
+          ...it,
+          soldInLast30Days: computeSoldInLast30Days(it),
+        }))
+        .filter((it) => it.soldInLast30Days <= 10);
+
+      // Sort by soldInLast30Days asc, then quantity desc
+      mappedCandidates.sort((a, b) => {
+        if (a.soldInLast30Days !== b.soldInLast30Days) {
+          return a.soldInLast30Days - b.soldInLast30Days;
+        }
+        return b.quantity - a.quantity;
+      });
+
+      total = mappedCandidates.length;
+      items = mappedCandidates.slice(skip, skip + limit);
+    } else {
+      const sortObj = q
+        ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 }
+        : { [sortBy]: orderBy === 'asc' ? 1 : -1 };
+
+      const [rawItems, count] = await Promise.all([
+        this.itemModel
+          .find(filter)
+          .sort(sortObj as any)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        this.itemModel.countDocuments(filter),
+      ]);
+
+      total = count;
+      items = rawItems.map((it) => ({
+        ...it,
+        soldInLast30Days: computeSoldInLast30Days(it),
+      }));
+    }
+
+    const lowStockCount = shouldCountLowStock
+      ? await this.itemModel.countDocuments(lowStockFilter)
+      : 0;
 
     return { items, data: items, total, lowStockCount, slowMovingCount };
   }
