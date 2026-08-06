@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ConsultingsService } from './consultings.service';
 import { ConsultingDto } from './dto/consulting.dto';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
@@ -28,6 +28,21 @@ export class ConsultingsController {
     const data = await this.consultingsService.getPatientConsultings(patientId);
     return {
       message: 'Patient consultation record retrived',
+      data,
+    };
+  }
+
+  @Patch('/:id/therapy-status')
+  async updateTherapyStatus(
+    @Param('id') id: string,
+    @Body('completed') completed?: boolean,
+  ) {
+    const data = await this.consultingsService.updateTherapyStatus(
+      id,
+      completed ?? true,
+    );
+    return {
+      message: 'Therapy status updated successfully',
       data,
     };
   }

@@ -107,6 +107,8 @@ export class Consulting {
   })
   therapy: mongoose.Types.ObjectId[];
 
+  @Prop({ type: Boolean, default: false })
+  therapyCompleted: boolean;
 
   @Prop({ type: String, default: null })
   therapyNotes: string | null;

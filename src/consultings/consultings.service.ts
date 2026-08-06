@@ -167,5 +167,16 @@ export class ConsultingsService {
       .lean();
     return data;
   }
+
+  async updateTherapyStatus(id: string, completed: boolean) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Please provide a valid consulting id');
+    }
+    const data = await this.consultingModel
+      .findByIdAndUpdate(id, { therapyCompleted: completed }, { new: true })
+      .populate('therapy')
+      .lean();
+    return data;
+  }
 }
 
