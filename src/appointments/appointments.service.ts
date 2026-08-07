@@ -102,11 +102,20 @@ export class AppointmentsService {
       console.error('Failed to generate appointment token:', tokenErr);
     }
 
+    const isWalkInApp = Boolean(
+      (createAppointmentDto as any).isWalkIn ||
+      (createAppointmentDto as any).walkIn ||
+      createAppointmentDto.isArrived === true ||
+      (createAppointmentDto.type as any) === 'Walk-in'
+    );
+    const isArrived = isWalkInApp ? true : (createAppointmentDto.isArrived ?? false);
+
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
       hasConsultationFee: shouldBillConsultation,
       tokenNumber,
       token,
+      isArrived,
       createdBy,
     });
 
@@ -682,6 +691,18 @@ export class AppointmentsService {
       appointment,
       bill: refundBill,
     };
+  }
+
+  async markArrived(id: mongoose.Types.ObjectId) {
+    const appointment = await this.appointmentModel.findByIdAndUpdate(
+      id,
+      { isArrived: true },
+      { new: true },
+    );
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+    return appointment;
   }
 }
 

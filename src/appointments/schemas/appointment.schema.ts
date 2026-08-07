@@ -96,6 +96,11 @@ export class Appointment {
 
   @Prop({ type: String, required: false, default: null })
   token?: string;
+
+  @Prop({
+    default: false,
+  })
+  isArrived: boolean;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

@@ -229,4 +229,14 @@ export class AppointmentsController {
       message: 'Appointment refunded successfully.',
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('arrived/:id')
+  async markArrived(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.appointmentsService.markArrived(id);
+    return {
+      data,
+      message: 'Patient marked as arrived successfully.',
+    };
+  }
 }
