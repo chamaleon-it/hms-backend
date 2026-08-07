@@ -18,6 +18,8 @@ import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
 
+import { CountersService } from 'src/counters/counters.service';
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -27,36 +29,12 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
+    private readonly countersService: CountersService,
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
-    const prefix = 'ORD-';
-    const lastRecord = await this.orderModel
-      .findOne({ mrn: { $regex: `^${prefix}\\d+$` } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
-      if (match && match[1]) {
-        nextNumber = parseInt(match[1], 10) + 1;
-      }
-    }
-
-    let mrn: string;
-    let exists = true;
-    do {
-      mrn = `${prefix}${nextNumber.toString().padStart(5, '0')}`;
-      const existing = await this.orderModel.exists({ mrn });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return mrn;
+    const seq = await this.countersService.getNextSequence('order_mrn');
+    return `ORD-${seq.toString().padStart(5, '0')}`;
   }
 
   async createOrder(order: CreateOrderDto) {
@@ -778,33 +756,31 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    if (true) {
-      const items = await Promise.all(
-        data.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
+    const items = await Promise.all(
+      data.items.map(async (item) => {
+        const itemData = await this.itemsService.getItem(item.name);
 
-          const unitPrice = itemData.unitPrice;
-          const quantity = item.quantity;
+        const unitPrice = itemData.unitPrice;
+        const quantity = item.quantity;
 
-          return {
-            name: itemData.name,
-            unitPrice,
-            quantity,
-            discount: 0,
-            gst: 0,
-            total: unitPrice * quantity,
-          };
-        }),
-      );
+        return {
+          name: itemData.name,
+          unitPrice,
+          quantity,
+          discount: 0,
+          gst: 0,
+          total: unitPrice * quantity,
+        };
+      }),
+    );
 
-      await this.billingService.generateBill({
-        patient: data.patient,
-        items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-        discount: data.discount ?? 0,
-        doctor: existOrder.doctorName || 'Self',
-      });
-    }
+    await this.billingService.generateBill({
+      patient: data.patient,
+      items,
+      user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+      discount: data.discount ?? 0,
+      doctor: existOrder.doctorName || 'Self',
+    });
 
     return data;
   }

@@ -18,6 +18,7 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { CountersService } from 'src/counters/counters.service';
 
 @Injectable()
 export class BillingService {
@@ -26,38 +27,14 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
+    private readonly countersService: CountersService,
   ) {}
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const prefixWithHyphen = prefix.endsWith('-') ? prefix : `${prefix}-`;
-    const lastRecord = await this.billingModel
-      .findOne({ mrn: { $regex: `^${prefixWithHyphen}\\d+$` } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(
-        new RegExp(`^${prefixWithHyphen}(\\d+)$`),
-      );
-      if (match && match[1]) {
-        nextNumber = parseInt(match[1], 10) + 1;
-      }
-    }
-
-    let mrn: string;
-    let exists = true;
-    do {
-      mrn = `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
-      const existing = await this.billingModel.exists({ mrn });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return mrn;
+    const counterKey = `bill_mrn_${prefixWithHyphen.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const seq = await this.countersService.getNextSequence(counterKey);
+    return `${prefixWithHyphen}${seq.toString().padStart(5, '0')}`;
   }
 
   async generateBill(createBill: CreateBillingDto) {

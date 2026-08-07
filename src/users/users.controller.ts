@@ -53,7 +53,7 @@ export class UsersController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('doctors')
   async getAllDoctors() {
     const data = await this.usersService.getAllDoctors();
@@ -63,6 +63,7 @@ export class UsersController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('role/:role')
   async getUsersByRole(@Param('role') role: string) {
     const data = await this.usersService.getUsersByRole(role);
@@ -72,7 +73,7 @@ export class UsersController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('pharmacy_wholesaler')
   async getAllPharmacyWholesaler() {
     const data = await this.usersService.getAllPharmacyWholesaler();

@@ -27,9 +27,11 @@ import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
 import { InPatientsModule } from './in-patients/in-patients.module';
 import { TherapyModule } from './therapy/therapy.module';
+import { CountersModule } from './counters/counters.module';
 
 @Module({
   imports: [
+    CountersModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

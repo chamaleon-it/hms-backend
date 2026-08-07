@@ -13,37 +13,19 @@ import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 import { Appointment } from '../appointments/schemas/appointment.schema';
 
+import { CountersService } from '../counters/counters.service';
+
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
+    private readonly countersService: CountersService,
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
-    const lastRecord = await this.patientModel
-      .findOne({ mrn: { $regex: /^\d{1,5}$/ } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.mrn) {
-      nextNumber = parseInt(lastRecord.mrn, 10) + 1;
-    }
-
-    let mrn: string;
-    let exists = true;
-    do {
-      mrn = nextNumber.toString().padStart(5, '0');
-      const existing = await this.patientModel.exists({ mrn });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return mrn;
+    const seq = await this.countersService.getNextSequence('patient_mrn');
+    return seq.toString().padStart(5, '0');
   }
 
   async register(

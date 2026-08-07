@@ -11,41 +11,19 @@ import { GetItemsDto } from './dto/get-items.dto';
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
 
+import { CountersService } from 'src/counters/counters.service';
+
 @Injectable()
 export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
+    private readonly countersService: CountersService,
   ) {}
 
   private async generateUniqueSKU(): Promise<string> {
-    const prefix = 'ITM-';
-    const lastRecord = await this.itemModel
-      .findOne({ sku: { $regex: `^${prefix}\\d+$` } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ sku: -1 })
-      .select('sku')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.sku) {
-      const match = lastRecord.sku.match(new RegExp(`^${prefix}(\\d+)$`));
-      if (match && match[1]) {
-        nextNumber = parseInt(match[1], 10) + 1;
-      }
-    }
-
-    let sku: string;
-    let exists = true;
-    do {
-      sku = `${prefix}${nextNumber.toString().padStart(5, '0')}`;
-      const existing = await this.itemModel.exists({ sku });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return sku;
+    const seq = await this.countersService.getNextSequence('item_sku');
+    return `ITM-${seq.toString().padStart(5, '0')}`;
   }
 
   async addItems(pharmacy: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
@@ -337,37 +315,40 @@ export class ItemsService {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
 
-    const item = await this.itemModel.findById(id);
-    if (!item) {
+    const existing = await this.itemModel.findById(id);
+    if (!existing) {
       throw new BadRequestException('Item is not available');
     }
-    const newQuantity = allowNegativeStock
-      ? item.quantity - quantity
-      : Math.max(item.quantity - quantity, 0);
 
-    if (newQuantity !== item.quantity) {
-      item.quantity = newQuantity;
-      await item.save();
-    }
+    const qtyToDecrement = allowNegativeStock
+      ? quantity
+      : Math.min(existing.quantity, quantity);
 
-    if (quantity > 0 && newQuantity >= 0) {
-      const newSoldQuantity = item.soldQuantity + quantity;
-      item.soldQuantity = newSoldQuantity;
-      item.soldHistory.push({
-        date: new Date(),
-        quantity,
-        unitPrice: item.unitPrice,
-        total: item.unitPrice * quantity,
-        customerName,
-        customerPhone,
-        doctorName,
-        pharmacistName,
-        patientMrn,
-      });
-      await item.save();
-    }
+    const updatedItem = await this.itemModel.findOneAndUpdate(
+      { _id: id },
+      {
+        $inc: {
+          quantity: -qtyToDecrement,
+          soldQuantity: qtyToDecrement,
+        },
+        $push: {
+          soldHistory: {
+            date: new Date(),
+            quantity: qtyToDecrement,
+            unitPrice: existing.unitPrice,
+            total: existing.unitPrice * qtyToDecrement,
+            customerName,
+            customerPhone,
+            doctorName,
+            pharmacistName,
+            patientMrn,
+          },
+        },
+      },
+      { new: true },
+    );
 
-    return item;
+    return updatedItem;
   }
 
   async increaseItem(id: mongoose.Types.ObjectId, quantity: number) {
