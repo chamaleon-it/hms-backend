@@ -15,6 +15,14 @@ import {
   IPStatus,
 } from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
+function getDoctorFirstNamePrefix(doctorName: string): string {
+  if (!doctorName) return 'DOC';
+  const cleanName = doctorName.replace(/^(Dr\.|Dr|Prof\.|Prof|Mr\.|Mr|Mrs\.|Mrs|Ms\.|Ms)\s+/i, '').trim();
+  const parts = cleanName.split(/[\s.]+/).filter(Boolean);
+  const firstName = parts[0] || 'DOC';
+  return firstName.toUpperCase();
+}
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -57,9 +65,48 @@ export class AppointmentsService {
       console.error('Failed to look up last appointment:', error);
     }
 
+    // Calculate Token for Doctor on Appointment Date
+    let tokenNumber = 1;
+    let token = 'DOC-01';
+
+    try {
+      const appDate = new Date(createAppointmentDto.date);
+      const startOfDay = new Date(appDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(appDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const lastDoctorApp = await this.appointmentModel
+        .findOne({
+          doctor: createAppointmentDto.doctor,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          isDeleted: { $ne: true },
+        })
+        .sort({ tokenNumber: -1, createdAt: -1 });
+
+      if (lastDoctorApp && typeof lastDoctorApp.tokenNumber === 'number' && lastDoctorApp.tokenNumber > 0) {
+        tokenNumber = lastDoctorApp.tokenNumber + 1;
+      } else {
+        const existingCount = await this.appointmentModel.countDocuments({
+          doctor: createAppointmentDto.doctor,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          isDeleted: { $ne: true },
+        });
+        tokenNumber = existingCount + 1;
+      }
+
+      const doctorUser = await this.usersService.getUserById(createAppointmentDto.doctor);
+      const prefix = getDoctorFirstNamePrefix(doctorUser?.name || '');
+      token = `${prefix}-${String(tokenNumber).padStart(2, '0')}`;
+    } catch (tokenErr) {
+      console.error('Failed to generate appointment token:', tokenErr);
+    }
+
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
       hasConsultationFee: shouldBillConsultation,
+      tokenNumber,
+      token,
       createdBy,
     });
 
@@ -76,6 +123,8 @@ export class AppointmentsService {
           user: createdBy,
           patient: appointment.patient,
           doctor: appointment.doctor.toString(),
+          token: appointment.token,
+          tokenNumber: appointment.tokenNumber,
           items: [
             {
               name: 'Consultation Fee',
@@ -173,7 +222,7 @@ export class AppointmentsService {
       }
     }
 
-    return this.appointmentModel
+    const list = await this.appointmentModel
       .aggregate([
         { $match },
         {
@@ -189,6 +238,12 @@ export class AppointmentsService {
                   phoneNumber: 1,
                   address: 1,
                   profilePic: 1,
+                  qualification: 1,
+                  specialization: 1,
+                  department: 1,
+                  designation: 1,
+                  licenseNo: 1,
+                  consultationFee: 1,
                 },
               },
             ],
@@ -234,6 +289,21 @@ export class AppointmentsService {
         { $sort: { date: 1 } },
       ])
       .option({ allowDiskUse: true });
+
+    const doctorCounters: Record<string, number> = {};
+    return list.map((item: any) => {
+      const docId = item.doctor?._id?.toString() || 'unknown';
+      doctorCounters[docId] = (doctorCounters[docId] || 0) + 1;
+      const num = item.tokenNumber || doctorCounters[docId];
+      const docName = item.doctor?.name || '';
+      const prefix = getDoctorFirstNamePrefix(docName);
+      const tokenStr = item.token || `${prefix}-${String(num).padStart(2, '0')}`;
+      return {
+        ...item,
+        tokenNumber: num,
+        token: tokenStr,
+      };
+    });
   }
 
   async getStatistics(doctor?: string) {

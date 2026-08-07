@@ -90,6 +90,12 @@ export class Appointment {
     default: true,
   })
   hasConsultationFee: boolean;
+
+  @Prop({ type: Number, required: false, default: null })
+  tokenNumber?: number;
+
+  @Prop({ type: String, required: false, default: null })
+  token?: string;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

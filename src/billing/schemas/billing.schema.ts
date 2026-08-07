@@ -75,6 +75,12 @@ export class Billing {
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Report', required: false })
   reportId?: Types.ObjectId;
+
+  @Prop({ type: String, required: false })
+  token?: string;
+
+  @Prop({ type: Number, required: false })
+  tokenNumber?: number;
 }
 
 export const BillingSchema = SchemaFactory.createForClass(Billing);

@@ -113,4 +113,13 @@ export class CreateBillingDto {
   @IsMongoId()
   @IsOptional()
   reportId?: mongoose.Types.ObjectId;
+
+  @IsString()
+  @IsOptional()
+  token?: string;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  tokenNumber?: number;
 }
