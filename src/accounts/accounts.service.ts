@@ -12,6 +12,7 @@ import {
 import { CreateAccountTransactionDto } from './dto/create-account-transaction.dto';
 import { UpdateAccountTransactionDto } from './dto/update-account-transaction.dto';
 import { GetAccountTransactionsDto } from './dto/get-account-transactions.dto';
+import { GetAccountAnalyticsDto } from './dto/get-account-analytics.dto';
 import {
   ExpenseCategory,
   IncomeCategory,
@@ -102,7 +103,9 @@ export class AccountsService {
     if (startDate || endDate) {
       filter.transactionDate = {};
       if (startDate) {
-        filter.transactionDate.$gte = new Date(startDate);
+        const bod = new Date(startDate);
+        bod.setHours(0, 0, 0, 0);
+        filter.transactionDate.$gte = bod;
       }
       if (endDate) {
         const eod = new Date(endDate);
@@ -168,6 +171,199 @@ export class AccountsService {
         totalIncome,
         totalExpense,
         netBalance,
+      },
+    };
+  }
+
+  async getAnalytics(query: GetAccountAnalyticsDto) {
+    const { startDate, endDate, type, category, period = 'monthly' } = query;
+
+    const filter: any = { isDeleted: false };
+
+    if (type) {
+      filter.type = type;
+    }
+    if (category) {
+      filter.category = category;
+    }
+
+    if (startDate || endDate) {
+      filter.transactionDate = {};
+      if (startDate) {
+        const bod = new Date(startDate);
+        bod.setHours(0, 0, 0, 0);
+        filter.transactionDate.$gte = bod;
+      }
+      if (endDate) {
+        const eod = new Date(endDate);
+        eod.setHours(23, 59, 59, 999);
+        filter.transactionDate.$lte = eod;
+      }
+    }
+
+    // 1. Summary aggregations
+    const summaryAgg = await this.accountTransactionModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalIncome: {
+            $sum: {
+              $cond: [{ $eq: ['$type', TransactionType.Income] }, '$amount', 0],
+            },
+          },
+          totalExpense: {
+            $sum: {
+              $cond: [
+                { $eq: ['$type', TransactionType.Expense] },
+                '$amount',
+                0,
+              ],
+            },
+          },
+          incomeCount: {
+            $sum: {
+              $cond: [{ $eq: ['$type', TransactionType.Income] }, 1, 0],
+            },
+          },
+          expenseCount: {
+            $sum: {
+              $cond: [{ $eq: ['$type', TransactionType.Expense] }, 1, 0],
+            },
+          },
+          totalTransactions: { $sum: 1 },
+          totalAmountSum: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const summaryRaw = summaryAgg[0] || {
+      totalIncome: 0,
+      totalExpense: 0,
+      incomeCount: 0,
+      expenseCount: 0,
+      totalTransactions: 0,
+      totalAmountSum: 0,
+    };
+
+    const totalIncome = summaryRaw.totalIncome;
+    const totalExpense = summaryRaw.totalExpense;
+    const netBalance = totalIncome - totalExpense;
+    const profitMargin =
+      totalIncome > 0 ? ((netBalance / totalIncome) * 100).toFixed(1) : 0;
+    const avgTransactionValue =
+      summaryRaw.totalTransactions > 0
+        ? Math.round(summaryRaw.totalAmountSum / summaryRaw.totalTransactions)
+        : 0;
+
+    // 2. Trend & Timeline Aggregation
+    const dateFormat =
+      period === 'daily' ? '%Y-%m-%d' : period === 'yearly' ? '%Y' : '%Y-%m';
+
+    const trendAgg = await this.accountTransactionModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            dateKey: {
+              $dateToString: { format: dateFormat, date: '$transactionDate' },
+            },
+            type: '$type',
+          },
+          total: { $sum: '$amount' },
+        },
+      },
+      { $sort: { '_id.dateKey': 1 } },
+    ]);
+
+    const trendMap: Record<
+      string,
+      { label: string; income: number; expense: number; net: number }
+    > = {};
+
+    trendAgg.forEach((item) => {
+      const dateKey = item._id.dateKey;
+      if (!trendMap[dateKey]) {
+        trendMap[dateKey] = {
+          label: dateKey,
+          income: 0,
+          expense: 0,
+          net: 0,
+        };
+      }
+
+      if (item._id.type === TransactionType.Income) {
+        trendMap[dateKey].income = item.total;
+      } else if (item._id.type === TransactionType.Expense) {
+        trendMap[dateKey].expense = item.total;
+      }
+      trendMap[dateKey].net =
+        trendMap[dateKey].income - trendMap[dateKey].expense;
+    });
+
+    const trendData = Object.values(trendMap);
+
+    // 3. Category Breakdown Aggregation
+    const categoryAgg = await this.accountTransactionModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { type: '$type', category: '$category' },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { total: -1 } },
+    ]);
+
+    const expenseCategories: any[] = [];
+    const incomeCategories: any[] = [];
+
+    categoryAgg.forEach((item) => {
+      const categoryName = item._id.category;
+      const catType = item._id.type;
+      const amount = item.total;
+
+      if (catType === TransactionType.Expense) {
+        const percentage =
+          totalExpense > 0
+            ? Number(((amount / totalExpense) * 100).toFixed(1))
+            : 0;
+        expenseCategories.push({
+          name: categoryName,
+          amount,
+          count: item.count,
+          percentage,
+        });
+      } else if (catType === TransactionType.Income) {
+        const percentage =
+          totalIncome > 0
+            ? Number(((amount / totalIncome) * 100).toFixed(1))
+            : 0;
+        incomeCategories.push({
+          name: categoryName,
+          amount,
+          count: item.count,
+          percentage,
+        });
+      }
+    });
+
+    return {
+      summary: {
+        totalIncome,
+        totalExpense,
+        netBalance,
+        profitMargin: Number(profitMargin),
+        avgTransactionValue,
+        totalTransactions: summaryRaw.totalTransactions,
+        incomeCount: summaryRaw.incomeCount,
+        expenseCount: summaryRaw.expenseCount,
+      },
+      trend: trendData,
+      categoryBreakdown: {
+        expenseCategories,
+        incomeCategories,
       },
     };
   }

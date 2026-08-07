@@ -14,6 +14,7 @@ export enum ExpenseCategory {
   Internet = 'Internet',
   Maintenance = 'Maintenance',
   Miscellaneous = 'Miscellaneous',
+  OtherExpense = 'Other Expense',
 }
 
 export enum IncomeCategory {

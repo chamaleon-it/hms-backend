@@ -13,6 +13,7 @@ import { AccountsService } from './accounts.service';
 import { CreateAccountTransactionDto } from './dto/create-account-transaction.dto';
 import { UpdateAccountTransactionDto } from './dto/update-account-transaction.dto';
 import { GetAccountTransactionsDto } from './dto/get-account-transactions.dto';
+import { GetAccountAnalyticsDto } from './dto/get-account-analytics.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -40,6 +41,15 @@ export class AccountsController {
     return {
       message: 'Account transactions retrieved successfully',
       ...res,
+    };
+  }
+
+  @Get('analytics')
+  async getAnalytics(@Query() query: GetAccountAnalyticsDto) {
+    const data = await this.accountsService.getAnalytics(query);
+    return {
+      message: 'Account analytics retrieved successfully',
+      data,
     };
   }
 
