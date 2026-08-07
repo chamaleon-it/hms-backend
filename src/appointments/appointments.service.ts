@@ -291,19 +291,21 @@ export class AppointmentsService {
       .option({ allowDiskUse: true });
 
     const doctorCounters: Record<string, number> = {};
-    return list.map((item: any) => {
-      const docId = item.doctor?._id?.toString() || 'unknown';
-      doctorCounters[docId] = (doctorCounters[docId] || 0) + 1;
-      const num = item.tokenNumber || doctorCounters[docId];
-      const docName = item.doctor?.name || '';
-      const prefix = getDoctorFirstNamePrefix(docName);
-      const tokenStr = item.token || `${prefix}-${String(num).padStart(2, '0')}`;
-      return {
-        ...item,
-        tokenNumber: num,
-        token: tokenStr,
-      };
-    });
+    return list
+      .map((item: any) => {
+        const docId = item.doctor?._id?.toString() || 'unknown';
+        doctorCounters[docId] = (doctorCounters[docId] || 0) + 1;
+        const num = item.tokenNumber || doctorCounters[docId];
+        const docName = item.doctor?.name || '';
+        const prefix = getDoctorFirstNamePrefix(docName);
+        const tokenStr = item.token || `${prefix}-${String(num).padStart(2, '0')}`;
+        return {
+          ...item,
+          tokenNumber: num,
+          token: tokenStr,
+        };
+      })
+      .sort((a: any, b: any) => (a.tokenNumber || 0) - (b.tokenNumber || 0));
   }
 
   async getStatistics(doctor?: string) {
