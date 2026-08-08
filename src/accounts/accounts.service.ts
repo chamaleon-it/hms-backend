@@ -84,6 +84,7 @@ export class AccountsService {
       q,
       type,
       category,
+      paymentMethod,
       startDate,
       endDate,
       sortBy = 'transactionDate',
@@ -98,6 +99,10 @@ export class AccountsService {
 
     if (category) {
       filter.category = category;
+    }
+
+    if (paymentMethod) {
+      filter.paymentMethod = paymentMethod;
     }
 
     if (startDate || endDate) {
@@ -119,6 +124,7 @@ export class AccountsService {
         { description: { $regex: q, $options: 'i' } },
         { category: { $regex: q, $options: 'i' } },
         { transactionId: { $regex: q, $options: 'i' } },
+        { paymentMethod: { $regex: q, $options: 'i' } },
         { notes: { $regex: q, $options: 'i' } },
       ];
     }

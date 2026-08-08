@@ -8,7 +8,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { TransactionType } from '../enums/account-transaction.enum';
+import { PaymentMethod, TransactionType } from '../enums/account-transaction.enum';
 
 export class CreateAccountTransactionDto {
   @IsEnum(TransactionType, {
@@ -28,6 +28,12 @@ export class CreateAccountTransactionDto {
   @IsString()
   @IsNotEmpty({ message: 'Description is required' })
   description: string;
+
+  @IsOptional()
+  @IsEnum(PaymentMethod, {
+    message: 'Payment method must be Cash, Card, or UPI',
+  })
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsString()

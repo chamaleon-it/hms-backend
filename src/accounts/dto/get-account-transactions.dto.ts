@@ -7,7 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { TransactionType } from '../enums/account-transaction.enum';
+import { PaymentMethod, TransactionType } from '../enums/account-transaction.enum';
 
 export class GetAccountTransactionsDto {
   @IsOptional()
@@ -35,6 +35,10 @@ export class GetAccountTransactionsDto {
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 
   @IsOptional()
   @IsDate()

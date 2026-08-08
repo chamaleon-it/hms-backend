@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { TransactionType } from '../enums/account-transaction.enum';
+import { PaymentMethod, TransactionType } from '../enums/account-transaction.enum';
 
 export type AccountTransactionDocument = HydratedDocument<AccountTransaction>;
 
@@ -20,6 +20,9 @@ export class AccountTransaction {
 
   @Prop({ required: true })
   description: string;
+
+  @Prop({ required: false, enum: PaymentMethod, default: PaymentMethod.Cash })
+  paymentMethod?: PaymentMethod;
 
   @Prop({ required: false })
   notes?: string;

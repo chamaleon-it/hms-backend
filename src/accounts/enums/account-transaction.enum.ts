@@ -23,3 +23,9 @@ export enum IncomeCategory {
   LaboratoryIncome = 'Laboratory Income',
   OtherIncome = 'Other Income',
 }
+
+export enum PaymentMethod {
+  Cash = 'Cash',
+  Card = 'Card',
+  UPI = 'UPI',
+}
