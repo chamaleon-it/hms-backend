@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
@@ -16,6 +17,8 @@ import { GetAccountAnalyticsDto } from './dto/get-account-analytics.dto';
 import {
   ExpenseCategory,
   IncomeCategory,
+  PaymentMethod,
+  SourceModule,
   TransactionType,
 } from './enums/account-transaction.enum';
 
@@ -24,7 +27,7 @@ export class AccountsService {
   constructor(
     @InjectModel(AccountTransaction.name)
     private accountTransactionModel: Model<AccountTransactionDocument>,
-  ) {}
+  ) { }
 
   private async generateTransactionId(): Promise<string> {
     const lastDoc = await this.accountTransactionModel
@@ -61,6 +64,50 @@ export class AccountsService {
     }
   }
 
+  async recordTransaction(params: {
+    type: TransactionType;
+    category: string;
+    amount: number;
+    description: string;
+    paymentMethod?: PaymentMethod;
+    sourceModule?: SourceModule;
+    notes?: string;
+    createdBy?: string | mongoose.Types.ObjectId;
+    transactionDate?: Date;
+  }) {
+    if (!params.amount || params.amount <= 0) return null;
+
+    try {
+      const transactionId = await this.generateTransactionId();
+      let createdByObjectId: mongoose.Types.ObjectId;
+
+      if (params.createdBy && mongoose.Types.ObjectId.isValid(params.createdBy.toString())) {
+        createdByObjectId = new mongoose.Types.ObjectId(params.createdBy.toString());
+      } else {
+        // Fallback default admin / system ObjectId
+        createdByObjectId = new mongoose.Types.ObjectId('000000000000000000000000');
+      }
+
+      const newTransaction = new this.accountTransactionModel({
+        transactionId,
+        type: params.type,
+        category: params.category,
+        amount: Math.abs(params.amount),
+        description: params.description,
+        paymentMethod: params.paymentMethod || PaymentMethod.Cash,
+        sourceModule: params.sourceModule || SourceModule.Uncategorised,
+        notes: params.notes,
+        transactionDate: params.transactionDate || new Date(),
+        createdBy: createdByObjectId,
+      });
+
+      return await newTransaction.save();
+    } catch (err) {
+      console.error(`Failed to record transaction for module ${params.sourceModule}:`, err);
+      return null;
+    }
+  }
+
   async create(
     dto: CreateAccountTransactionDto,
     userId: string | mongoose.Types.ObjectId,
@@ -70,6 +117,7 @@ export class AccountsService {
 
     const newTransaction = new this.accountTransactionModel({
       ...dto,
+      sourceModule: dto.sourceModule || SourceModule.Uncategorised,
       transactionId,
       createdBy: new mongoose.Types.ObjectId(userId),
     });
@@ -85,6 +133,7 @@ export class AccountsService {
       type,
       category,
       paymentMethod,
+      sourceModule,
       startDate,
       endDate,
       sortBy = 'transactionDate',
@@ -103,6 +152,10 @@ export class AccountsService {
 
     if (paymentMethod) {
       filter.paymentMethod = paymentMethod;
+    }
+
+    if (sourceModule) {
+      filter.sourceModule = sourceModule;
     }
 
     if (startDate || endDate) {
@@ -125,6 +178,7 @@ export class AccountsService {
         { category: { $regex: q, $options: 'i' } },
         { transactionId: { $regex: q, $options: 'i' } },
         { paymentMethod: { $regex: q, $options: 'i' } },
+        { sourceModule: { $regex: q, $options: 'i' } },
         { notes: { $regex: q, $options: 'i' } },
       ];
     }
@@ -182,7 +236,7 @@ export class AccountsService {
   }
 
   async getAnalytics(query: GetAccountAnalyticsDto) {
-    const { startDate, endDate, type, category, period = 'monthly' } = query;
+    const { startDate, endDate, type, category, sourceModule, period = 'monthly' } = query;
 
     const filter: any = { isDeleted: false };
 
@@ -191,6 +245,9 @@ export class AccountsService {
     }
     if (category) {
       filter.category = category;
+    }
+    if (sourceModule) {
+      filter.sourceModule = sourceModule;
     }
 
     if (startDate || endDate) {

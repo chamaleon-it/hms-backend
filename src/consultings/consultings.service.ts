@@ -28,6 +28,25 @@ export class ConsultingsService {
     consultingDto: ConsultingDto,
     doctorId: mongoose.Types.ObjectId,
   ) {
+    const inHouseLabId = configuration().in_house_lab_id;
+    const defaultLabObjectId =
+      inHouseLabId && mongoose.isValidObjectId(inHouseLabId)
+        ? new mongoose.Types.ObjectId(inHouseLabId)
+        : new mongoose.Types.ObjectId();
+
+    if (Array.isArray(consultingDto.test)) {
+      consultingDto.test = consultingDto.test.map((t) => {
+        const validLab =
+          t.lab && mongoose.isValidObjectId(t.lab.toString())
+            ? new mongoose.Types.ObjectId(t.lab.toString())
+            : defaultLabObjectId;
+        return {
+          ...t,
+          lab: validLab as any,
+        };
+      });
+    }
+
     const consulting = await this.consultingModel.create({
       ...consultingDto,
       doctor: doctorId,
@@ -64,7 +83,9 @@ export class ConsultingsService {
       patient: consultingDto.patient,
       doctor: doctorId,
       lab:
-        t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
+        t.lab && mongoose.isValidObjectId(t.lab.toString())
+          ? new mongoose.Types.ObjectId(t.lab.toString())
+          : defaultLabObjectId,
       date: t.date,
       test: t.name.map((n) => ({ name: n })),
       priority: t.priority,

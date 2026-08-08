@@ -19,6 +19,17 @@ import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
+import { AccountsService } from 'src/accounts/accounts.service';
+import {
+  ExpenseCategory,
+  IncomeCategory,
+  PaymentMethod,
+  SourceModule,
+  TransactionType,
+} from 'src/accounts/enums/account-transaction.enum';
+
+import configuration from 'src/config/configuration';
+
 @Injectable()
 export class BillingService {
   constructor(
@@ -26,7 +37,43 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
+    private readonly accountsService: AccountsService,
   ) {}
+
+  private async determineSourceModule(userId: any): Promise<SourceModule> {
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      return SourceModule.Pharmacy;
+    }
+
+    const uIdStr = userId.toString();
+    const config = configuration();
+    if (config.in_house_lab_id && uIdStr === config.in_house_lab_id.toString()) {
+      return SourceModule.Lab;
+    }
+    if (config.in_house_pharmacy_id && uIdStr === config.in_house_pharmacy_id.toString()) {
+      return SourceModule.Pharmacy;
+    }
+    if (config.in_house_reception_id && uIdStr === config.in_house_reception_id.toString()) {
+      return SourceModule.Reception;
+    }
+
+    try {
+      const user = await this.usersService.getUserById(userId);
+      if (!user || !user.role) {
+        return SourceModule.Pharmacy;
+      }
+
+      const role = String(user.role).toLowerCase();
+      if (role.includes('doctor')) return SourceModule.Doctor;
+      if (role.includes('pharmacy') || role.includes('pharmacist')) return SourceModule.Pharmacy;
+      if (role.includes('lab') || role.includes('technician')) return SourceModule.Lab;
+      if (role.includes('reception') || role.includes('receptionist')) return SourceModule.Reception;
+
+      return SourceModule.Pharmacy;
+    } catch {
+      return SourceModule.Pharmacy;
+    }
+  }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const prefixWithHyphen = prefix.endsWith('-') ? prefix : `${prefix}-`;
@@ -126,6 +173,85 @@ export class BillingService {
         await order.save();
       }
     }
+
+    // Auto-record transaction in Accounts
+    try {
+      const sourceModule = await this.determineSourceModule(createBill.user);
+      const isRefund =
+        createBill.transactionType === 'Refund' ||
+        (createBill.items &&
+          createBill.items.some((i: any) =>
+            String(i.name || '').toLowerCase().includes('refund'),
+          ));
+      const isReturn = createBill.transactionType === 'Return';
+      const isExpense = isRefund || isReturn;
+
+      const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+      let category: string;
+      if (isRefund) {
+        category = ExpenseCategory.Refund;
+      } else if (isReturn) {
+        category = ExpenseCategory.SalesReturn;
+      } else {
+        const isTherapy =
+          String(createBill.note || '').toLowerCase().includes('therapy') ||
+          (createBill.items &&
+            createBill.items.some((i: any) =>
+              String(i.name || '').toLowerCase().includes('therapy'),
+            ));
+
+        if (isTherapy) category = IncomeCategory.TherapyIncome;
+        else if (sourceModule === SourceModule.Doctor)
+          category = IncomeCategory.ConsultationFee;
+        else if (sourceModule === SourceModule.Lab)
+          category = IncomeCategory.LaboratoryIncome;
+        else if (sourceModule === SourceModule.Reception)
+          category = IncomeCategory.ConsultationFee;
+        else category = IncomeCategory.MedicineSale;
+      }
+
+      let paymentMethod = PaymentMethod.Cash;
+      if (
+        (createBill.card ?? 0) > (createBill.cash ?? 0) &&
+        (createBill.card ?? 0) > (createBill.upi ?? 0)
+      ) {
+        paymentMethod = PaymentMethod.Card;
+      } else if (
+        (createBill.upi ?? 0) > (createBill.cash ?? 0) &&
+        (createBill.upi ?? 0) > (createBill.card ?? 0)
+      ) {
+        paymentMethod = PaymentMethod.UPI;
+      }
+
+      const billAmount = isExpense
+        ? itemsTotal > 0
+          ? itemsTotal
+          : totalPaid > 0
+            ? totalPaid
+            : Math.abs(
+                (createBill.cash ?? 0) +
+                  (createBill.card ?? 0) +
+                  (createBill.upi ?? 0),
+              )
+        : totalPaid;
+
+      // Record Expense for Refunds/Returns or Income if totalPaid > 0
+      if (billAmount > 0) {
+        await this.accountsService.recordTransaction({
+          type,
+          category,
+          amount: billAmount,
+          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Bill'} #${data.mrn}`,
+          paymentMethod,
+          sourceModule,
+          createdBy: createBill.user,
+          transactionDate: new Date(),
+        });
+      }
+    } catch (err) {
+      console.error('Error auto recording account transaction from bill:', err);
+    }
+
     return data;
   }
 
@@ -476,6 +602,63 @@ export class BillingService {
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
+
+    const totalNewPaid = (addPaymentDto.cash ?? 0) + (addPaymentDto.card ?? 0) + (addPaymentDto.upi ?? 0);
+    if (totalNewPaid > 0) {
+      try {
+        const sourceModule = await this.determineSourceModule(user || data.user);
+        const isRefund =
+          data.transactionType === 'Refund' ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '').toLowerCase().includes('refund'),
+            ));
+        const isReturn = data.transactionType === 'Return';
+        const isExpense = isRefund || isReturn;
+
+        const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+        let category: string;
+        if (isRefund) {
+          category = ExpenseCategory.Refund;
+        } else if (isReturn) {
+          category = ExpenseCategory.SalesReturn;
+        } else {
+          const isTherapy =
+            String(data.note || '').toLowerCase().includes('therapy') ||
+            (data.items &&
+              data.items.some((i: any) =>
+                String(i.name || '').toLowerCase().includes('therapy'),
+              ));
+
+          if (isTherapy) category = IncomeCategory.TherapyIncome;
+          else if (sourceModule === SourceModule.Doctor) category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Lab) category = IncomeCategory.LaboratoryIncome;
+          else if (sourceModule === SourceModule.Reception) category = IncomeCategory.ConsultationFee;
+          else category = IncomeCategory.MedicineSale;
+        }
+
+        let paymentMethod = PaymentMethod.Cash;
+        if ((addPaymentDto.card ?? 0) > (addPaymentDto.cash ?? 0) && (addPaymentDto.card ?? 0) > (addPaymentDto.upi ?? 0)) {
+          paymentMethod = PaymentMethod.Card;
+        } else if ((addPaymentDto.upi ?? 0) > (addPaymentDto.cash ?? 0) && (addPaymentDto.upi ?? 0) > (addPaymentDto.card ?? 0)) {
+          paymentMethod = PaymentMethod.UPI;
+        }
+
+        await this.accountsService.recordTransaction({
+          type,
+          category,
+          amount: totalNewPaid,
+          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
+          paymentMethod,
+          sourceModule,
+          createdBy: user || data.user,
+          transactionDate: new Date(),
+        });
+      } catch (err) {
+        console.error('Error recording account transaction in addPayment:', err);
+      }
+    }
+
     return data;
   }
 
@@ -486,6 +669,55 @@ export class BillingService {
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
+
+    if (markAsPaidDto.amount > 0) {
+      try {
+        const sourceModule = await this.determineSourceModule(data.user);
+        const isRefund =
+          data.transactionType === 'Refund' ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '').toLowerCase().includes('refund'),
+            ));
+        const isReturn = data.transactionType === 'Return';
+        const isExpense = isRefund || isReturn;
+
+        const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+        let category: string;
+        if (isRefund) {
+          category = ExpenseCategory.Refund;
+        } else if (isReturn) {
+          category = ExpenseCategory.SalesReturn;
+        } else {
+          const isTherapy =
+            String(data.note || '').toLowerCase().includes('therapy') ||
+            (data.items &&
+              data.items.some((i: any) =>
+                String(i.name || '').toLowerCase().includes('therapy'),
+              ));
+
+          if (isTherapy) category = IncomeCategory.TherapyIncome;
+          else if (sourceModule === SourceModule.Doctor) category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Lab) category = IncomeCategory.LaboratoryIncome;
+          else if (sourceModule === SourceModule.Reception) category = IncomeCategory.ConsultationFee;
+          else category = IncomeCategory.MedicineSale;
+        }
+
+        await this.accountsService.recordTransaction({
+          type,
+          category,
+          amount: markAsPaidDto.amount,
+          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
+          paymentMethod: PaymentMethod.Cash,
+          sourceModule,
+          createdBy: data.user,
+          transactionDate: new Date(),
+        });
+      } catch (err) {
+        console.error('Error recording account transaction in markAsPaid:', err);
+      }
+    }
+
     return data;
   }
 

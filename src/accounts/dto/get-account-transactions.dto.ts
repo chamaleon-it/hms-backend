@@ -7,7 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { PaymentMethod, TransactionType } from '../enums/account-transaction.enum';
+import { PaymentMethod, SourceModule, TransactionType } from '../enums/account-transaction.enum';
 
 export class GetAccountTransactionsDto {
   @IsOptional()
@@ -39,6 +39,10 @@ export class GetAccountTransactionsDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsEnum(SourceModule)
+  sourceModule?: SourceModule;
 
   @IsOptional()
   @IsDate()

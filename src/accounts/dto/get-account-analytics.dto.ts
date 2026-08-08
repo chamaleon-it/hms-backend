@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { IsDate, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TransactionType } from '../enums/account-transaction.enum';
+import { SourceModule, TransactionType } from '../enums/account-transaction.enum';
 
 export class GetAccountAnalyticsDto {
   @IsOptional()
@@ -21,6 +21,10 @@ export class GetAccountAnalyticsDto {
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsEnum(SourceModule)
+  sourceModule?: SourceModule;
 
   @IsOptional()
   @IsString()

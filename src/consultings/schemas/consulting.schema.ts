@@ -125,7 +125,7 @@ export class Consulting {
       date: { type: Date, required: true },
       lab: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
+        required: false,
         default: configuration().in_house_lab_id,
         ref: 'User',
       },

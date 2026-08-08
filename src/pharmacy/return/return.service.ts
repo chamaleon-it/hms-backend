@@ -11,12 +11,21 @@ import { ItemsService } from '../items/items.service';
 import { Billing } from 'src/billing/schemas/billing.schema';
 import configuration from 'src/config/configuration';
 
+import { AccountsService } from 'src/accounts/accounts.service';
+import {
+  ExpenseCategory,
+  PaymentMethod,
+  SourceModule,
+  TransactionType,
+} from 'src/accounts/enums/account-transaction.enum';
+
 @Injectable()
 export class ReturnService {
   constructor(
     @InjectModel(Return.name) private returnModel: Model<Return>,
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     private readonly itemsService: ItemsService,
+    private readonly accountsService: AccountsService,
   ) {}
 
   async create(createReturnDto: CreateReturnDto) {
@@ -30,6 +39,11 @@ export class ReturnService {
       );
     }
     const data = await this.returnModel.create(createReturnDto);
+
+    const returnTotal = createReturnDto.items.reduce(
+      (acc, item) => acc + Number(item.unitPrice) * Number(item.quantity),
+      0,
+    );
 
     await this.billingModel.create({
       patient: createReturnDto.patient,
@@ -49,11 +63,24 @@ export class ReturnService {
       ),
       mrn: createReturnDto.billNo,
       transactionType: 'Return',
-      cash: createReturnDto.items.reduce(
-        (acc, item) => acc + Number(item.unitPrice) * Number(item.quantity),
-        0,
-      ),
+      cash: returnTotal,
     });
+
+    // Auto record Expense transaction in Accounts for Pharmacy Return
+    try {
+      await this.accountsService.recordTransaction({
+        type: TransactionType.Expense,
+        category: ExpenseCategory.SalesReturn,
+        amount: returnTotal,
+        description: `Pharmacy Sales Return Bill #${createReturnDto.billNo}`,
+        paymentMethod: PaymentMethod.Cash,
+        sourceModule: SourceModule.Pharmacy,
+        createdBy: configuration().in_house_pharmacy_id,
+        transactionDate: new Date(),
+      });
+    } catch (err) {
+      console.error('Error recording account transaction for Pharmacy Return:', err);
+    }
 
     const validReasonForQuantityAdd = [
       ReturnReason.AdverseReaction,

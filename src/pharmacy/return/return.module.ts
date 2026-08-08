@@ -6,6 +6,7 @@ import { Return, ReturnSchema } from './schemas/return.schema';
 import { ItemsModule } from '../items/items.module';
 import { Billing, BillingSchema } from 'src/billing/schemas/billing.schema';
 import { UsersModule } from 'src/users/users.module';
+import { AccountsModule } from 'src/accounts/accounts.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersModule } from 'src/users/users.module';
     MongooseModule.forFeature([{ name: Billing.name, schema: BillingSchema }]),
     ItemsModule,
     UsersModule,
+    AccountsModule,
   ],
   controllers: [ReturnController],
   providers: [ReturnService],
