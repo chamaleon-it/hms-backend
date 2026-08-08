@@ -13,6 +13,17 @@ import {
   BillingItemDocument,
 } from '../billing/schemas/billingItem.schema';
 
+import {
+  Consulting,
+  ConsultingDocument,
+} from '../consultings/schemas/consulting.schema';
+import {
+  InPatient,
+  InPatientDocument,
+} from '../in-patients/schemas/in-patient.schema';
+import { Report, ReportDocument } from '../lab/report/schemas/report.schema';
+import { Therapy, TherapyDocument } from '../therapy/schemas/therapy.schema';
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -23,6 +34,14 @@ export class AdminService {
     @InjectModel(Billing.name) private billingModel: Model<BillingDocument>,
     @InjectModel(BillingItem.name)
     private billingItemModel: Model<BillingItemDocument>,
+    @InjectModel(Consulting.name)
+    private consultingModel: Model<ConsultingDocument>,
+    @InjectModel(InPatient.name)
+    private inPatientModel: Model<InPatientDocument>,
+    @InjectModel(Report.name)
+    private reportModel: Model<ReportDocument>,
+    @InjectModel(Therapy.name)
+    private therapyModel: Model<TherapyDocument>,
   ) {}
 
   async getDashboardStats() {
@@ -264,5 +283,339 @@ export class AdminService {
       })
       .select('-password')
       .sort({ createdAt: -1 });
+  }
+
+  async getClinicalAnalytics(query: {
+    range?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    let start = new Date();
+    let end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const range = query.range || 'monthly';
+    if (range === 'today') {
+      start.setHours(0, 0, 0, 0);
+    } else if (range === 'weekly') {
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+    } else if (range === 'monthly') {
+      start.setDate(start.getDate() - 29);
+      start.setHours(0, 0, 0, 0);
+    } else if (range === 'yearly') {
+      start.setDate(start.getDate() - 364);
+      start.setHours(0, 0, 0, 0);
+    } else if (range === 'custom' && query.startDate) {
+      start = new Date(query.startDate);
+      start.setHours(0, 0, 0, 0);
+      if (query.endDate) {
+        end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+      }
+    } else {
+      start.setDate(start.getDate() - 29);
+      start.setHours(0, 0, 0, 0);
+    }
+
+    // 1. All Patients & Demographics
+    const allPatients = await this.patientModel.find().lean();
+    const totalPatients = allPatients.length;
+    let maleCount = 0;
+    let femaleCount = 0;
+    let childrenCount = 0;
+    let teensCount = 0;
+    let adultsCount = 0;
+    let elderlyCount = 0;
+
+    const nowYear = new Date().getFullYear();
+
+    allPatients.forEach((p: any) => {
+      if (p.gender === 'Male') maleCount++;
+      else if (p.gender === 'Female') femaleCount++;
+
+      if (p.dateOfBirth) {
+        const dob = new Date(p.dateOfBirth);
+        if (!isNaN(dob.getTime())) {
+          const age = nowYear - dob.getFullYear();
+          if (age <= 12) childrenCount++;
+          else if (age <= 19) teensCount++;
+          else if (age <= 59) adultsCount++;
+          else elderlyCount++;
+        } else {
+          adultsCount++;
+        }
+      } else {
+        adultsCount++;
+      }
+    });
+
+    // 2. Appointments & Visit Trends within Date Range
+    const rangeAppointments = await this.appointmentModel
+      .find({
+        createdAt: { $gte: start, $lte: end },
+        isDeleted: { $ne: true },
+      })
+      .populate('doctor', 'name')
+      .lean();
+
+    let newPatientsCount = 0;
+    let returningPatientsCount = 0;
+    const doctorCountMap: Record<string, number> = {};
+
+    rangeAppointments.forEach((apt: any) => {
+      if (apt.type === 'Follow up') {
+        returningPatientsCount++;
+      } else {
+        newPatientsCount++;
+      }
+
+      const docName = apt.doctor?.name ? `Dr. ${apt.doctor.name}` : 'Unassigned';
+      doctorCountMap[docName] = (doctorCountMap[docName] || 0) + 1;
+    });
+
+    // 3. IP Admissions (Active vs Discharged)
+    const inPatients = await this.inPatientModel.find().lean();
+    let activeInPatientsCount = 0;
+    let dischargedInPatientsCount = 0;
+    const ipDiagnoses: string[] = [];
+
+    inPatients.forEach((ip: any) => {
+      if (ip.status === 'Discharged') {
+        dischargedInPatientsCount++;
+      } else {
+        activeInPatientsCount++;
+      }
+      if (ip.diagnosis) {
+        ipDiagnoses.push(ip.diagnosis);
+      }
+    });
+
+    // 4. Consultations (Complaints, Diagnoses, Medicines, Therapies, Lab Tests)
+    const consultings = await this.consultingModel
+      .find({ createdAt: { $gte: start, $lte: end } })
+      .populate('medicines.name', 'name')
+      .populate('therapy', 'name')
+      .populate('test.name', 'name')
+      .lean();
+
+    const complaintsMap: Record<string, number> = {};
+    const medicinesMap: Record<string, number> = {};
+    const therapiesMap: Record<string, number> = {};
+    const labTestsMap: Record<string, number> = {};
+
+    ipDiagnoses.forEach((diag) => {
+      if (diag && diag.trim()) {
+        const clean = diag.trim();
+        complaintsMap[clean] = (complaintsMap[clean] || 0) + 1;
+      }
+    });
+
+    consultings.forEach((c: any) => {
+      if (c.chiefComplaints?.complaints && Array.isArray(c.chiefComplaints.complaints)) {
+        c.chiefComplaints.complaints.forEach((comp: string) => {
+          if (comp && comp.trim()) {
+            const clean = comp.trim();
+            complaintsMap[clean] = (complaintsMap[clean] || 0) + 1;
+          }
+        });
+      }
+      if (c.consultationNotes?.diagnosis) {
+        const diag = c.consultationNotes.diagnosis.trim();
+        if (diag) {
+          complaintsMap[diag] = (complaintsMap[diag] || 0) + 1;
+        }
+      }
+
+      if (Array.isArray(c.medicines)) {
+        c.medicines.forEach((m: any) => {
+          const medName =
+            m.referralName ||
+            (typeof m.name === 'object' && m.name?.name ? m.name.name : null);
+          if (medName) {
+            medicinesMap[medName] = (medicinesMap[medName] || 0) + (m.quantity || 1);
+          }
+        });
+      }
+
+      if (Array.isArray(c.therapy)) {
+        c.therapy.forEach((th: any) => {
+          const thName = typeof th === 'object' && th?.name ? th.name : String(th);
+          if (thName && thName !== '[object Object]') {
+            therapiesMap[thName] = (therapiesMap[thName] || 0) + 1;
+          }
+        });
+      }
+
+      if (Array.isArray(c.test)) {
+        c.test.forEach((t: any) => {
+          if (Array.isArray(t.name)) {
+            t.name.forEach((tNameObj: any) => {
+              const tName = typeof tNameObj === 'object' && tNameObj?.name ? tNameObj.name : null;
+              if (tName) {
+                labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // 5. Reports for additional lab tests
+    const reports = await this.reportModel
+      .find({ createdAt: { $gte: start, $lte: end } })
+      .populate('test.name', 'name')
+      .lean();
+
+    reports.forEach((rep: any) => {
+      if (Array.isArray(rep.test)) {
+        rep.test.forEach((tItem: any) => {
+          const tName =
+            typeof tItem.name === 'object' && tItem.name?.name
+              ? tItem.name.name
+              : null;
+          if (tName) {
+            labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    // Build trend chart data
+    const toLocalDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const trendDict: Record<string, any> = {};
+    const curr = new Date(start);
+    while (curr <= end) {
+      const dStr = toLocalDateStr(curr);
+      trendDict[dStr] = { date: dStr, totalVisits: 0, newPatients: 0, followUps: 0 };
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    rangeAppointments.forEach((apt: any) => {
+      const dStr = toLocalDateStr(new Date(apt.createdAt));
+      if (trendDict[dStr]) {
+        trendDict[dStr].totalVisits += 1;
+        if (apt.type === 'Follow up') {
+          trendDict[dStr].followUps += 1;
+        } else {
+          trendDict[dStr].newPatients += 1;
+        }
+      }
+    });
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const visitTrends = Object.values(trendDict).map((item: any) => {
+      const parts = item.date.split('-');
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parts[2];
+      item.label = `${monthNames[month]} ${day}`;
+      return item;
+    });
+
+    const formatTopList = (mapObj: Record<string, number>, limit = 6) => {
+      return Object.entries(mapObj)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+    };
+
+    const topComplaints = formatTopList(complaintsMap, 6);
+    const topMedicines = formatTopList(medicinesMap, 6);
+    const topTherapies = formatTopList(therapiesMap, 6);
+    const topLabTests = formatTopList(labTestsMap, 6);
+    const doctorStats = Object.entries(doctorCountMap)
+      .map(([doctorName, count]) => ({ doctorName, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const departmentStats = [
+      { name: 'OP Consultation', count: rangeAppointments.length },
+      { name: 'Therapies', count: Object.values(therapiesMap).reduce((a, b) => a + b, 0) },
+      { name: 'Lab Tests', count: Object.values(labTestsMap).reduce((a, b) => a + b, 0) },
+      { name: 'In-Patient (IP)', count: inPatients.length },
+    ];
+
+    return {
+      summary: {
+        totalPatients,
+        newPatientsCount,
+        returningPatientsCount,
+        malePatientsCount: maleCount,
+        femalePatientsCount: femaleCount,
+        activeInPatientsCount,
+        dischargedInPatientsCount,
+        totalVisits: rangeAppointments.length,
+      },
+      demographics: {
+        genderDistribution: [
+          { name: 'Male', value: maleCount },
+          { name: 'Female', value: femaleCount },
+        ],
+        ageDistribution: [
+          { name: 'Children (0-12)', value: childrenCount },
+          { name: 'Teens (13-19)', value: teensCount },
+          { name: 'Adults (20-59)', value: adultsCount },
+          { name: 'Elderly (60+)', value: elderlyCount },
+        ],
+      },
+      visitTrends,
+      topComplaints,
+      topMedicines,
+      topTherapies,
+      topLabTests,
+      doctorStats,
+      departmentStats,
+    };
+  }
+
+  async getPatientsList(query: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    gender?: string;
+    doctor?: string;
+    status?: string;
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+    if (query.gender && query.gender !== 'ALL') {
+      filter.gender = query.gender;
+    }
+    if (query.doctor && query.doctor !== 'ALL') {
+      filter.doctor = query.doctor;
+    }
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status;
+    }
+    if (query.search && query.search.trim()) {
+      const searchRegex = new RegExp(query.search.trim(), 'i');
+      filter.$or = [
+        { name: searchRegex },
+        { mrn: searchRegex },
+        { phoneNumber: searchRegex },
+        { email: searchRegex },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.patientModel
+        .find(filter)
+        .populate('doctor', 'name email specialization')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.patientModel.countDocuments(filter),
+    ]);
+
+    return { data, total, page, limit };
   }
 }

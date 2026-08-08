@@ -14,7 +14,16 @@ import {
   BillingItemSchema,
 } from '../billing/schemas/billingItem.schema';
 import { BillingModule } from '../billing/billing.module';
-// Import other schemas as needed for stats
+import {
+  Consulting,
+  ConsultingSchema,
+} from '../consultings/schemas/consulting.schema';
+import {
+  InPatient,
+  InPatientSchema,
+} from '../in-patients/schemas/in-patient.schema';
+import { Report, ReportSchema } from '../lab/report/schemas/report.schema';
+import { Therapy, TherapySchema } from '../therapy/schemas/therapy.schema';
 
 @Module({
   imports: [
@@ -24,6 +33,10 @@ import { BillingModule } from '../billing/billing.module';
       { name: Billing.name, schema: BillingSchema },
       { name: Patient.name, schema: PatientSchema },
       { name: BillingItem.name, schema: BillingItemSchema },
+      { name: Consulting.name, schema: ConsultingSchema },
+      { name: InPatient.name, schema: InPatientSchema },
+      { name: Report.name, schema: ReportSchema },
+      { name: Therapy.name, schema: TherapySchema },
     ]),
     BillingModule,
   ],

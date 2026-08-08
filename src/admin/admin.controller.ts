@@ -56,6 +56,46 @@ export class AdminController {
     return { message: 'Doctors retrieved', data };
   }
 
+  @Get('clinical/analytics')
+  async getClinicalAnalytics(
+    @Query('range') range?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.adminService.getClinicalAnalytics({
+      range,
+      startDate,
+      endDate,
+    });
+    return { message: 'Clinical analytics retrieved successfully', data };
+  }
+
+  @Get('patients')
+  async getPatients(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('gender') gender?: string,
+    @Query('doctor') doctor?: string,
+    @Query('status') status?: string,
+  ) {
+    const { data, total } = await this.adminService.getPatientsList({
+      page,
+      limit,
+      search,
+      gender,
+      doctor,
+      status,
+    });
+    return {
+      message: 'Patients list retrieved successfully',
+      data,
+      total,
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+    };
+  }
+
   @Get('staff')
   async getAllStaff() {
     const data = await this.adminService.getAllStaff();
