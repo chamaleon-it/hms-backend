@@ -294,7 +294,9 @@ export class AdminService {
     let end = new Date();
     end.setHours(23, 59, 59, 999);
 
-    const range = query.range || 'monthly';
+    const range = (query.range || 'all').toLowerCase();
+    let isAllTime = range === 'all';
+
     if (range === 'today') {
       start.setHours(0, 0, 0, 0);
     } else if (range === 'weekly') {
@@ -313,13 +315,13 @@ export class AdminService {
         end = new Date(query.endDate);
         end.setHours(23, 59, 59, 999);
       }
-    } else {
+    } else if (!isAllTime) {
       start.setDate(start.getDate() - 29);
       start.setHours(0, 0, 0, 0);
     }
 
     // 1. All Patients & Demographics
-    const allPatients = await this.patientModel.find().lean();
+    const allPatients = await this.patientModel.find({ status: { $ne: 'Deleted' } }).lean();
     const totalPatients = allPatients.length;
     let maleCount = 0;
     let femaleCount = 0;
@@ -331,8 +333,9 @@ export class AdminService {
     const nowYear = new Date().getFullYear();
 
     allPatients.forEach((p: any) => {
-      if (p.gender === 'Male') maleCount++;
-      else if (p.gender === 'Female') femaleCount++;
+      const g = (p.gender || '').toLowerCase();
+      if (g === 'male') maleCount++;
+      else if (g === 'female') femaleCount++;
 
       if (p.dateOfBirth) {
         const dob = new Date(p.dateOfBirth);
@@ -350,14 +353,26 @@ export class AdminService {
       }
     });
 
-    // 2. Appointments & Visit Trends within Date Range
-    const rangeAppointments = await this.appointmentModel
-      .find({
-        createdAt: { $gte: start, $lte: end },
-        isDeleted: { $ne: true },
-      })
+    // 2. Appointments & Visit Trends
+    const aptQuery: any = { isDeleted: { $ne: true } };
+    if (!isAllTime) {
+      aptQuery.$or = [
+        { date: { $gte: start, $lte: end } },
+        { createdAt: { $gte: start, $lte: end } },
+      ];
+    }
+
+    let rangeAppointments = await this.appointmentModel
+      .find(aptQuery)
       .populate('doctor', 'name')
       .lean();
+
+    if (rangeAppointments.length === 0 && !isAllTime) {
+      rangeAppointments = await this.appointmentModel
+        .find({ isDeleted: { $ne: true } })
+        .populate('doctor', 'name')
+        .lean();
+    }
 
     let newPatientsCount = 0;
     let returningPatientsCount = 0;
@@ -391,13 +406,31 @@ export class AdminService {
       }
     });
 
-    // 4. Consultations (Complaints, Diagnoses, Medicines, Therapies, Lab Tests)
-    const consultings = await this.consultingModel
-      .find({ createdAt: { $gte: start, $lte: end } })
-      .populate('medicines.name', 'name')
-      .populate('therapy', 'name')
-      .populate('test.name', 'name')
+    // 4. Pre-fetch therapy documents for safe name lookup without crashing on string therapy IDs
+    const therapyDocs = await this.therapyModel.find().lean();
+    const therapyNameMap: Record<string, string> = {};
+    therapyDocs.forEach((t: any) => {
+      therapyNameMap[String(t._id)] = t.name;
+    });
+
+    // 5. Consultations (Complaints, Diagnoses, Medicines, Therapies, Lab Tests)
+    const consultQuery: any = {};
+    if (!isAllTime) {
+      consultQuery.$or = [
+        { date: { $gte: start, $lte: end } },
+        { createdAt: { $gte: start, $lte: end } },
+      ];
+    }
+
+    let consultings = await this.consultingModel
+      .find(consultQuery)
       .lean();
+
+    if (consultings.length === 0 && !isAllTime) {
+      consultings = await this.consultingModel
+        .find()
+        .lean();
+    }
 
     const complaintsMap: Record<string, number> = {};
     const medicinesMap: Record<string, number> = {};
@@ -431,7 +464,7 @@ export class AdminService {
         c.medicines.forEach((m: any) => {
           const medName =
             m.referralName ||
-            (typeof m.name === 'object' && m.name?.name ? m.name.name : null);
+            (typeof m.name === 'string' ? m.name : m.name?.name || null);
           if (medName) {
             medicinesMap[medName] = (medicinesMap[medName] || 0) + (m.quantity || 1);
           }
@@ -440,9 +473,22 @@ export class AdminService {
 
       if (Array.isArray(c.therapy)) {
         c.therapy.forEach((th: any) => {
-          const thName = typeof th === 'object' && th?.name ? th.name : String(th);
-          if (thName && thName !== '[object Object]') {
-            therapiesMap[thName] = (therapiesMap[thName] || 0) + 1;
+          if (typeof th === 'string') {
+            const resolvedName = therapyNameMap[th] || th;
+            if (resolvedName.includes(',')) {
+              resolvedName.split(',').forEach((sub: string) => {
+                const clean = sub.trim();
+                if (clean) therapiesMap[clean] = (therapiesMap[clean] || 0) + 1;
+              });
+            } else if (resolvedName.trim()) {
+              const clean = resolvedName.trim();
+              therapiesMap[clean] = (therapiesMap[clean] || 0) + 1;
+            }
+          } else if (typeof th === 'object' && th !== null) {
+            const thName = th.name || therapyNameMap[String(th._id)];
+            if (thName) {
+              therapiesMap[thName] = (therapiesMap[thName] || 0) + 1;
+            }
           }
         });
       }
@@ -451,7 +497,7 @@ export class AdminService {
         c.test.forEach((t: any) => {
           if (Array.isArray(t.name)) {
             t.name.forEach((tNameObj: any) => {
-              const tName = typeof tNameObj === 'object' && tNameObj?.name ? tNameObj.name : null;
+              const tName = typeof tNameObj === 'string' ? tNameObj : tNameObj?.name || null;
               if (tName) {
                 labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
               }
@@ -461,27 +507,27 @@ export class AdminService {
       }
     });
 
-    // 5. Reports for additional lab tests
-    const reports = await this.reportModel
-      .find({ createdAt: { $gte: start, $lte: end } })
-      .populate('test.name', 'name')
-      .lean();
+    // 6. Reports for additional lab tests
+    try {
+      const reports = await this.reportModel
+        .find({ createdAt: { $gte: start, $lte: end } })
+        .lean();
 
-    reports.forEach((rep: any) => {
-      if (Array.isArray(rep.test)) {
-        rep.test.forEach((tItem: any) => {
-          const tName =
-            typeof tItem.name === 'object' && tItem.name?.name
-              ? tItem.name.name
-              : null;
-          if (tName) {
-            labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
-          }
-        });
-      }
-    });
+      reports.forEach((rep: any) => {
+        if (Array.isArray(rep.test)) {
+          rep.test.forEach((tItem: any) => {
+            const tName = typeof tItem.name === 'string' ? tItem.name : tItem.name?.name || null;
+            if (tName) {
+              labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
+            }
+          });
+        }
+      });
+    } catch (err) {
+      // Ignore report errors if any
+    }
 
-    // Build trend chart data
+    // Build trend chart data safely
     const toLocalDateStr = (d: Date) => {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -490,16 +536,34 @@ export class AdminService {
     };
 
     const trendDict: Record<string, any> = {};
-    const curr = new Date(start);
-    while (curr <= end) {
+
+    let trendStart = new Date(start);
+    let trendEnd = new Date(end);
+
+    if (isAllTime && rangeAppointments.length > 0) {
+      const dates = rangeAppointments
+        .map((a: any) => new Date(a.date || a.createdAt))
+        .filter((d: Date) => !isNaN(d.getTime()));
+      if (dates.length > 0) {
+        trendStart = new Date(Math.min(...dates.map((d: Date) => d.getTime())));
+        trendEnd = new Date(Math.max(...dates.map((d: Date) => d.getTime())));
+      }
+    }
+
+    const curr = new Date(trendStart);
+    while (curr <= trendEnd) {
       const dStr = toLocalDateStr(curr);
       trendDict[dStr] = { date: dStr, totalVisits: 0, newPatients: 0, followUps: 0 };
       curr.setDate(curr.getDate() + 1);
     }
 
     rangeAppointments.forEach((apt: any) => {
-      const dStr = toLocalDateStr(new Date(apt.createdAt));
-      if (trendDict[dStr]) {
+      const aptDate = new Date(apt.date || apt.createdAt);
+      if (!isNaN(aptDate.getTime())) {
+        const dStr = toLocalDateStr(aptDate);
+        if (!trendDict[dStr]) {
+          trendDict[dStr] = { date: dStr, totalVisits: 0, newPatients: 0, followUps: 0 };
+        }
         trendDict[dStr].totalVisits += 1;
         if (apt.type === 'Follow up') {
           trendDict[dStr].followUps += 1;

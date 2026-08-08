@@ -183,6 +183,7 @@ export class ConsultingsService {
       .populate('appointment')
       .populate('doctor', 'name email specialization')
       .populate('medicines.name', 'name')
+      .populate('test.name', 'name code type panels')
       .populate('therapy')
       .sort({ createdAt: -1 })
       .lean();

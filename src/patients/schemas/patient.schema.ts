@@ -36,8 +36,16 @@ export class Patient {
   @Prop({ default: [], type: [String] })
   conditions: string[];
 
-  @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] })
-  blood: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+  @Prop({
+    type: String,
+    enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    required: false,
+    default: null,
+  })
+  blood?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | null;
+
+  @Prop({ type: String, required: false, default: null, trim: true })
+  allergies?: string | null;
 
   @Prop()
   insurance: string;

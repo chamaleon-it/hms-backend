@@ -268,27 +268,53 @@ export class BillingService {
       status,
       startDate,
       endDate,
+      date,
       activeDate,
       userRole,
+      billType,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
-    const match: any = {};
-    const qEndFound = await this.billingModel.exists({
-      mrn: qEnd?.toUpperCase(),
+    // Lookup patient first to allow matching on patient fields
+    pipeline.push({
+      $lookup: {
+        from: 'patients',
+        localField: 'patient',
+        foreignField: '_id',
+        as: 'patient',
+      },
     });
+    pipeline.push({
+      $unwind: { path: '$patient', preserveNullAndEmptyArrays: true },
+    });
+
+    const match: any = {};
+    const qEndFound = qEnd
+      ? await this.billingModel.exists({ mrn: qEnd.toUpperCase() })
+      : false;
 
     if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
+    } else if (q && q.trim()) {
+      const searchRegex = new RegExp(q.trim(), 'i');
+      match.$or = [
+        { mrn: searchRegex },
+        { 'patient.name': searchRegex },
+        { 'patient.mrn': searchRegex },
+        { 'patient.phoneNumber': searchRegex },
+      ];
     }
-    // else if (q) {
-    //   match.mrn = { $regex: '^' + q, $options: 'i' };
-    // }
 
-    if (!q && startDate && endDate) {
-      match.createdAt = { $gte: startDate, $lte: endDate };
+    if (date) {
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+      match.createdAt = { $gte: dayStart, $lte: dayEnd };
+    } else if (startDate && endDate) {
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
 
     if (method) {
@@ -298,6 +324,32 @@ export class BillingService {
         match.upi = { $ne: 0 };
       } else if (method === 'Card') {
         match.card = { $ne: 0 };
+      }
+    }
+
+    if (billType && billType !== 'all') {
+      const therapyRegex = /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
+      const receptionRegex = /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
+
+      if (billType === 'therapy') {
+        match.$or = [
+          { note: therapyRegex },
+          { 'items.name': therapyRegex },
+        ];
+      } else if (billType === 'reception') {
+        match.$or = [
+          { transactionType: { $in: ['Refund', 'Return'] } },
+          { note: receptionRegex },
+          { 'items.name': receptionRegex },
+        ];
+      } else if (billType === 'other') {
+        match.$nor = [
+          { note: therapyRegex },
+          { 'items.name': therapyRegex },
+          { note: receptionRegex },
+          { 'items.name': receptionRegex },
+          { transactionType: { $in: ['Refund', 'Return'] } },
+        ];
       }
     }
 
@@ -387,15 +439,6 @@ export class BillingService {
           ...(activeDate === 'Today' || activeDate === 'Custom' || true
             ? []
             : [{ $skip: skip }, { $limit: limit }]),
-          {
-            $lookup: {
-              from: 'patients',
-              localField: 'patient',
-              foreignField: '_id',
-              as: 'patient',
-            },
-          },
-          { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
           {
             $lookup: {
               from: 'users',

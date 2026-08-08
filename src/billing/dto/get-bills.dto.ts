@@ -50,10 +50,19 @@ export class GetBillisDto {
   endDate?: Date;
 
   @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  date?: Date;
+
+  @IsOptional()
   @IsString()
   activeDate?: string;
 
   @IsOptional()
   @IsString()
   userRole?: string;
+
+  @IsOptional()
+  @IsString()
+  billType?: string;
 }

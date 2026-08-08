@@ -59,8 +59,13 @@ export class PatientRegisterDto {
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
+  @Transform(({ value }) => (value && typeof value === 'string' && value.trim() ? value.trim() : undefined))
   blood?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value && typeof value === 'string' && value.trim() ? value.trim() : undefined))
+  allergies?: string;
 
   @IsOptional()
   @IsString()
