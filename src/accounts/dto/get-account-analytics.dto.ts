@@ -1,6 +1,9 @@
 import { Transform, Type } from 'class-transformer';
 import { IsDate, IsEnum, IsOptional, IsString } from 'class-validator';
-import { SourceModule, TransactionType } from '../enums/account-transaction.enum';
+import {
+  SourceModule,
+  TransactionType,
+} from '../enums/account-transaction.enum';
 
 export class GetAccountAnalyticsDto {
   @IsOptional()

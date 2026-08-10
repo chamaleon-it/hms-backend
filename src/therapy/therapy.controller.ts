@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { TherapyService } from './therapy.service';
 import { CreateTherapyDto } from './dto/create-therapy.dto';
 import { UpdateTherapyDto } from './dto/update-therapy.dto';
@@ -52,4 +61,3 @@ export class TherapyController {
     };
   }
 }
-

@@ -27,7 +27,7 @@ export class AccountsService {
   constructor(
     @InjectModel(AccountTransaction.name)
     private accountTransactionModel: Model<AccountTransactionDocument>,
-  ) { }
+  ) {}
 
   private async generateTransactionId(): Promise<string> {
     const lastDoc = await this.accountTransactionModel
@@ -81,11 +81,18 @@ export class AccountsService {
       const transactionId = await this.generateTransactionId();
       let createdByObjectId: mongoose.Types.ObjectId;
 
-      if (params.createdBy && mongoose.Types.ObjectId.isValid(params.createdBy.toString())) {
-        createdByObjectId = new mongoose.Types.ObjectId(params.createdBy.toString());
+      if (
+        params.createdBy &&
+        mongoose.Types.ObjectId.isValid(params.createdBy.toString())
+      ) {
+        createdByObjectId = new mongoose.Types.ObjectId(
+          params.createdBy.toString(),
+        );
       } else {
         // Fallback default admin / system ObjectId
-        createdByObjectId = new mongoose.Types.ObjectId('000000000000000000000000');
+        createdByObjectId = new mongoose.Types.ObjectId(
+          '000000000000000000000000',
+        );
       }
 
       const newTransaction = new this.accountTransactionModel({
@@ -103,7 +110,10 @@ export class AccountsService {
 
       return await newTransaction.save();
     } catch (err) {
-      console.error(`Failed to record transaction for module ${params.sourceModule}:`, err);
+      console.error(
+        `Failed to record transaction for module ${params.sourceModule}:`,
+        err,
+      );
       return null;
     }
   }
@@ -236,7 +246,14 @@ export class AccountsService {
   }
 
   async getAnalytics(query: GetAccountAnalyticsDto) {
-    const { startDate, endDate, type, category, sourceModule, period = 'monthly' } = query;
+    const {
+      startDate,
+      endDate,
+      type,
+      category,
+      sourceModule,
+      period = 'monthly',
+    } = query;
 
     const filter: any = { isDeleted: false };
 

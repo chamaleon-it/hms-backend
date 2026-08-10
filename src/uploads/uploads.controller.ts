@@ -26,7 +26,9 @@ export class UploadsController {
       /\.(pdf|jpg|jpeg|png|webp|gif|svg)$/i.test(file.originalname);
 
     if (!isAllowed) {
-      throw new BadRequestException('Only PDF documents and image files are allowed.');
+      throw new BadRequestException(
+        'Only PDF documents and image files are allowed.',
+      );
     }
     return {
       message: 'File uploaded',

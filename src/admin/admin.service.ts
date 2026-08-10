@@ -295,7 +295,7 @@ export class AdminService {
     end.setHours(23, 59, 59, 999);
 
     const range = (query.range || 'all').toLowerCase();
-    let isAllTime = range === 'all';
+    const isAllTime = range === 'all';
 
     if (range === 'today') {
       start.setHours(0, 0, 0, 0);
@@ -321,7 +321,9 @@ export class AdminService {
     }
 
     // 1. All Patients & Demographics
-    const allPatients = await this.patientModel.find({ status: { $ne: 'Deleted' } }).lean();
+    const allPatients = await this.patientModel
+      .find({ status: { $ne: 'Deleted' } })
+      .lean();
     const totalPatients = allPatients.length;
     let maleCount = 0;
     let femaleCount = 0;
@@ -385,7 +387,9 @@ export class AdminService {
         newPatientsCount++;
       }
 
-      const docName = apt.doctor?.name ? `Dr. ${apt.doctor.name}` : 'Unassigned';
+      const docName = apt.doctor?.name
+        ? `Dr. ${apt.doctor.name}`
+        : 'Unassigned';
       doctorCountMap[docName] = (doctorCountMap[docName] || 0) + 1;
     });
 
@@ -422,14 +426,10 @@ export class AdminService {
       ];
     }
 
-    let consultings = await this.consultingModel
-      .find(consultQuery)
-      .lean();
+    let consultings = await this.consultingModel.find(consultQuery).lean();
 
     if (consultings.length === 0 && !isAllTime) {
-      consultings = await this.consultingModel
-        .find()
-        .lean();
+      consultings = await this.consultingModel.find().lean();
     }
 
     const complaintsMap: Record<string, number> = {};
@@ -445,7 +445,10 @@ export class AdminService {
     });
 
     consultings.forEach((c: any) => {
-      if (c.chiefComplaints?.complaints && Array.isArray(c.chiefComplaints.complaints)) {
+      if (
+        c.chiefComplaints?.complaints &&
+        Array.isArray(c.chiefComplaints.complaints)
+      ) {
         c.chiefComplaints.complaints.forEach((comp: string) => {
           if (comp && comp.trim()) {
             const clean = comp.trim();
@@ -466,7 +469,8 @@ export class AdminService {
             m.referralName ||
             (typeof m.name === 'string' ? m.name : m.name?.name || null);
           if (medName) {
-            medicinesMap[medName] = (medicinesMap[medName] || 0) + (m.quantity || 1);
+            medicinesMap[medName] =
+              (medicinesMap[medName] || 0) + (m.quantity || 1);
           }
         });
       }
@@ -497,7 +501,10 @@ export class AdminService {
         c.test.forEach((t: any) => {
           if (Array.isArray(t.name)) {
             t.name.forEach((tNameObj: any) => {
-              const tName = typeof tNameObj === 'string' ? tNameObj : tNameObj?.name || null;
+              const tName =
+                typeof tNameObj === 'string'
+                  ? tNameObj
+                  : tNameObj?.name || null;
               if (tName) {
                 labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
               }
@@ -516,7 +523,10 @@ export class AdminService {
       reports.forEach((rep: any) => {
         if (Array.isArray(rep.test)) {
           rep.test.forEach((tItem: any) => {
-            const tName = typeof tItem.name === 'string' ? tItem.name : tItem.name?.name || null;
+            const tName =
+              typeof tItem.name === 'string'
+                ? tItem.name
+                : tItem.name?.name || null;
             if (tName) {
               labTestsMap[tName] = (labTestsMap[tName] || 0) + 1;
             }
@@ -553,7 +563,12 @@ export class AdminService {
     const curr = new Date(trendStart);
     while (curr <= trendEnd) {
       const dStr = toLocalDateStr(curr);
-      trendDict[dStr] = { date: dStr, totalVisits: 0, newPatients: 0, followUps: 0 };
+      trendDict[dStr] = {
+        date: dStr,
+        totalVisits: 0,
+        newPatients: 0,
+        followUps: 0,
+      };
       curr.setDate(curr.getDate() + 1);
     }
 
@@ -562,7 +577,12 @@ export class AdminService {
       if (!isNaN(aptDate.getTime())) {
         const dStr = toLocalDateStr(aptDate);
         if (!trendDict[dStr]) {
-          trendDict[dStr] = { date: dStr, totalVisits: 0, newPatients: 0, followUps: 0 };
+          trendDict[dStr] = {
+            date: dStr,
+            totalVisits: 0,
+            newPatients: 0,
+            followUps: 0,
+          };
         }
         trendDict[dStr].totalVisits += 1;
         if (apt.type === 'Follow up') {
@@ -573,7 +593,20 @@ export class AdminService {
       }
     });
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     const visitTrends = Object.values(trendDict).map((item: any) => {
       const parts = item.date.split('-');
       const month = parseInt(parts[1], 10) - 1;
@@ -599,8 +632,14 @@ export class AdminService {
 
     const departmentStats = [
       { name: 'OP Consultation', count: rangeAppointments.length },
-      { name: 'Therapies', count: Object.values(therapiesMap).reduce((a, b) => a + b, 0) },
-      { name: 'Lab Tests', count: Object.values(labTestsMap).reduce((a, b) => a + b, 0) },
+      {
+        name: 'Therapies',
+        count: Object.values(therapiesMap).reduce((a, b) => a + b, 0),
+      },
+      {
+        name: 'Lab Tests',
+        count: Object.values(labTestsMap).reduce((a, b) => a + b, 0),
+      },
       { name: 'In-Patient (IP)', count: inPatients.length },
     ];
 

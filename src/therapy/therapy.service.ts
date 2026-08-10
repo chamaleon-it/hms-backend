@@ -7,7 +7,9 @@ import { UpdateTherapyDto } from './dto/update-therapy.dto';
 
 @Injectable()
 export class TherapyService {
-  constructor(@InjectModel(Therapy.name) private therapyModel: Model<Therapy>) {}
+  constructor(
+    @InjectModel(Therapy.name) private therapyModel: Model<Therapy>,
+  ) {}
 
   async createTherapy(dto: CreateTherapyDto) {
     const therapy = new this.therapyModel(dto);
@@ -27,7 +29,9 @@ export class TherapyService {
   }
 
   async findOne(id: string) {
-    const therapy = await this.therapyModel.findOne({ _id: id, isDeleted: false }).exec();
+    const therapy = await this.therapyModel
+      .findOne({ _id: id, isDeleted: false })
+      .exec();
     if (!therapy) {
       throw new NotFoundException(`Therapy with id ${id} not found`);
     }
@@ -54,4 +58,3 @@ export class TherapyService {
     return therapy;
   }
 }
-

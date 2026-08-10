@@ -4,10 +4,11 @@ import { TherapyController } from './therapy.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Therapy, TherapySchema } from './schemas/therapy.schema';
 
-
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Therapy.name, schema: TherapySchema }])],
+  imports: [
+    MongooseModule.forFeature([{ name: Therapy.name, schema: TherapySchema }]),
+  ],
   controllers: [TherapyController],
   providers: [TherapyService],
 })
-export class TherapyModule { }
+export class TherapyModule {}

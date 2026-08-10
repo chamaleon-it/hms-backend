@@ -101,9 +101,7 @@ export class ConsultingsService {
     if (Array.isArray(consultingDto.therapy)) {
       therapyIds = consultingDto.therapy
         .map((id: any) =>
-          typeof id === 'object' && id?._id
-            ? id._id.toString()
-            : String(id),
+          typeof id === 'object' && id?._id ? id._id.toString() : String(id),
         )
         .filter((id: string) => mongoose.isValidObjectId(id));
     } else if (
@@ -134,7 +132,10 @@ export class ConsultingsService {
           }
         }
 
-        if (receptionUserIdStr && mongoose.isValidObjectId(receptionUserIdStr)) {
+        if (
+          receptionUserIdStr &&
+          mongoose.isValidObjectId(receptionUserIdStr)
+        ) {
           const doctorUser = await this.consultingModel.db
             .collection('users')
             .findOne({ _id: new mongoose.Types.ObjectId(doctorId) });
@@ -201,4 +202,3 @@ export class ConsultingsService {
     return data;
   }
 }
-

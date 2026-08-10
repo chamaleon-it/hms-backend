@@ -737,7 +737,9 @@ export class OrdersService {
             item.quantity,
             userObjId,
             patientObj?.name || (order as any).customerName,
-            patientObj?.phoneNumber || (order as any).customerPhone || patientObj?.phone,
+            patientObj?.phoneNumber ||
+              (order as any).customerPhone ||
+              patientObj?.phone,
             (order as any).doctorName || (order as any).doctor,
             (order as any).pharmacistName || (order as any).pharmacist,
             patientObj?.mrn || (order as any).mrn,

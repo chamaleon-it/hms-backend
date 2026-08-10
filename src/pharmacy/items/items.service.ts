@@ -173,7 +173,11 @@ export class ItemsService {
       filter.quantity = stockConditions[stock];
     }
 
-    if (lowStockItemsView && !slowMovingItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
+    if (
+      lowStockItemsView &&
+      !slowMovingItemsView &&
+      (stock === 'Low' || stock === 'Out' || !stock)
+    ) {
       filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
     }
 
@@ -200,10 +204,12 @@ export class ItemsService {
     };
 
     // Calculate slowMovingCount (items with quantity > 0 and soldInLast30Days <= 10)
-    const activeItemsForCount = await this.itemModel.find(
-      { status: { $ne: ItemStatus.Deleted }, quantity: { $gt: 0 } },
-      { soldHistory: 1, quantity: 1 },
-    ).lean();
+    const activeItemsForCount = await this.itemModel
+      .find(
+        { status: { $ne: ItemStatus.Deleted }, quantity: { $gt: 0 } },
+        { soldHistory: 1, quantity: 1 },
+      )
+      .lean();
     const slowMovingCount = activeItemsForCount.filter(
       (it) => computeSoldInLast30Days(it) <= 10,
     ).length;
@@ -217,9 +223,7 @@ export class ItemsService {
         ...filter,
         quantity: { $gt: 0 },
       };
-      const candidateItems = await this.itemModel
-        .find(candidateFilter)
-        .lean();
+      const candidateItems = await this.itemModel.find(candidateFilter).lean();
 
       const mappedCandidates = candidateItems
         .map((it) => ({

@@ -79,7 +79,10 @@ export class ReturnService {
         transactionDate: new Date(),
       });
     } catch (err) {
-      console.error('Error recording account transaction for Pharmacy Return:', err);
+      console.error(
+        'Error recording account transaction for Pharmacy Return:',
+        err,
+      );
     }
 
     const validReasonForQuantityAdd = [

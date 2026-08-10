@@ -8,7 +8,11 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { PaymentMethod, SourceModule, TransactionType } from '../enums/account-transaction.enum';
+import {
+  PaymentMethod,
+  SourceModule,
+  TransactionType,
+} from '../enums/account-transaction.enum';
 
 export class CreateAccountTransactionDto {
   @IsEnum(TransactionType, {
@@ -37,7 +41,8 @@ export class CreateAccountTransactionDto {
 
   @IsOptional()
   @IsEnum(SourceModule, {
-    message: 'Source module must be Uncategorised, Doctor, Pharmacy, Lab, or Reception',
+    message:
+      'Source module must be Uncategorised, Doctor, Pharmacy, Lab, or Reception',
   })
   sourceModule?: SourceModule;
 

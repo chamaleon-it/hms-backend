@@ -1,4 +1,3 @@
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -26,4 +25,3 @@ export class Therapy {
 }
 
 export const TherapySchema = SchemaFactory.createForClass(Therapy);
-

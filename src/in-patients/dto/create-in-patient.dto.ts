@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { IPStatus } from '../schemas/in-patient.schema';
 
 export class CreateInPatientDto {

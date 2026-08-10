@@ -119,7 +119,10 @@ class TestDto {
 
   @IsOptional()
   @Transform(({ value }) =>
-    !value || typeof value !== 'string' || value.trim() === '' || !mongoose.isValidObjectId(value)
+    !value ||
+    typeof value !== 'string' ||
+    value.trim() === '' ||
+    !mongoose.isValidObjectId(value)
       ? undefined
       : value,
   )
@@ -171,7 +174,6 @@ export class ConsultingDto {
 
   @IsOptional()
   therapy: any;
-
 
   @IsOptional()
   @IsString({ message: 'Therapy notes must be a string or null.' })

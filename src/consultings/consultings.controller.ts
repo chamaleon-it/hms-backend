@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ConsultingsService } from './consultings.service';
 import { ConsultingDto } from './dto/consulting.dto';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';

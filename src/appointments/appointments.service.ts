@@ -17,7 +17,9 @@ import {
 import { BillingService } from 'src/billing/billing.service';
 function getDoctorFirstNamePrefix(doctorName: string): string {
   if (!doctorName) return 'DOC';
-  const cleanName = doctorName.replace(/^(Dr\.|Dr|Prof\.|Prof|Mr\.|Mr|Mrs\.|Mrs|Ms\.|Ms)\s+/i, '').trim();
+  const cleanName = doctorName
+    .replace(/^(Dr\.|Dr|Prof\.|Prof|Mr\.|Mr|Mrs\.|Mrs|Ms\.|Ms)\s+/i, '')
+    .trim();
   const parts = cleanName.split(/[\s.]+/).filter(Boolean);
   const firstName = parts[0] || 'DOC';
   return firstName.toUpperCase();
@@ -84,7 +86,11 @@ export class AppointmentsService {
         })
         .sort({ tokenNumber: -1, createdAt: -1 });
 
-      if (lastDoctorApp && typeof lastDoctorApp.tokenNumber === 'number' && lastDoctorApp.tokenNumber > 0) {
+      if (
+        lastDoctorApp &&
+        typeof lastDoctorApp.tokenNumber === 'number' &&
+        lastDoctorApp.tokenNumber > 0
+      ) {
         tokenNumber = lastDoctorApp.tokenNumber + 1;
       } else {
         const existingCount = await this.appointmentModel.countDocuments({
@@ -95,7 +101,9 @@ export class AppointmentsService {
         tokenNumber = existingCount + 1;
       }
 
-      const doctorUser = await this.usersService.getUserById(createAppointmentDto.doctor);
+      const doctorUser = await this.usersService.getUserById(
+        createAppointmentDto.doctor,
+      );
       const prefix = getDoctorFirstNamePrefix(doctorUser?.name || '');
       token = `${prefix}-${String(tokenNumber).padStart(2, '0')}`;
     } catch (tokenErr) {
@@ -106,9 +114,11 @@ export class AppointmentsService {
       (createAppointmentDto as any).isWalkIn ||
       (createAppointmentDto as any).walkIn ||
       createAppointmentDto.isArrived === true ||
-      (createAppointmentDto.type as any) === 'Walk-in'
+      (createAppointmentDto.type as any) === 'Walk-in',
     );
-    const isArrived = isWalkInApp ? true : (createAppointmentDto.isArrived ?? false);
+    const isArrived = isWalkInApp
+      ? true
+      : (createAppointmentDto.isArrived ?? false);
 
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
@@ -307,7 +317,8 @@ export class AppointmentsService {
         const num = item.tokenNumber || doctorCounters[docId];
         const docName = item.doctor?.name || '';
         const prefix = getDoctorFirstNamePrefix(docName);
-        const tokenStr = item.token || `${prefix}-${String(num).padStart(2, '0')}`;
+        const tokenStr =
+          item.token || `${prefix}-${String(num).padStart(2, '0')}`;
         return {
           ...item,
           tokenNumber: num,

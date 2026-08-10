@@ -47,13 +47,22 @@ export class BillingService {
 
     const uIdStr = userId.toString();
     const config = configuration();
-    if (config.in_house_lab_id && uIdStr === config.in_house_lab_id.toString()) {
+    if (
+      config.in_house_lab_id &&
+      uIdStr === config.in_house_lab_id.toString()
+    ) {
       return SourceModule.Lab;
     }
-    if (config.in_house_pharmacy_id && uIdStr === config.in_house_pharmacy_id.toString()) {
+    if (
+      config.in_house_pharmacy_id &&
+      uIdStr === config.in_house_pharmacy_id.toString()
+    ) {
       return SourceModule.Pharmacy;
     }
-    if (config.in_house_reception_id && uIdStr === config.in_house_reception_id.toString()) {
+    if (
+      config.in_house_reception_id &&
+      uIdStr === config.in_house_reception_id.toString()
+    ) {
       return SourceModule.Reception;
     }
 
@@ -65,9 +74,12 @@ export class BillingService {
 
       const role = String(user.role).toLowerCase();
       if (role.includes('doctor')) return SourceModule.Doctor;
-      if (role.includes('pharmacy') || role.includes('pharmacist')) return SourceModule.Pharmacy;
-      if (role.includes('lab') || role.includes('technician')) return SourceModule.Lab;
-      if (role.includes('reception') || role.includes('receptionist')) return SourceModule.Reception;
+      if (role.includes('pharmacy') || role.includes('pharmacist'))
+        return SourceModule.Pharmacy;
+      if (role.includes('lab') || role.includes('technician'))
+        return SourceModule.Lab;
+      if (role.includes('reception') || role.includes('receptionist'))
+        return SourceModule.Reception;
 
       return SourceModule.Pharmacy;
     } catch {
@@ -181,7 +193,9 @@ export class BillingService {
         createBill.transactionType === 'Refund' ||
         (createBill.items &&
           createBill.items.some((i: any) =>
-            String(i.name || '').toLowerCase().includes('refund'),
+            String(i.name || '')
+              .toLowerCase()
+              .includes('refund'),
           ));
       const isReturn = createBill.transactionType === 'Return';
       const isExpense = isRefund || isReturn;
@@ -194,10 +208,14 @@ export class BillingService {
         category = ExpenseCategory.SalesReturn;
       } else {
         const isTherapy =
-          String(createBill.note || '').toLowerCase().includes('therapy') ||
+          String(createBill.note || '')
+            .toLowerCase()
+            .includes('therapy') ||
           (createBill.items &&
             createBill.items.some((i: any) =>
-              String(i.name || '').toLowerCase().includes('therapy'),
+              String(i.name || '')
+                .toLowerCase()
+                .includes('therapy'),
             ));
 
         if (isTherapy) category = IncomeCategory.TherapyIncome;
@@ -328,14 +346,13 @@ export class BillingService {
     }
 
     if (billType && billType !== 'all') {
-      const therapyRegex = /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
-      const receptionRegex = /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
+      const therapyRegex =
+        /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
+      const receptionRegex =
+        /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
 
       if (billType === 'therapy') {
-        match.$or = [
-          { note: therapyRegex },
-          { 'items.name': therapyRegex },
-        ];
+        match.$or = [{ note: therapyRegex }, { 'items.name': therapyRegex }];
       } else if (billType === 'reception') {
         match.$or = [
           { transactionType: { $in: ['Refund', 'Return'] } },
@@ -646,20 +663,29 @@ export class BillingService {
     );
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    const totalNewPaid = (addPaymentDto.cash ?? 0) + (addPaymentDto.card ?? 0) + (addPaymentDto.upi ?? 0);
+    const totalNewPaid =
+      (addPaymentDto.cash ?? 0) +
+      (addPaymentDto.card ?? 0) +
+      (addPaymentDto.upi ?? 0);
     if (totalNewPaid > 0) {
       try {
-        const sourceModule = await this.determineSourceModule(user || data.user);
+        const sourceModule = await this.determineSourceModule(
+          user || data.user,
+        );
         const isRefund =
           data.transactionType === 'Refund' ||
           (data.items &&
             data.items.some((i: any) =>
-              String(i.name || '').toLowerCase().includes('refund'),
+              String(i.name || '')
+                .toLowerCase()
+                .includes('refund'),
             ));
         const isReturn = data.transactionType === 'Return';
         const isExpense = isRefund || isReturn;
 
-        const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+        const type = isExpense
+          ? TransactionType.Expense
+          : TransactionType.Income;
         let category: string;
         if (isRefund) {
           category = ExpenseCategory.Refund;
@@ -667,23 +693,36 @@ export class BillingService {
           category = ExpenseCategory.SalesReturn;
         } else {
           const isTherapy =
-            String(data.note || '').toLowerCase().includes('therapy') ||
+            String(data.note || '')
+              .toLowerCase()
+              .includes('therapy') ||
             (data.items &&
               data.items.some((i: any) =>
-                String(i.name || '').toLowerCase().includes('therapy'),
+                String(i.name || '')
+                  .toLowerCase()
+                  .includes('therapy'),
               ));
 
           if (isTherapy) category = IncomeCategory.TherapyIncome;
-          else if (sourceModule === SourceModule.Doctor) category = IncomeCategory.ConsultationFee;
-          else if (sourceModule === SourceModule.Lab) category = IncomeCategory.LaboratoryIncome;
-          else if (sourceModule === SourceModule.Reception) category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Doctor)
+            category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Lab)
+            category = IncomeCategory.LaboratoryIncome;
+          else if (sourceModule === SourceModule.Reception)
+            category = IncomeCategory.ConsultationFee;
           else category = IncomeCategory.MedicineSale;
         }
 
         let paymentMethod = PaymentMethod.Cash;
-        if ((addPaymentDto.card ?? 0) > (addPaymentDto.cash ?? 0) && (addPaymentDto.card ?? 0) > (addPaymentDto.upi ?? 0)) {
+        if (
+          (addPaymentDto.card ?? 0) > (addPaymentDto.cash ?? 0) &&
+          (addPaymentDto.card ?? 0) > (addPaymentDto.upi ?? 0)
+        ) {
           paymentMethod = PaymentMethod.Card;
-        } else if ((addPaymentDto.upi ?? 0) > (addPaymentDto.cash ?? 0) && (addPaymentDto.upi ?? 0) > (addPaymentDto.card ?? 0)) {
+        } else if (
+          (addPaymentDto.upi ?? 0) > (addPaymentDto.cash ?? 0) &&
+          (addPaymentDto.upi ?? 0) > (addPaymentDto.card ?? 0)
+        ) {
           paymentMethod = PaymentMethod.UPI;
         }
 
@@ -698,7 +737,10 @@ export class BillingService {
           transactionDate: new Date(),
         });
       } catch (err) {
-        console.error('Error recording account transaction in addPayment:', err);
+        console.error(
+          'Error recording account transaction in addPayment:',
+          err,
+        );
       }
     }
 
@@ -720,12 +762,16 @@ export class BillingService {
           data.transactionType === 'Refund' ||
           (data.items &&
             data.items.some((i: any) =>
-              String(i.name || '').toLowerCase().includes('refund'),
+              String(i.name || '')
+                .toLowerCase()
+                .includes('refund'),
             ));
         const isReturn = data.transactionType === 'Return';
         const isExpense = isRefund || isReturn;
 
-        const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+        const type = isExpense
+          ? TransactionType.Expense
+          : TransactionType.Income;
         let category: string;
         if (isRefund) {
           category = ExpenseCategory.Refund;
@@ -733,16 +779,23 @@ export class BillingService {
           category = ExpenseCategory.SalesReturn;
         } else {
           const isTherapy =
-            String(data.note || '').toLowerCase().includes('therapy') ||
+            String(data.note || '')
+              .toLowerCase()
+              .includes('therapy') ||
             (data.items &&
               data.items.some((i: any) =>
-                String(i.name || '').toLowerCase().includes('therapy'),
+                String(i.name || '')
+                  .toLowerCase()
+                  .includes('therapy'),
               ));
 
           if (isTherapy) category = IncomeCategory.TherapyIncome;
-          else if (sourceModule === SourceModule.Doctor) category = IncomeCategory.ConsultationFee;
-          else if (sourceModule === SourceModule.Lab) category = IncomeCategory.LaboratoryIncome;
-          else if (sourceModule === SourceModule.Reception) category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Doctor)
+            category = IncomeCategory.ConsultationFee;
+          else if (sourceModule === SourceModule.Lab)
+            category = IncomeCategory.LaboratoryIncome;
+          else if (sourceModule === SourceModule.Reception)
+            category = IncomeCategory.ConsultationFee;
           else category = IncomeCategory.MedicineSale;
         }
 
@@ -757,7 +810,10 @@ export class BillingService {
           transactionDate: new Date(),
         });
       } catch (err) {
-        console.error('Error recording account transaction in markAsPaid:', err);
+        console.error(
+          'Error recording account transaction in markAsPaid:',
+          err,
+        );
       }
     }
 
