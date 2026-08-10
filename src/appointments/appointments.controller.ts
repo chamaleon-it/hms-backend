@@ -109,12 +109,14 @@ export class AppointmentsController {
   async calenderWeekly(
     @GetUser() user: JWTUserInterface,
     @Query('date') date?: string,
+    @Query('startOfWeek') startOfWeek?: string,
     @Query('doctor') doctor?: string,
   ) {
     const doctorFilter =
       doctor || (user.role === 'Doctor' ? user.id?.toString() : undefined);
+    const queryDate = date || startOfWeek || new Date().toString();
     const data = await this.appointmentsService.calenderWeekly(
-      date || new Date().toString(),
+      queryDate,
       doctorFilter,
     );
     return {

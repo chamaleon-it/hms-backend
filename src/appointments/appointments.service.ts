@@ -492,14 +492,13 @@ export class AppointmentsService {
   }
 
   async calenderWeekly(date: string, doctor?: string) {
-    let dateStr = date || new Date().toISOString().split('T')[0];
-    if (dateStr.includes('T')) {
-      dateStr = dateStr.split('T')[0];
+    let now = new Date();
+    if (date) {
+      const parsed = new Date(date.includes('T') ? date : `${date}T00:00:00.000Z`);
+      if (!isNaN(parsed.getTime())) {
+        now = parsed;
+      }
     }
-    const now =
-      dateStr && !isNaN(new Date(`${dateStr}T00:00:00.000Z`).getTime())
-        ? new Date(`${dateStr}T00:00:00.000Z`)
-        : new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setUTCDate(now.getUTCDate() - now.getUTCDay());
     startOfWeek.setUTCHours(0, 0, 0, 0);
@@ -518,8 +517,9 @@ export class AppointmentsService {
 
     const data = await this.appointmentModel
       .find(filter)
-      .select('date status')
-      .populate('patient', 'name')
+      .select('date endDate patient doctor type status visitCount notes method token tokenNumber')
+      .populate('patient', 'name mrn')
+      .populate('doctor', 'name')
       .lean();
 
     return data;
