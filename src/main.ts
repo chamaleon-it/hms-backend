@@ -8,8 +8,8 @@ async function bootstrap() {
 
   // Increase payload limit for large uploads/prints
   const express = require('express');
-  app.use(express.json({ limit: '5mb' }));
-  app.use(express.urlencoded({ limit: '5mb', extended: true }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.enableCors({
     origin: process.env.CORS_ORIGINS
       ? process.env.CORS_ORIGINS.split(',')
