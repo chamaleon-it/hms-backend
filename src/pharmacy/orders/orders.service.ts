@@ -770,11 +770,29 @@ export class OrdersService {
     newOrder.patient = existOrder.patient;
     newOrder.doctor = existOrder.doctor;
     newOrder.doctorName = existOrder.doctorName;
-    newOrder.items = existOrder.items.map((item) => {
-      return {
-        ...item,
-      };
-    });
+    newOrder.items = (existOrder.items || [])
+      .filter((item: any) => {
+        const nameStr = String(item.name || '').toLowerCase().trim();
+        const nonMedicineKeywords = [
+          'consultation', 'consulting', 'doctor fee', 'opd', 'ipd', 'registration', 'token', 'ncf',
+          'lab', 'laboratory', 'investigation', 'test', 'blood', 'ecg', 'x-ray', 'xray', 'ct scan',
+          'mri', 'scan', 'ultrasound', 'usg', 'therapy', 'therapies', 'procedure', 'procedures',
+          'procedural', 'treatment', 'fasad', 'agni karma', 'agnikarma', 'steam bath', 'swedana',
+          'swedanam', 'kizhi', 'elakizhi', 'podikizhi', 'njavarakizhi', 'abhyangam', 'abhyanga',
+          'shirodhara', 'takradhara', 'ksheeradhara', 'dhara', 'vasti', 'basti', 'kativasti',
+          'januvasti', 'greevavasti', 'matravasti', 'nasya', 'nasyam', 'raktamokshana',
+          'udvarthanam', 'udvartana', 'pizhichil', 'thalam', 'talam', 'lepanam', 'lepa',
+          'tarpanam', 'tarpana', 'pichu', 'karna poorana', 'karnapooranam', 'acupuncture',
+          'panchakarma', 'cupping', 'hijama', 'moxibustion', 'varmam', 'varma', 'physio',
+          'physiotherapy', 'massage', 'refund', 'return',
+        ];
+        return !nonMedicineKeywords.some((kw) => nameStr.includes(kw));
+      })
+      .map((item) => {
+        return {
+          ...item,
+        };
+      });
     newOrder.priority = existOrder.priority;
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;

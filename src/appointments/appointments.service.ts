@@ -528,19 +528,31 @@ export class AppointmentsService {
   async getBookedSlot(date: Date | string, doctor?: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(doctor))
       throw new BadRequestException(
-        'Doctor id is not valid, Please selected valid doctor id',
+        'Doctor id is not valid, Please select a valid doctor id',
       );
 
     let dateStr = typeof date === 'string' ? date : date.toISOString();
     if (dateStr.includes('T')) {
       dateStr = dateStr.split('T')[0];
     }
-    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    const startOfDay = new Date(
+      Math.min(
+        new Date(`${dateStr}T00:00:00.000Z`).getTime(),
+        new Date(`${dateStr}T00:00:00.000+05:30`).getTime(),
+      ),
+    );
+    const endOfDay = new Date(
+      Math.max(
+        new Date(`${dateStr}T23:59:59.999Z`).getTime(),
+        new Date(`${dateStr}T23:59:59.999+05:30`).getTime(),
+      ),
+    );
 
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
       doctor,
+      isDeleted: { $ne: true },
+      status: { $nin: ['Cancelled', 'Canceled'] },
     };
 
     const data = await this.appointmentModel
