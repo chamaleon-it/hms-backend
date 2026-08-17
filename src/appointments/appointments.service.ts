@@ -48,6 +48,7 @@ export class AppointmentsService {
           patient: createAppointmentDto.patient,
           doctor: createAppointmentDto.doctor,
           hasConsultationFee: { $ne: false },
+          isRefunded: { $ne: true },
           isDeleted: { $ne: true },
         })
         .sort({ date: -1 });
@@ -707,6 +708,7 @@ export class AppointmentsService {
     } as any);
 
     appointment.isRefunded = true;
+    appointment.hasConsultationFee = false;
     if (reason) appointment.refundReason = reason;
     await appointment.save();
 
