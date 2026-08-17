@@ -54,4 +54,19 @@ export class ConsultingsController {
       data,
     };
   }
+
+  @Patch('/:id/procedure-status')
+  async updateProcedureStatus(
+    @Param('id') id: string,
+    @Body('completed') completed?: boolean,
+  ) {
+    const data = await this.consultingsService.updateProcedureStatus(
+      id,
+      completed ?? true,
+    );
+    return {
+      message: 'Procedure status updated successfully',
+      data,
+    };
+  }
 }

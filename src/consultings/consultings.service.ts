@@ -4,6 +4,7 @@ import mongoose, { Model, Types } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Consulting } from './schemas/consulting.schema';
 import { Therapy } from 'src/therapy/schemas/therapy.schema';
+import { ProcedureService } from 'src/procedure/procedure.service';
 import { OrdersService } from 'src/pharmacy/orders/orders.service';
 import {
   OrderPriority,
@@ -19,6 +20,7 @@ export class ConsultingsService {
   constructor(
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     @InjectModel(Therapy.name) private therapyModel: Model<Therapy>,
+    private readonly procedureService: ProcedureService,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
     private readonly billingService: BillingService,
@@ -47,8 +49,20 @@ export class ConsultingsService {
       });
     }
 
+    // Resolve Procedure Items
+    let resolvedProcedures: any[] = [];
+    if (consultingDto.procedure) {
+      const rawProcList = Array.isArray(consultingDto.procedure)
+        ? consultingDto.procedure
+        : [consultingDto.procedure];
+      resolvedProcedures = await this.procedureService.resolveProcedureItems(
+        rawProcList,
+      );
+    }
+
     const consulting = await this.consultingModel.create({
       ...consultingDto,
+      procedure: resolvedProcedures,
       doctor: doctorId,
     });
 
@@ -96,7 +110,32 @@ export class ConsultingsService {
 
     await Promise.all(tests.map((t) => this.reportService.createReport(t)));
 
-    // Generate Reception Bill for prescribed Therapies
+    // Helper to get Reception User and Doctor Name for billing
+    const getBillingContext = async () => {
+      let receptionUserIdStr = configuration().in_house_reception_id;
+      if (
+        !receptionUserIdStr ||
+        !mongoose.isValidObjectId(receptionUserIdStr)
+      ) {
+        const receptionUser = await this.consultingModel.db
+          .collection('users')
+          .findOne({ role: 'Reception' });
+        if (receptionUser) {
+          receptionUserIdStr = receptionUser._id.toString();
+        }
+      }
+
+      const doctorUser = await this.consultingModel.db
+        .collection('users')
+        .findOne({ _id: new mongoose.Types.ObjectId(doctorId) });
+      const doctorName = doctorUser?.name
+        ? `Dr. ${doctorUser.name}`
+        : 'Doctor';
+
+      return { receptionUserIdStr, doctorName };
+    };
+
+    // 1. Generate Reception Bill for prescribed Therapies (if any)
     let therapyIds: string[] = [];
     if (Array.isArray(consultingDto.therapy)) {
       therapyIds = consultingDto.therapy
@@ -118,31 +157,12 @@ export class ConsultingsService {
       });
 
       if (therapies.length > 0) {
-        let receptionUserIdStr = configuration().in_house_reception_id;
-
-        if (
-          !receptionUserIdStr ||
-          !mongoose.isValidObjectId(receptionUserIdStr)
-        ) {
-          const receptionUser = await this.consultingModel.db
-            .collection('users')
-            .findOne({ role: 'Reception' });
-          if (receptionUser) {
-            receptionUserIdStr = receptionUser._id.toString();
-          }
-        }
+        const { receptionUserIdStr, doctorName } = await getBillingContext();
 
         if (
           receptionUserIdStr &&
           mongoose.isValidObjectId(receptionUserIdStr)
         ) {
-          const doctorUser = await this.consultingModel.db
-            .collection('users')
-            .findOne({ _id: new mongoose.Types.ObjectId(doctorId) });
-          const doctorName = doctorUser?.name
-            ? `Dr. ${doctorUser.name}`
-            : 'Doctor';
-
           const billingItems = therapies.map((t) => ({
             name: t.name,
             quantity: 1,
@@ -167,6 +187,41 @@ export class ConsultingsService {
           } catch (err) {
             console.error('Error generating therapy bill for reception:', err);
           }
+        }
+      }
+    }
+
+    // 2. Generate Separate Reception Bill for prescribed Procedures (if any)
+    if (resolvedProcedures.length > 0) {
+      const { receptionUserIdStr, doctorName } = await getBillingContext();
+
+      if (
+        receptionUserIdStr &&
+        mongoose.isValidObjectId(receptionUserIdStr)
+      ) {
+        const procedureBillingItems = resolvedProcedures.map((p) => ({
+          name: p.parentName ? `${p.parentName} - ${p.name}` : p.name,
+          quantity: 1,
+          unitPrice: p.price,
+          gst: 0,
+          discount: 0,
+          total: p.price,
+        }));
+
+        try {
+          await this.billingService.generateBill({
+            user: new mongoose.Types.ObjectId(receptionUserIdStr),
+            patient: consultingDto.patient,
+            doctor: doctorName,
+            items: procedureBillingItems,
+            status: 'Draft',
+            transactionType: 'Sale',
+            note:
+              consultingDto.procedureNotes ||
+              'Procedure Bill from Doctor Consultation',
+          });
+        } catch (err) {
+          console.error('Error generating procedure bill for reception:', err);
         }
       }
     }
@@ -198,6 +253,16 @@ export class ConsultingsService {
     const data = await this.consultingModel
       .findByIdAndUpdate(id, { therapyCompleted: completed }, { new: true })
       .populate('therapy')
+      .lean();
+    return data;
+  }
+
+  async updateProcedureStatus(id: string, completed: boolean) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Please provide a valid consulting id');
+    }
+    const data = await this.consultingModel
+      .findByIdAndUpdate(id, { procedureCompleted: completed }, { new: true })
       .lean();
     return data;
   }

@@ -24,6 +24,7 @@ export enum IncomeCategory {
   ConsultationFee = 'Consultation Fee',
   LaboratoryIncome = 'Laboratory Income',
   TherapyIncome = 'Therapy Income',
+  ProcedureIncome = 'Procedure Income',
   OtherIncome = 'Other Income',
 }
 

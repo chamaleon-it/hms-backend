@@ -218,7 +218,19 @@ export class BillingService {
                 .includes('therapy'),
             ));
 
+        const isProcedure =
+          String(createBill.note || '')
+            .toLowerCase()
+            .includes('procedure') ||
+          (createBill.items &&
+            createBill.items.some((i: any) =>
+              String(i.name || '')
+                .toLowerCase()
+                .includes('procedure'),
+            ));
+
         if (isTherapy) category = IncomeCategory.TherapyIncome;
+        else if (isProcedure) category = IncomeCategory.ProcedureIncome;
         else if (sourceModule === SourceModule.Doctor)
           category = IncomeCategory.ConsultationFee;
         else if (sourceModule === SourceModule.Lab)
@@ -348,11 +360,14 @@ export class BillingService {
     if (billType && billType !== 'all') {
       const therapyRegex =
         /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
+      const procedureRegex = /procedure/i;
       const receptionRegex =
         /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
 
       if (billType === 'therapy') {
         match.$or = [{ note: therapyRegex }, { 'items.name': therapyRegex }];
+      } else if (billType === 'procedure') {
+        match.$or = [{ note: procedureRegex }, { 'items.name': procedureRegex }];
       } else if (billType === 'reception') {
         match.$or = [
           { transactionType: { $in: ['Refund', 'Return'] } },
@@ -363,6 +378,8 @@ export class BillingService {
         match.$nor = [
           { note: therapyRegex },
           { 'items.name': therapyRegex },
+          { note: procedureRegex },
+          { 'items.name': procedureRegex },
           { note: receptionRegex },
           { 'items.name': receptionRegex },
           { transactionType: { $in: ['Refund', 'Return'] } },
@@ -703,7 +720,19 @@ export class BillingService {
                   .includes('therapy'),
               ));
 
+          const isProcedure =
+            String(data.note || '')
+              .toLowerCase()
+              .includes('procedure') ||
+            (data.items &&
+              data.items.some((i: any) =>
+                String(i.name || '')
+                  .toLowerCase()
+                  .includes('procedure'),
+              ));
+
           if (isTherapy) category = IncomeCategory.TherapyIncome;
+          else if (isProcedure) category = IncomeCategory.ProcedureIncome;
           else if (sourceModule === SourceModule.Doctor)
             category = IncomeCategory.ConsultationFee;
           else if (sourceModule === SourceModule.Lab)
@@ -789,7 +818,19 @@ export class BillingService {
                   .includes('therapy'),
               ));
 
+          const isProcedure =
+            String(data.note || '')
+              .toLowerCase()
+              .includes('procedure') ||
+            (data.items &&
+              data.items.some((i: any) =>
+                String(i.name || '')
+                  .toLowerCase()
+                  .includes('procedure'),
+              ));
+
           if (isTherapy) category = IncomeCategory.TherapyIncome;
+          else if (isProcedure) category = IncomeCategory.ProcedureIncome;
           else if (sourceModule === SourceModule.Doctor)
             category = IncomeCategory.ConsultationFee;
           else if (sourceModule === SourceModule.Lab)

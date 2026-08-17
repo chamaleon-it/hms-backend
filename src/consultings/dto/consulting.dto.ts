@@ -172,12 +172,19 @@ export class ConsultingDto {
   @Type(() => MedicineDto)
   medicines: MedicineDto[];
 
-  @IsOptional()
+   @IsOptional()
   therapy: any;
 
   @IsOptional()
   @IsString({ message: 'Therapy notes must be a string or null.' })
   therapyNotes: null | string;
+
+  @IsOptional()
+  procedure: any;
+
+  @IsOptional()
+  @IsString({ message: 'Procedure notes must be a string or null.' })
+  procedureNotes: null | string;
 
   @IsOptional()
   @IsString({ message: 'Advice must be a string or null.' })

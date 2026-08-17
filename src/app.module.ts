@@ -27,6 +27,7 @@ import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
 import { InPatientsModule } from './in-patients/in-patients.module';
 import { TherapyModule } from './therapy/therapy.module';
+import { ProcedureModule } from './procedure/procedure.module';
 import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
@@ -65,6 +66,7 @@ import { AccountsModule } from './accounts/accounts.module';
     AdminModule,
     InPatientsModule,
     TherapyModule,
+    ProcedureModule,
     AccountsModule,
   ],
   controllers: [AppController],

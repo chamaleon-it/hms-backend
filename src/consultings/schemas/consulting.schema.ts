@@ -113,6 +113,38 @@ export class Consulting {
   @Prop({ type: String, default: null })
   therapyNotes: string | null;
 
+  @Prop({
+    type: [
+      {
+        procedureId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Procedure',
+          default: null,
+        },
+        subProcedureId: { type: String, default: null },
+        name: { type: String, required: true },
+        parentName: { type: String, default: null },
+        price: { type: Number, required: true, default: 0 },
+        code: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  procedure: {
+    procedureId?: Types.ObjectId | null;
+    subProcedureId?: string | null;
+    name: string;
+    parentName?: string | null;
+    price: number;
+    code?: string | null;
+  }[];
+
+  @Prop({ type: Boolean, default: false })
+  procedureCompleted: boolean;
+
+  @Prop({ type: String, default: null })
+  procedureNotes: string | null;
+
   @Prop({ type: String, default: null })
   advice: string | null;
 
