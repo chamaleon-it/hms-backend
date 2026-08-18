@@ -154,23 +154,26 @@ class MedicalParametersDto {
 }
 
 export class ConsultingDto {
+  @IsOptional()
   @ValidateNested()
   @Type(() => ConsultationNotesDto)
-  consultationNotes: ConsultationNotesDto;
+  consultationNotes?: ConsultationNotesDto;
 
+  @IsOptional()
   @ValidateNested()
   @Type(() => ExaminationNoteDto)
-  examinationNote: ExaminationNoteDto;
+  examinationNote?: ExaminationNoteDto;
 
   @IsOptional()
   @ValidateNested()
   @Type(() => MedicalParametersDto)
   medicalParameters?: MedicalParametersDto;
 
+  @IsOptional()
   @IsArray({ message: 'Medicines must be an array.' })
   @ValidateNested({ each: true })
   @Type(() => MedicineDto)
-  medicines: MedicineDto[];
+  medicines?: MedicineDto[];
 
    @IsOptional()
   therapy: any;
@@ -258,13 +261,6 @@ export class ConsultingDto {
     rom: string | null;
     posture: string | null;
     specialFindings: string | null;
-  };
-
-  @IsOptional()
-  treatmentGiven?: {
-    treatments: string[];
-    acuPoints: string | null;
-    retentionTime: string | null;
   };
 
   @IsOptional()

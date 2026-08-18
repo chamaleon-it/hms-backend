@@ -10,5 +10,6 @@ import { Therapy, TherapySchema } from './schemas/therapy.schema';
   ],
   controllers: [TherapyController],
   providers: [TherapyService],
+  exports: [TherapyService],
 })
 export class TherapyModule {}

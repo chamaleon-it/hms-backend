@@ -102,10 +102,30 @@ export class Consulting {
   }[];
 
   @Prop({
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Therapy' }],
+    type: [
+      {
+        therapyId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Therapy',
+          default: null,
+        },
+        subTherapyId: { type: String, default: null },
+        name: { type: String, required: true },
+        parentName: { type: String, default: null },
+        price: { type: Number, required: true, default: 0 },
+        code: { type: String, default: null },
+      },
+    ],
     default: [],
   })
-  therapy: mongoose.Types.ObjectId[];
+  therapy: {
+    therapyId?: Types.ObjectId | null;
+    subTherapyId?: string | null;
+    name: string;
+    parentName?: string | null;
+    price: number;
+    code?: string | null;
+  }[];
 
   @Prop({ type: Boolean, default: false })
   therapyCompleted: boolean;
@@ -282,20 +302,6 @@ export class Consulting {
     rom: string | null;
     posture: string | null;
     specialFindings: string | null;
-  };
-
-  @Prop({
-    type: {
-      treatments: [{ type: String }],
-      acuPoints: { type: String, default: null },
-      retentionTime: { type: String, default: null },
-    },
-    required: false,
-  })
-  treatmentGiven?: {
-    treatments: string[];
-    acuPoints: string | null;
-    retentionTime: string | null;
   };
 
   @Prop({

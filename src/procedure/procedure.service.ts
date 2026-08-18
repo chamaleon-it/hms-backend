@@ -138,22 +138,19 @@ export class ProcedureService {
       throw new BadRequestException(`Invalid procedure ID: ${id}`);
     }
 
-    const procedure = await this.procedureModel
-      .findOneAndUpdate(
-        { _id: id },
-        {
-          isDeleted: true,
-          'subProcedures.$[].isDeleted': true,
-        },
-        { new: true },
-      )
-      .exec();
-
+    const procedure = await this.procedureModel.findOne({ _id: id });
     if (!procedure) {
       throw new NotFoundException(`Procedure with id ${id} not found`);
     }
 
-    return procedure;
+    procedure.isDeleted = true;
+    if (Array.isArray(procedure.subProcedures) && procedure.subProcedures.length > 0) {
+      procedure.subProcedures.forEach((sp: any) => {
+        sp.isDeleted = true;
+      });
+    }
+
+    return await procedure.save();
   }
 
   async addSubProcedure(procedureId: string, dto: SubProcedureDto) {

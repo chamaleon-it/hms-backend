@@ -15,11 +15,14 @@ import { ReportStatus } from 'src/lab/report/schemas/report.schema';
 import { BillingService } from 'src/billing/billing.service';
 import configuration from 'src/config/configuration';
 
+import { TherapyService } from 'src/therapy/therapy.service';
+
 @Injectable()
 export class ConsultingsService {
   constructor(
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     @InjectModel(Therapy.name) private therapyModel: Model<Therapy>,
+    private readonly therapyService: TherapyService,
     private readonly procedureService: ProcedureService,
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
@@ -49,6 +52,17 @@ export class ConsultingsService {
       });
     }
 
+    // Resolve Therapy Items
+    let resolvedTherapies: any[] = [];
+    if (consultingDto.therapy) {
+      const rawTherapyList = Array.isArray(consultingDto.therapy)
+        ? consultingDto.therapy
+        : [consultingDto.therapy];
+      resolvedTherapies = await this.therapyService.resolveTherapyItems(
+        rawTherapyList,
+      );
+    }
+
     // Resolve Procedure Items
     let resolvedProcedures: any[] = [];
     if (consultingDto.procedure) {
@@ -62,11 +76,12 @@ export class ConsultingsService {
 
     const consulting = await this.consultingModel.create({
       ...consultingDto,
+      therapy: resolvedTherapies,
       procedure: resolvedProcedures,
       doctor: doctorId,
     });
 
-    const inventoryMedicines = consultingDto.medicines.filter(
+    const inventoryMedicines = (consultingDto.medicines || []).filter(
       (m) => !m.isCustom && m.name && mongoose.isValidObjectId(m.name),
     );
 
@@ -136,57 +151,36 @@ export class ConsultingsService {
     };
 
     // 1. Generate Reception Bill for prescribed Therapies (if any)
-    let therapyIds: string[] = [];
-    if (Array.isArray(consultingDto.therapy)) {
-      therapyIds = consultingDto.therapy
-        .map((id: any) =>
-          typeof id === 'object' && id?._id ? id._id.toString() : String(id),
-        )
-        .filter((id: string) => mongoose.isValidObjectId(id));
-    } else if (
-      typeof consultingDto.therapy === 'string' &&
-      mongoose.isValidObjectId(consultingDto.therapy)
-    ) {
-      therapyIds = [consultingDto.therapy];
-    }
+    if (resolvedTherapies.length > 0) {
+      const { receptionUserIdStr, doctorName } = await getBillingContext();
 
-    if (therapyIds.length > 0) {
-      const therapies = await this.therapyModel.find({
-        _id: { $in: therapyIds },
-        isDeleted: false,
-      });
+      if (
+        receptionUserIdStr &&
+        mongoose.isValidObjectId(receptionUserIdStr)
+      ) {
+        const therapyBillingItems = resolvedTherapies.map((t) => ({
+          name: t.parentName ? `${t.parentName} - ${t.name}` : t.name,
+          quantity: 1,
+          unitPrice: t.price,
+          gst: 0,
+          discount: 0,
+          total: t.price,
+        }));
 
-      if (therapies.length > 0) {
-        const { receptionUserIdStr, doctorName } = await getBillingContext();
-
-        if (
-          receptionUserIdStr &&
-          mongoose.isValidObjectId(receptionUserIdStr)
-        ) {
-          const billingItems = therapies.map((t) => ({
-            name: t.name,
-            quantity: 1,
-            unitPrice: t.price,
-            gst: 0,
-            discount: 0,
-            total: t.price,
-          }));
-
-          try {
-            await this.billingService.generateBill({
-              user: new mongoose.Types.ObjectId(receptionUserIdStr),
-              patient: consultingDto.patient,
-              doctor: doctorName,
-              items: billingItems,
-              status: 'Draft',
-              transactionType: 'Sale',
-              note:
-                consultingDto.therapyNotes ||
-                'Therapy Bill from Doctor Consultation',
-            });
-          } catch (err) {
-            console.error('Error generating therapy bill for reception:', err);
-          }
+        try {
+          await this.billingService.generateBill({
+            user: new mongoose.Types.ObjectId(receptionUserIdStr),
+            patient: consultingDto.patient,
+            doctor: doctorName,
+            items: therapyBillingItems,
+            status: 'Draft',
+            transactionType: 'Sale',
+            note:
+              consultingDto.therapyNotes ||
+              'Therapy Bill from Doctor Consultation',
+          });
+        } catch (err) {
+          console.error('Error generating therapy bill for reception:', err);
         }
       }
     }

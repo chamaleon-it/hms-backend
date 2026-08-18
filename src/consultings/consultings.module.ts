@@ -7,6 +7,7 @@ import { OrdersModule } from 'src/pharmacy/orders/orders.module';
 import { ReportModule } from 'src/lab/report/report.module';
 
 import { Therapy, TherapySchema } from 'src/therapy/schemas/therapy.schema';
+import { TherapyModule } from 'src/therapy/therapy.module';
 import { Procedure, ProcedureSchema } from 'src/procedure/schemas/procedure.schema';
 import { ProcedureModule } from 'src/procedure/procedure.module';
 import { BillingModule } from 'src/billing/billing.module';
@@ -22,6 +23,7 @@ import { BillingModule } from 'src/billing/billing.module';
     ReportModule,
     BillingModule,
     ProcedureModule,
+    TherapyModule,
   ],
 
   controllers: [ConsultingsController],
