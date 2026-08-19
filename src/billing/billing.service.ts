@@ -777,14 +777,54 @@ export class BillingService {
   }
 
   async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto) {
+    const existingBill = await this.billingModel.findById(id);
+    if (!existingBill) throw new NotFoundException('Bill is not found.');
+
+    const addedCash = Math.max(0, Number(markAsPaidDto.cash) || 0);
+    const addedCard = Math.max(0, Number(markAsPaidDto.card) || 0);
+    const addedUpi = Math.max(0, Number(markAsPaidDto.upi) || 0);
+    const addedDiscount = Math.max(0, Number(markAsPaidDto.discount) || 0);
+
+    const currentCash = existingBill.cash || 0;
+    const currentCard = existingBill.card || 0;
+    const currentUpi = existingBill.upi || 0;
+    const currentDiscount = existingBill.discount || 0;
+
+    const newCash = currentCash + addedCash;
+    const newCard = currentCard + addedCard;
+    const newUpi = currentUpi + addedUpi;
+    const newDiscount = currentDiscount + addedDiscount;
+
+    const totalPaid = newCash + newCard + newUpi + newDiscount;
+    const itemsTotal = (existingBill.items || []).reduce(
+      (a, b) => a + (b.total ?? 0),
+      0,
+    );
+    const roundOffAmount = existingBill.roundOff ? itemsTotal % 1 : 0;
+    const netTotal = itemsTotal - roundOffAmount;
+
+    const updateObj: any = {
+      $inc: {
+        cash: addedCash,
+        card: addedCard,
+        upi: addedUpi,
+        discount: addedDiscount,
+      },
+    };
+
+    if (totalPaid >= netTotal - 0.01) {
+      updateObj.$set = { status: 'Completed' };
+    }
+
     const data = await this.billingModel.findOneAndUpdate(
       { _id: id },
-      { $inc: { cash: markAsPaidDto.amount } },
+      updateObj,
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    if (markAsPaidDto.amount > 0) {
+    const totalPayment = addedCash + addedCard + addedUpi;
+    if (totalPayment > 0) {
       try {
         const sourceModule = await this.determineSourceModule(data.user);
         const isRefund =
@@ -840,16 +880,26 @@ export class BillingService {
           else category = IncomeCategory.MedicineSale;
         }
 
-        await this.accountsService.recordTransaction({
-          type,
-          category,
-          amount: markAsPaidDto.amount,
-          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
-          paymentMethod: PaymentMethod.Cash,
-          sourceModule,
-          createdBy: data.user,
-          transactionDate: new Date(),
-        });
+        const paymentsToRecord: { amount: number; method: PaymentMethod }[] = [
+          { amount: addedCash, method: PaymentMethod.Cash },
+          { amount: addedCard, method: PaymentMethod.Card },
+          { amount: addedUpi, method: PaymentMethod.UPI },
+        ];
+
+        for (const p of paymentsToRecord) {
+          if (p.amount > 0) {
+            await this.accountsService.recordTransaction({
+              type,
+              category,
+              amount: p.amount,
+              description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn} (${p.method})`,
+              paymentMethod: p.method,
+              sourceModule,
+              createdBy: data.user,
+              transactionDate: new Date(),
+            });
+          }
+        }
       } catch (err) {
         console.error(
           'Error recording account transaction in markAsPaid:',
