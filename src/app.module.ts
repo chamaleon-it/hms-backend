@@ -22,13 +22,12 @@ import { ReportModule } from './lab/report/report.module';
 import { PanelsModule } from './lab/panels/panels.module';
 import { BackupModule } from './backup/backup.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
-import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
-import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
 import { InPatientsModule } from './in-patients/in-patients.module';
 import { TherapyModule } from './therapy/therapy.module';
 import { ProcedureModule } from './procedure/procedure.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { EmployeeModule } from './employee/employee.module';
 
 @Module({
   imports: [
@@ -61,13 +60,12 @@ import { AccountsModule } from './accounts/accounts.module';
     PanelsModule,
     BackupModule,
     SuppliersModule,
-    PharmacistModule,
-    TechnicianModule,
     AdminModule,
     InPatientsModule,
     TherapyModule,
     ProcedureModule,
     AccountsModule,
+    EmployeeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
