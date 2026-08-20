@@ -5,7 +5,7 @@ export type PatientDocument = HydratedDocument<Patient>;
 
 export enum Gender {
   MALE = 'Male',
-  FEMALE = 'Female'
+  FEMALE = 'Female',
 }
 
 export enum PatientStatus {
@@ -87,8 +87,8 @@ export class Patient {
   @Prop({ default: null, trim: true })
   guardianRelation: string;
 
-  @Prop({ required: false})
-  weight?: number; 
+  @Prop({ required: false })
+  weight?: number;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

@@ -41,8 +41,8 @@ export class AuthService {
     //   throw new BadRequestException(
     //     'This profile is inactive. Please contact the administrator for further assistance.',
     //   );
-    // } else 
-      if ((user.status as UserStatus) === UserStatus.BLOCKED) {
+    // } else
+    if ((user.status as UserStatus) === UserStatus.BLOCKED) {
       throw new BadRequestException(
         'This profile is blocked. Please contact the administrator for further assistance.',
       );

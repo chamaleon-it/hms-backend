@@ -26,7 +26,7 @@ import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) { }
+  constructor(private readonly billingService: BillingService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -146,7 +146,9 @@ export class BillingController {
 
   @Get('report/:reportId')
   @UseGuards(JwtAuthGuard)
-  async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId) {
+  async getBillByReportId(
+    @Param('reportId') reportId: mongoose.Types.ObjectId,
+  ) {
     const data = await this.billingService.getBillByReportId(reportId);
     return {
       data,

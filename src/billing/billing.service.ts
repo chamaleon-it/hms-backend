@@ -26,7 +26,7 @@ export class BillingService {
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const lastRecord = await this.billingModel
@@ -67,14 +67,14 @@ export class BillingService {
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
-            order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
+          order.items.reduce(
+            (total, item) => total + item.quantity * item.name.unitPrice,
+            0,
+          )
             ? order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
+                (total, item) => total + item.quantity * item.name.unitPrice,
+                0,
+              )
             : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
@@ -292,14 +292,16 @@ export class BillingService {
     return data;
   }
 
-
-  async updateBill(id: mongoose.Types.ObjectId, updateBillDto: UpdateBillingDto) {
+  async updateBill(
+    id: mongoose.Types.ObjectId,
+    updateBillDto: UpdateBillingDto,
+  ) {
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('Please provide a valid bill id');
-    
+
     const existingBill = await this.billingModel.findById(id);
     if (!existingBill) throw new NotFoundException('Bill is not found.');
-    
+
     if (existingBill.status === 'Completed') {
       throw new BadRequestException('Cannot edit a completed bill');
     }
@@ -307,19 +309,22 @@ export class BillingService {
     const data = await this.billingModel.findByIdAndUpdate(
       id,
       { $set: updateBillDto },
-      { new: true }
+      { new: true },
     );
     return data;
   }
 
-  async updateBillStatusByReportId(reportId: mongoose.Types.ObjectId, status: 'Draft' | 'Completed') {
+  async updateBillStatusByReportId(
+    reportId: mongoose.Types.ObjectId,
+    status: 'Draft' | 'Completed',
+  ) {
     if (!mongoose.isValidObjectId(reportId))
       throw new BadRequestException('Please provide a valid report id');
-    
+
     const data = await this.billingModel.findOneAndUpdate(
       { reportId },
       { $set: { status } },
-      { new: true }
+      { new: true },
     );
     return data;
   }
@@ -431,19 +436,22 @@ export class BillingService {
   }
 
   async getBillDropDown(getBillDropDownDto: GetBillDropdownDto) {
-    const { query = '', } = getBillDropDownDto;
+    const { query = '' } = getBillDropDownDto;
 
-    const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
-      .limit(10).select("user patient mrn")
-      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+    const data = await this.billingModel
+      .find({ mrn: new RegExp(query, 'i'), transactionType: 'Sale' })
+      .limit(10)
+      .select('user patient mrn')
+      .populate('patient', 'name phoneNumber gender dateOfBirth mrn address')
       .lean()
       .exec();
     return data;
   }
 
   async getSingleCustomerBill(q: string) {
-    const data = await this.billingModel.find({ patient: q })
-      .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
+    const data = await this.billingModel
+      .find({ patient: q })
+      .populate('patient', 'name phoneNumber gender dateOfBirth mrn address')
       .lean()
       .exec();
     return data;

@@ -38,10 +38,12 @@ export class ReportService implements OnModuleInit {
     try {
       const result = await this.reportModel.updateMany(
         { status: 'Sample Collected' },
-        { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } },
       );
       if (result.modifiedCount > 0) {
-        console.log(`[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`);
+        console.log(
+          `[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`,
+        );
       }
     } catch (e) {
       console.error('[Migration] Error migrating reports:', e);
@@ -82,13 +84,13 @@ export class ReportService implements OnModuleInit {
 
       if (dto.panels && dto.panels.length > 0) {
         userReport.panels.push(
-          ...dto.panels.filter((p) => !userReport.panels.includes(p))
+          ...dto.panels.filter((p) => !userReport.panels.includes(p)),
         );
       }
       if (dto.groups && dto.groups.length > 0) {
         if (!userReport.groups) userReport.groups = [];
         userReport.groups.push(
-          ...dto.groups.filter((g) => !userReport.groups.includes(g))
+          ...dto.groups.filter((g) => !userReport.groups.includes(g)),
         );
       }
       await userReport.save();
@@ -102,7 +104,9 @@ export class ReportService implements OnModuleInit {
     let total = 0;
 
     if (report.groups && report.groups.length > 0) {
-      const groupsData = await this.groupModel.find({ name: { $in: report.groups } });
+      const groupsData = await this.groupModel.find({
+        name: { $in: report.groups },
+      });
       for (const group of groupsData) {
         items.push({
           name: group.name,
@@ -117,14 +121,20 @@ export class ReportService implements OnModuleInit {
     }
 
     if (report.panels && report.panels.length > 0) {
-      const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
-      
+      const panelsData = await this.panelModel.find({
+        name: { $in: report.panels },
+      });
+
       let groupPanelNames: string[] = [];
       if (report.groups && report.groups.length > 0) {
-        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('panels');
-        groupPanelNames = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
+        const groupsData = await this.groupModel
+          .find({ name: { $in: report.groups } })
+          .populate('panels');
+        groupPanelNames = groupsData
+          .flatMap((g) => g.panels || [])
+          .map((p: any) => p.name || p.toString());
       }
-      
+
       for (const panel of panelsData) {
         if (!groupPanelNames.includes(panel.name)) {
           items.push({
@@ -141,28 +151,48 @@ export class ReportService implements OnModuleInit {
     }
 
     if (report.test && report.test.length > 0) {
-      const testIds = report.test.map(t => t.name);
+      const testIds = report.test.map((t) => t.name);
       const testsData = await this.testModel.find({ _id: { $in: testIds } });
-      
+
       let panelTestIds: string[] = [];
       let groupTestIds: string[] = [];
-      
+
       if (report.panels && report.panels.length > 0) {
-        const panelsData = await this.panelModel.find({ name: { $in: report.panels } });
-        panelTestIds = panelsData.flatMap(p => p.tests || []).map(id => id.toString());
+        const panelsData = await this.panelModel.find({
+          name: { $in: report.panels },
+        });
+        panelTestIds = panelsData
+          .flatMap((p) => p.tests || [])
+          .map((id) => id.toString());
       }
-      
+
       if (report.groups && report.groups.length > 0) {
-        const groupsData = await this.groupModel.find({ name: { $in: report.groups } }).populate('tests').populate('panels');
-        groupTestIds = groupsData.flatMap(g => g.tests || []).map((t: any) => t._id?.toString() || t.toString());
-        
-        const groupPanelIds = groupsData.flatMap(g => g.panels || []).map((p: any) => p.name || p.toString());
-        const groupPanelsData = await this.panelModel.find({ name: { $in: groupPanelIds } });
-        groupTestIds.push(...groupPanelsData.flatMap(p => p.tests || []).map(id => id.toString()));
+        const groupsData = await this.groupModel
+          .find({ name: { $in: report.groups } })
+          .populate('tests')
+          .populate('panels');
+        groupTestIds = groupsData
+          .flatMap((g) => g.tests || [])
+          .map((t: any) => t._id?.toString() || t.toString());
+
+        const groupPanelIds = groupsData
+          .flatMap((g) => g.panels || [])
+          .map((p: any) => p.name || p.toString());
+        const groupPanelsData = await this.panelModel.find({
+          name: { $in: groupPanelIds },
+        });
+        groupTestIds.push(
+          ...groupPanelsData
+            .flatMap((p) => p.tests || [])
+            .map((id) => id.toString()),
+        );
       }
 
       for (const test of testsData) {
-        if (!panelTestIds.includes(test._id.toString()) && !groupTestIds.includes(test._id.toString())) {
+        if (
+          !panelTestIds.includes(test._id.toString()) &&
+          !groupTestIds.includes(test._id.toString())
+        ) {
           items.push({
             name: test.name,
             quantity: 1,
@@ -179,8 +209,10 @@ export class ReportService implements OnModuleInit {
     // Try to find existing bill for this report
     let existingBill;
     try {
-      existingBill = await this.billingService['billingModel'].findOne({ reportId: report._id });
-    } catch(e) {}
+      existingBill = await this.billingService['billingModel'].findOne({
+        reportId: report._id,
+      });
+    } catch (e) {}
 
     if (existingBill) {
       if (existingBill.status === 'Draft') {
@@ -288,7 +320,10 @@ export class ReportService implements OnModuleInit {
 
     await report.save();
     if (allFilled || dto.status === 'Completed') {
-      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+      await this.billingService.updateBillStatusByReportId(
+        report._id,
+        'Completed',
+      );
     }
 
     // Forcefully override locked timestamp behavior directly in Mongo
@@ -457,7 +492,10 @@ export class ReportService implements OnModuleInit {
     await report.save();
 
     if (allFilled) {
-      await this.billingService.updateBillStatusByReportId(report._id, 'Completed');
+      await this.billingService.updateBillStatusByReportId(
+        report._id,
+        'Completed',
+      );
     }
 
     return {
@@ -583,11 +621,10 @@ export class ReportService implements OnModuleInit {
     data.testStartedAt = new Date();
     data.sampleId = dto.sampleId;
     data.sampleType = dto?.sampleType || '';
-    
+
     await data.save();
     return data;
   }
-
 
   async startTest(id: mongoose.Types.ObjectId) {
     const data = await this.reportModel.findById(id);

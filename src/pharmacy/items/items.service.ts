@@ -16,7 +16,7 @@ export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -66,7 +66,8 @@ export class ItemsService {
       addItemDto.manufacturer = '-';
     }
 
-    const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+    const openingQty =
+      addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
 
     const data = await this.itemModel.create({
       ...addItemDto,
@@ -145,7 +146,7 @@ export class ItemsService {
 
       filter.quantity = stockConditions[stock];
     }
-    if (lowStockItemsView && (stock === "Low" || stock === "Out" || !stock)) {
+    if (lowStockItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
       filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
     }
 
@@ -165,7 +166,7 @@ export class ItemsService {
 
     filter.status = { $ne: ItemStatus.Deleted };
 
-    const shouldCountLowStock = stock === "Low" || stock === "Out" || !stock;
+    const shouldCountLowStock = stock === 'Low' || stock === 'Out' || !stock;
     const lowStockFilter = {
       ...filter,
       quantity: { $lte: Number(lowStockThreshold ?? 20) },
@@ -174,7 +175,11 @@ export class ItemsService {
     const [items, total, lowStockCount] = await Promise.all([
       this.itemModel
         .find(filter)
-        .sort(q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 })  // sort BEFORE skip/limit
+        .sort(
+          q
+            ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 }
+            : { [sortBy]: orderBy === 'asc' ? 1 : -1 },
+        ) // sort BEFORE skip/limit
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -282,8 +287,6 @@ export class ItemsService {
       await item.save();
     }
 
-
-
     return item;
   }
 
@@ -355,9 +358,7 @@ export class ItemsService {
   }
 
   async addMRP() {
-    const cursor = this.itemModel
-      .find({ mrp: { $exists: false } })
-      .cursor();
+    const cursor = this.itemModel.find({ mrp: { $exists: false } }).cursor();
 
     for await (const item of cursor) {
       const newMrp = item.unitPrice;

@@ -28,7 +28,10 @@ export class CreateUserDto {
   name: string;
 
   @IsString({ message: 'Username must be a string.' })
-  @Matches(/^[a-zA-Z0-9]{3,}$/, { message: 'Username must be at least 3 characters and contain only letters and numbers.' })
+  @Matches(/^[a-zA-Z0-9]{3,}$/, {
+    message:
+      'Username must be at least 3 characters and contain only letters and numbers.',
+  })
   @Transform(({ value }: { value: string }) => value.trim().toLowerCase())
   username: string;
 

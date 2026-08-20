@@ -68,7 +68,10 @@ export class User {
     lowercase: true,
     trim: true,
     index: true,
-    match: [/^[a-z0-9]{3,}$/, 'Username must be at least 3 characters and contain only letters and numbers'],
+    match: [
+      /^[a-z0-9]{3,}$/,
+      'Username must be at least 3 characters and contain only letters and numbers',
+    ],
   })
   username: string;
 

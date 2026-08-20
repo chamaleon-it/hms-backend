@@ -19,7 +19,7 @@ import { AddTestDto } from './dto/add-test.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 @Controller('lab/panels')
 export class PanelsController {
-  constructor(private readonly panelsService: PanelsService) { }
+  constructor(private readonly panelsService: PanelsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -152,10 +152,7 @@ export class PanelsController {
 
   @Patch('groups/:name')
   @UseGuards(JwtAuthGuard)
-  async updateGroup(
-    @Param('name') name: string,
-    @Body() dto: CreateGroupDto,
-  ) {
+  async updateGroup(@Param('name') name: string, @Body() dto: CreateGroupDto) {
     const data = await this.panelsService.updateGroup(name, dto);
     return { message: 'Group updated successfully', data };
   }

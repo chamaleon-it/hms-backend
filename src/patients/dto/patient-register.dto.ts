@@ -45,9 +45,9 @@ export class PatientRegisterDto {
     if (!str) return undefined;
     return str.includes(',')
       ? str
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [str];
   })
   @IsArray()
