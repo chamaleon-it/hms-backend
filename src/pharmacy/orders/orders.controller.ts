@@ -13,7 +13,7 @@ import {
 import { OrdersService } from './orders.service';
 import mongoose from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
+import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -26,7 +26,7 @@ import configuration from 'src/config/configuration';
 
 @Controller('pharmacy/orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {

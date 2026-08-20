@@ -8,7 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
+import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto';
 import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
@@ -29,7 +29,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     let mrn: string;
