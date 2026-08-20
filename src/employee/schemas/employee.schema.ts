@@ -52,6 +52,15 @@ export class Employee {
 
   @Prop({ default: false })
   inCharge: boolean;
+
+  @Prop({ default: 0 })
+  basicPay: number;
+
+  @Prop({ default: 0 })
+  hourlySalary: number;
+
+  @Prop({ default: 0 })
+  commission: number;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

@@ -28,6 +28,8 @@ import { TherapyModule } from './therapy/therapy.module';
 import { ProcedureModule } from './procedure/procedure.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { EmployeeModule } from './employee/employee.module';
+import { EmployeeLeaveModule } from './employee/leave/employee-leave.module';
+import { EmployeeSalaryModule } from './employee/salary/employee-salary.module';
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { EmployeeModule } from './employee/employee.module';
     ProcedureModule,
     AccountsModule,
     EmployeeModule,
+    EmployeeLeaveModule,
+    EmployeeSalaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

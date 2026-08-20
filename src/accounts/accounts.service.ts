@@ -429,6 +429,151 @@ export class AccountsService {
       }
     });
 
+    // 4. Payment Method Breakdown Aggregation (Cash, Card, UPI)
+    const paymentMethodAgg = await this.accountTransactionModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { paymentMethod: '$paymentMethod', type: '$type' },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const methodsMap: Record<
+      string,
+      {
+        name: string;
+        totalAmount: number;
+        incomeAmount: number;
+        expenseAmount: number;
+        count: number;
+        percentage: number;
+      }
+    > = {
+      Cash: {
+        name: 'Cash',
+        totalAmount: 0,
+        incomeAmount: 0,
+        expenseAmount: 0,
+        count: 0,
+        percentage: 0,
+      },
+      Card: {
+        name: 'Card',
+        totalAmount: 0,
+        incomeAmount: 0,
+        expenseAmount: 0,
+        count: 0,
+        percentage: 0,
+      },
+      UPI: {
+        name: 'UPI',
+        totalAmount: 0,
+        incomeAmount: 0,
+        expenseAmount: 0,
+        count: 0,
+        percentage: 0,
+      },
+    };
+
+    let totalMethodVolume = 0;
+
+    paymentMethodAgg.forEach((item) => {
+      const rawMethod = item._id.paymentMethod || 'Cash';
+      const mType = item._id.type;
+      const amt = item.total || 0;
+      const cnt = item.count || 0;
+
+      const normalized =
+        rawMethod === PaymentMethod.Card
+          ? 'Card'
+          : rawMethod === PaymentMethod.UPI
+          ? 'UPI'
+          : 'Cash';
+
+      if (!methodsMap[normalized]) {
+        methodsMap[normalized] = {
+          name: normalized,
+          totalAmount: 0,
+          incomeAmount: 0,
+          expenseAmount: 0,
+          count: 0,
+          percentage: 0,
+        };
+      }
+
+      methodsMap[normalized].totalAmount += amt;
+      methodsMap[normalized].count += cnt;
+      totalMethodVolume += amt;
+
+      if (mType === TransactionType.Income) {
+        methodsMap[normalized].incomeAmount += amt;
+      } else if (mType === TransactionType.Expense) {
+        methodsMap[normalized].expenseAmount += amt;
+      }
+    });
+
+    Object.values(methodsMap).forEach((m) => {
+      m.percentage =
+        totalMethodVolume > 0
+          ? Number(((m.totalAmount / totalMethodVolume) * 100).toFixed(1))
+          : 0;
+    });
+
+    const paymentMethods = Object.values(methodsMap);
+
+    // 5. Payment Method Trend (Timeline by dateKey and paymentMethod)
+    const paymentTrendAgg = await this.accountTransactionModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            dateKey: {
+              $dateToString: { format: dateFormat, date: '$transactionDate' },
+            },
+            paymentMethod: '$paymentMethod',
+          },
+          total: { $sum: '$amount' },
+        },
+      },
+      { $sort: { '_id.dateKey': 1 } },
+    ]);
+
+    const paymentTrendMap: Record<
+      string,
+      { label: string; Cash: number; Card: number; UPI: number; total: number }
+    > = {};
+
+    paymentTrendAgg.forEach((item) => {
+      const dateKey = item._id.dateKey;
+      const rawMethod = item._id.paymentMethod || 'Cash';
+      const amt = item.total || 0;
+
+      const methodKey =
+        rawMethod === PaymentMethod.Card
+          ? 'Card'
+          : rawMethod === PaymentMethod.UPI
+          ? 'UPI'
+          : 'Cash';
+
+      if (!paymentTrendMap[dateKey]) {
+        paymentTrendMap[dateKey] = {
+          label: dateKey,
+          Cash: 0,
+          Card: 0,
+          UPI: 0,
+          total: 0,
+        };
+      }
+
+      paymentTrendMap[dateKey][methodKey] += amt;
+      paymentTrendMap[dateKey].total += amt;
+    });
+
+    const paymentMethodTrend = Object.values(paymentTrendMap);
+
     return {
       summary: {
         totalIncome,
@@ -445,6 +590,8 @@ export class AccountsService {
         expenseCategories,
         incomeCategories,
       },
+      paymentMethods,
+      paymentMethodTrend,
     };
   }
 

@@ -2,8 +2,10 @@ import {
   IsBoolean,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 import { EmployeeRole } from '../schemas/employee.schema';
 
@@ -63,4 +65,19 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsBoolean()
   inCharge?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  basicPay?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  hourlySalary?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  commission?: number;
 }
