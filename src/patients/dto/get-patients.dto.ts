@@ -4,6 +4,7 @@ export class GetPatientsDto {
   limit: number = 100;
 
   query?: string;
+  q?: string;
 
   gender?: Gender;
   minAge?: string;

@@ -13,7 +13,7 @@ export class AccountTransaction {
   @Prop({ required: true, unique: true })
   transactionId: string;
 
-  @Prop({ required: true, enum: TransactionType })
+  @Prop({ required: true, enum: TransactionType, type: String })
   type: TransactionType;
 
   @Prop({ required: true })
@@ -25,12 +25,18 @@ export class AccountTransaction {
   @Prop({ required: true })
   description: string;
 
-  @Prop({ required: false, enum: PaymentMethod, default: PaymentMethod.Cash })
+  @Prop({
+    required: false,
+    enum: PaymentMethod,
+    type: String,
+    default: PaymentMethod.Cash,
+  })
   paymentMethod?: PaymentMethod;
 
   @Prop({
     required: false,
     enum: SourceModule,
+    type: String,
     default: SourceModule.Uncategorised,
   })
   sourceModule?: SourceModule;

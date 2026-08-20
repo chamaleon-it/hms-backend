@@ -179,11 +179,19 @@ export class ConsultingDto {
   therapy: any;
 
   @IsOptional()
+  @IsArray()
+  therapyDates?: (Date | string)[];
+
+  @IsOptional()
   @IsString({ message: 'Therapy notes must be a string or null.' })
   therapyNotes: null | string;
 
   @IsOptional()
   procedure: any;
+
+  @IsOptional()
+  @IsArray()
+  procedureDates?: (Date | string)[];
 
   @IsOptional()
   @IsString({ message: 'Procedure notes must be a string or null.' })

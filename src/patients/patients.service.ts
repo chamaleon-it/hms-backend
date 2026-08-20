@@ -230,7 +230,9 @@ export class PatientsService {
       filter._id = { $in: patientsWithAppts };
     }
 
-    if (!query?.trim()) {
+    const rawQuery = (getPatientsDto.query || getPatientsDto.q || '').trim();
+
+    if (!rawQuery) {
       const [data, total] = await Promise.all([
         this.patientModel
           .find(filter)
@@ -243,15 +245,24 @@ export class PatientsService {
       return { data, total };
     }
 
-    const searchTerm = query.trim().toLowerCase();
+    const searchTerm = rawQuery.toLowerCase();
+    const searchRegex = { $regex: rawQuery, $options: 'i' };
 
     const patients = await this.patientModel
       .find({
         ...filter,
         $or: [
-          { name: { $regex: searchTerm, $options: 'i' } },
-          { mrn: { $regex: searchTerm, $options: 'i' } },
-          { phoneNumber: { $regex: searchTerm, $options: 'i' } },
+          { name: searchRegex },
+          { mrn: searchRegex },
+          { phoneNumber: searchRegex },
+          { address: searchRegex },
+          { addressLine1: searchRegex },
+          { addressLine2: searchRegex },
+          { city: searchRegex },
+          { district: searchRegex },
+          { state: searchRegex },
+          { pinCode: searchRegex },
+          { uhid: searchRegex },
         ],
       })
       .populate('doctor')
@@ -261,35 +272,48 @@ export class PatientsService {
       const name = (patient.name || '').toLowerCase().trim();
       const mrn = (patient.mrn || '').toLowerCase();
       const phone = (patient.phoneNumber || '').toLowerCase();
+      const address = [
+        patient.address,
+        patient.addressLine1,
+        patient.addressLine2,
+        patient.city,
+        patient.district,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
 
       const words = name.split(/\s+/);
 
-      if (name.startsWith(searchTerm)) {
+      if (name === searchTerm || mrn === searchTerm || phone === searchTerm) {
         return 1;
       }
 
-      if (words.some((word) => word.startsWith(searchTerm))) {
+      if (name.startsWith(searchTerm)) {
         return 2;
       }
 
-      if (words.some((word) => word.endsWith(searchTerm))) {
+      if (words.some((word) => word.startsWith(searchTerm))) {
         return 3;
       }
 
-      if (mrn.includes(searchTerm)) {
+      if (name.includes(searchTerm)) {
         return 4;
       }
 
-      if (phone.includes(searchTerm)) {
+      if (mrn.includes(searchTerm)) {
         return 5;
       }
 
-      const patientAddress = (patient.address || '').toLowerCase();
-      if (patientAddress.includes(searchTerm)) {
+      if (phone.includes(searchTerm)) {
         return 6;
       }
 
-      return 999;
+      if (address.includes(searchTerm)) {
+        return 7;
+      }
+
+      return 10;
     };
 
     const sortedPatients = patients
@@ -297,17 +321,15 @@ export class PatientsService {
         ...patient,
         _searchPriority: getPriority(patient),
       }))
-      .filter((patient) => patient._searchPriority !== 999)
       .sort((a, b) => {
         if (a._searchPriority !== b._searchPriority) {
           return a._searchPriority - b._searchPriority;
         }
-
-        return (a.name || '').localeCompare(b.name || '', undefined, {
-          sensitivity: 'base',
-        });
-      })
-      .map(({ _searchPriority, ...patient }) => patient);
+        return (
+          new Date((b as any).createdAt || 0).getTime() -
+          new Date((a as any).createdAt || 0).getTime()
+        );
+      });
 
     return {
       data: sortedPatients.slice(skip, skip + Number(limit)),

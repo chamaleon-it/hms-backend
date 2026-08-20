@@ -11,6 +11,7 @@ import { TherapyModule } from 'src/therapy/therapy.module';
 import { Procedure, ProcedureSchema } from 'src/procedure/schemas/procedure.schema';
 import { ProcedureModule } from 'src/procedure/procedure.module';
 import { BillingModule } from 'src/billing/billing.module';
+import { TreatmentModule } from 'src/treatment/treatment.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { BillingModule } from 'src/billing/billing.module';
     BillingModule,
     ProcedureModule,
     TherapyModule,
+    TreatmentModule,
   ],
 
   controllers: [ConsultingsController],

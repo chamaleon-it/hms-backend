@@ -30,6 +30,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { EmployeeModule } from './employee/employee.module';
 import { EmployeeLeaveModule } from './employee/leave/employee-leave.module';
 import { EmployeeSalaryModule } from './employee/salary/employee-salary.module';
+import { TreatmentModule } from './treatment/treatment.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { EmployeeSalaryModule } from './employee/salary/employee-salary.module';
     EmployeeModule,
     EmployeeLeaveModule,
     EmployeeSalaryModule,
+    TreatmentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

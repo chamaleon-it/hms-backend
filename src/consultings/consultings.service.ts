@@ -16,6 +16,8 @@ import { BillingService } from 'src/billing/billing.service';
 import configuration from 'src/config/configuration';
 
 import { TherapyService } from 'src/therapy/therapy.service';
+import { TreatmentService } from 'src/treatment/treatment.service';
+import { TreatmentType } from 'src/treatment/schemas/treatment.schema';
 
 @Injectable()
 export class ConsultingsService {
@@ -27,6 +29,7 @@ export class ConsultingsService {
     private readonly ordersService: OrdersService,
     private readonly reportService: ReportService,
     private readonly billingService: BillingService,
+    private readonly treatmentService: TreatmentService,
   ) {}
 
   async create(
@@ -125,98 +128,50 @@ export class ConsultingsService {
 
     await Promise.all(tests.map((t) => this.reportService.createReport(t)));
 
-    // Helper to get Reception User and Doctor Name for billing
-    const getBillingContext = async () => {
-      let receptionUserIdStr = configuration().in_house_reception_id;
-      if (
-        !receptionUserIdStr ||
-        !mongoose.isValidObjectId(receptionUserIdStr)
-      ) {
-        const receptionUser = await this.consultingModel.db
-          .collection('users')
-          .findOne({ role: 'Reception' });
-        if (receptionUser) {
-          receptionUserIdStr = receptionUser._id.toString();
-        }
-      }
+    const doctorUser = await this.consultingModel.db
+      .collection('users')
+      .findOne({ _id: new mongoose.Types.ObjectId(doctorId) });
+    const doctorName = doctorUser?.name
+      ? `Dr. ${doctorUser.name}`
+      : 'Doctor';
 
-      const doctorUser = await this.consultingModel.db
-        .collection('users')
-        .findOne({ _id: new mongoose.Types.ObjectId(doctorId) });
-      const doctorName = doctorUser?.name
-        ? `Dr. ${doctorUser.name}`
-        : 'Doctor';
-
-      return { receptionUserIdStr, doctorName };
-    };
-
-    // 1. Generate Reception Bill for prescribed Therapies (if any)
+    // 1. Create Treatment Request for prescribed Therapies (if any)
     if (resolvedTherapies.length > 0) {
-      const { receptionUserIdStr, doctorName } = await getBillingContext();
-
-      if (
-        receptionUserIdStr &&
-        mongoose.isValidObjectId(receptionUserIdStr)
-      ) {
-        const therapyBillingItems = resolvedTherapies.map((t) => ({
-          name: t.parentName ? `${t.parentName} - ${t.name}` : t.name,
-          quantity: 1,
-          unitPrice: t.price,
-          gst: 0,
-          discount: 0,
-          total: t.price,
-        }));
-
-        try {
-          await this.billingService.generateBill({
-            user: new mongoose.Types.ObjectId(receptionUserIdStr),
-            patient: consultingDto.patient,
-            doctor: doctorName,
-            items: therapyBillingItems,
-            status: 'Draft',
-            transactionType: 'Sale',
-            note:
-              consultingDto.therapyNotes ||
-              'Therapy Bill from Doctor Consultation',
-          });
-        } catch (err) {
-          console.error('Error generating therapy bill for reception:', err);
-        }
+      try {
+        await this.treatmentService.createFromConsultation({
+          type: TreatmentType.Therapy,
+          items: resolvedTherapies,
+          patient: consultingDto.patient,
+          doctor: doctorId,
+          doctorName,
+          treatmentDates: (consultingDto as any).therapyDates,
+          notes:
+            consultingDto.therapyNotes ||
+            'Therapy prescribed from Doctor Consultation',
+          consultingId: consulting._id as any,
+        });
+      } catch (err) {
+        console.error('Error creating therapy treatment request:', err);
       }
     }
 
-    // 2. Generate Separate Reception Bill for prescribed Procedures (if any)
+    // 2. Create Treatment Request for prescribed Procedures (if any)
     if (resolvedProcedures.length > 0) {
-      const { receptionUserIdStr, doctorName } = await getBillingContext();
-
-      if (
-        receptionUserIdStr &&
-        mongoose.isValidObjectId(receptionUserIdStr)
-      ) {
-        const procedureBillingItems = resolvedProcedures.map((p) => ({
-          name: p.parentName ? `${p.parentName} - ${p.name}` : p.name,
-          quantity: 1,
-          unitPrice: p.price,
-          gst: 0,
-          discount: 0,
-          total: p.price,
-        }));
-
-        try {
-          await this.billingService.generateBill({
-            user: new mongoose.Types.ObjectId(receptionUserIdStr),
-            patient: consultingDto.patient,
-            doctor: doctorName,
-            items: procedureBillingItems,
-            status: 'Draft',
-            transactionType: 'Sale',
-            note:
-              consultingDto.procedureNotes ||
-              'Procedure Bill from Doctor Consultation',
-          });
-        } catch (err) {
-          console.error('Error generating procedure bill for reception:', err);
-        }
+      try {
+        await this.treatmentService.createFromConsultation({
+          type: TreatmentType.Procedure,
+          items: resolvedProcedures,
+          patient: consultingDto.patient,
+          doctor: doctorId,
+          doctorName,
+          treatmentDates: (consultingDto as any).procedureDates,
+          notes:
+            consultingDto.procedureNotes ||
+            'Procedure prescribed from Doctor Consultation',
+          consultingId: consulting._id as any,
+        });
+      } catch (err) {
+        console.error('Error creating procedure treatment request:', err);
       }
     }
 
