@@ -122,7 +122,7 @@ export class Item {
       {
         batchNumber: { type: String, required: true },
         quantity: { type: Number, required: true },
-        expiryDate: { type: Date, required: true },
+        expiryDate: { type: Date, required: false },
         purchasePrice: { type: Number, required: true },
         supplier: { type: String, required: true },
         createdAt: { type: Date, default: Date.now },
@@ -133,7 +133,7 @@ export class Item {
   batches: {
     batchNumber: string;
     quantity: number;
-    expiryDate: Date;
+    expiryDate?: Date;
     purchasePrice: number;
     supplier: string;
     createdAt: Date;

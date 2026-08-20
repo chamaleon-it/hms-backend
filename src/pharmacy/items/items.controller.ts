@@ -104,9 +104,18 @@ export class ItemsController {
       expiryDate: Date;
       purchasePrice: number;
       supplier: string;
+      unitPrice?: number;
+      mrp?: number;
+      packing?: number;
     },
   ) {
-    const data = await this.itemsService.addBatchItems(id, batchData);
+    const data = await this.itemsService.addBatchItems(
+      id,
+      batchData,
+      batchData.unitPrice,
+      batchData.mrp,
+      batchData.packing,
+    );
     return {
       data,
       message: 'Batch items added successfully',

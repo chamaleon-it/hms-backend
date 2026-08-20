@@ -75,15 +75,21 @@ export class ItemsService {
     });
 
     if (addItemDto.batchNumber) {
-      const updatedItem = await this.addBatchItems(data._id, {
-        batchNumber: addItemDto.batchNumber,
-        expiryDate: addItemDto?.expiryDate
-          ? new Date(addItemDto?.expiryDate)
-          : new Date(),
-        purchasePrice: addItemDto.purchasePrice,
-        quantity: openingQty,
-        supplier: addItemDto.supplier || '-',
-      }, addItemDto.mrp);
+      const updatedItem = await this.addBatchItems(
+        data._id,
+        {
+          batchNumber: addItemDto.batchNumber,
+          expiryDate: addItemDto?.expiryDate
+            ? new Date(addItemDto?.expiryDate)
+            : undefined,
+          purchasePrice: addItemDto.purchasePrice,
+          quantity: openingQty,
+          supplier: addItemDto.supplier || '-',
+        },
+        addItemDto.unitPrice,
+        addItemDto.mrp,
+        addItemDto.packing,
+      );
       return updatedItem; // ✅ return the DB-refreshed item with correct quantity
     }
     return data;
@@ -301,12 +307,13 @@ export class ItemsService {
     batchData: {
       batchNumber: string;
       quantity: number;
-      expiryDate: Date;
+      expiryDate?: Date;
       purchasePrice: number;
       supplier: string;
     },
-    unitPrice?:number,
-    mrp?:number,
+    unitPrice?: number,
+    mrp?: number,
+    packing?: number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
@@ -316,20 +323,26 @@ export class ItemsService {
     item.batches.push({ ...batchData, createdAt: new Date() });
     item.quantity += batchData.quantity;
 
-    // if (
-    //   !item.expiryDate ||
-    //   new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-    //   new Date() > new Date(item.expiryDate)
-    // ) {
-    item.expiryDate = batchData.expiryDate;
-    item.purchasePrice = batchData.purchasePrice;
-    item.supplier = batchData.supplier;
-    // }
-    if(unitPrice){
-        item.unitPrice = unitPrice ;
+    if (batchData.expiryDate) {
+      item.expiryDate = batchData.expiryDate;
     }
-    if(mrp){
-        item.mrp = mrp;
+    if (batchData.purchasePrice !== undefined) {
+      item.purchasePrice = batchData.purchasePrice;
+    }
+    if (batchData.supplier) {
+      item.supplier = batchData.supplier;
+    }
+    if (unitPrice !== undefined && unitPrice > 0) {
+      item.unitPrice = unitPrice;
+    }
+    if (mrp !== undefined && mrp > 0) {
+      item.mrp = mrp;
+    }
+    if (packing !== undefined && packing > 0) {
+      item.packing = packing;
+    }
+    if (item.packing && item.packing > 0 && batchData.quantity) {
+      item.noOfPacking = Math.floor(batchData.quantity / item.packing);
     }
     await item.save();
 
