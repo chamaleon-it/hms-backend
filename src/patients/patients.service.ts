@@ -21,29 +21,13 @@ export class PatientsService {
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
-    const lastRecord = await this.patientModel
-      .findOne({ mrn: { $regex: /^\d{1,5}$/ } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.mrn) {
-      nextNumber = parseInt(lastRecord.mrn, 10) + 1;
-    }
-
-    let mrn: string;
-    let exists = true;
-    do {
-      mrn = nextNumber.toString().padStart(5, '0');
-      const existing = await this.patientModel.exists({ mrn });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return mrn;
+    const counterDoc = await (this.patientModel.db.collection('counters') as any).findOneAndUpdate(
+      { _id: 'patient_mrn' },
+      { $inc: { seq: 1 } },
+      { returnDocument: 'after', upsert: true }
+    );
+    const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
+    return nextNumber.toString().padStart(5, '0');
   }
 
   async register(
@@ -465,7 +449,7 @@ export class PatientsService {
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
       patientRegisterDto,
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!data) {
       throw new BadRequestException('Patient not found.');
@@ -480,7 +464,7 @@ export class PatientsService {
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
       updateRemarksDto,
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!data) {
       throw new BadRequestException('Patient not found.');

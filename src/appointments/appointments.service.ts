@@ -445,7 +445,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { status: updateStatusDto.status },
-      { new: true },
+      { new: true , runValidators: true },
     );
 
     if (
@@ -634,7 +634,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       createAppointmentDto,
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!data) {
       throw new BadRequestException('No appointment found');
@@ -646,7 +646,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { isDeleted: true },
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!data) {
       throw new BadRequestException('No appointment found');
@@ -658,7 +658,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { isDeleted: false },
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!data) {
       throw new BadRequestException('No appointment found');
@@ -722,7 +722,7 @@ export class AppointmentsService {
     const appointment = await this.appointmentModel.findByIdAndUpdate(
       id,
       { isArrived: true },
-      { new: true },
+      { new: true , runValidators: true },
     );
     if (!appointment) {
       throw new NotFoundException('Appointment not found');

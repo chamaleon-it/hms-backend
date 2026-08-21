@@ -89,34 +89,13 @@ export class BillingService {
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const prefixWithHyphen = prefix.endsWith('-') ? prefix : `${prefix}-`;
-    const lastRecord = await this.billingModel
-      .findOne({ mrn: { $regex: `^${prefixWithHyphen}\\d+$` } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
-
-    let nextNumber = 1;
-    if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(
-        new RegExp(`^${prefixWithHyphen}(\\d+)$`),
-      );
-      if (match && match[1]) {
-        nextNumber = parseInt(match[1], 10) + 1;
-      }
-    }
-
-    let mrn: string;
-    let exists = true;
-    do {
-      mrn = `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
-      const existing = await this.billingModel.exists({ mrn });
-      exists = !!existing;
-      if (exists) nextNumber++;
-    } while (exists);
-
-    return mrn;
+    const counterDoc = await (this.billingModel.db.collection('counters') as any).findOneAndUpdate(
+      { _id: prefixWithHyphen },
+      { $inc: { seq: 1 } },
+      { returnDocument: 'after', upsert: true }
+    );
+    const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
+    return `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
   }
 
   async generateBill(createBill: CreateBillingDto) {
@@ -470,7 +449,7 @@ export class BillingService {
         metadata: [{ $count: 'total' }],
         data: [
           { $sort: { createdAt: -1 } },
-          ...(activeDate === 'Today' || activeDate === 'Custom' || true
+          ...(activeDate === 'Today' || activeDate === 'Custom'
             ? []
             : [{ $skip: skip }, { $limit: limit }]),
           {
@@ -487,6 +466,20 @@ export class BillingService {
               preserveNullAndEmptyArrays: true,
             },
           },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'doctor',
+              foreignField: '_id',
+              as: 'doctor',
+            },
+          },
+          {
+            $unwind: {
+              path: '$doctor',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
         ],
       },
     });
@@ -495,16 +488,6 @@ export class BillingService {
 
     const data = result[0].data;
     const total = result[0].metadata[0]?.total ?? 0;
-
-    // Populate doctor names for the bills
-    for (const bill of data) {
-      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
-        const doc = await this.usersService.getUserById(bill.doctor);
-        if (doc) {
-          bill.doctor = doc;
-        }
-      }
-    }
 
     return { data, total };
   }
@@ -566,7 +549,7 @@ export class BillingService {
     const data = await this.billingModel.findByIdAndUpdate(
       id,
       { $set: updateBillDto },
-      { new: true },
+      { new: true , runValidators: true },
     );
     return data;
   }

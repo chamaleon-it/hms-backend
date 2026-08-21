@@ -12,6 +12,9 @@ import {
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { GetListDto } from './dto/get-list.dto';
@@ -19,9 +22,11 @@ import mongoose from 'mongoose';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) { }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Post()
   async createAppointment(
@@ -37,6 +42,8 @@ export class AppointmentsController {
       message: 'Appointment created successfully.',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('list')
   async getAppointments(
@@ -59,6 +66,8 @@ export class AppointmentsController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Get('single/:id')
   async getSingleAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getSingleAppointment(id);
@@ -67,6 +76,8 @@ export class AppointmentsController {
       message: 'Single appointment is retrieved.',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('statistics')
   async getStatistics(
@@ -81,6 +92,8 @@ export class AppointmentsController {
       message: 'Appointment statistics retrieved successfully',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('calender-monthly')
   async calenderMonthly(
@@ -99,6 +112,8 @@ export class AppointmentsController {
       message: 'Monthly calender fetched successfully',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('/calender/weekly')
   async calenderWeekly(
@@ -120,7 +135,9 @@ export class AppointmentsController {
     };
   }
 
-  @Patch('update_status/:id')
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
+
+  @Patch('update-status/:id')
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
@@ -134,6 +151,8 @@ export class AppointmentsController {
       message: 'Appointment status is updated',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('booked_slot')
   async getBookedSlot(
@@ -151,6 +170,8 @@ export class AppointmentsController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Get('patient/:id')
   async getPatientAppointment(@Param('id') patient: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getPatientAppointment(patient);
@@ -159,6 +180,8 @@ export class AppointmentsController {
       message: 'patient appointment are retrieved successfully',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('walk-in/:doctor')
   async getWalkInAppointment(
@@ -175,6 +198,8 @@ export class AppointmentsController {
     };
   }
 
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Patch(':id')
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
@@ -190,6 +215,8 @@ export class AppointmentsController {
     };
   }
 
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Delete(':id')
   async deleteAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.deleteAppointment(id);
@@ -199,6 +226,8 @@ export class AppointmentsController {
     };
   }
 
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Post('recover/:id')
   async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.recoverAppointment(id);
@@ -207,6 +236,8 @@ export class AppointmentsController {
       message: 'Appointment recovered successfully.',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Post('refund/:id')
   async refundAppointment(
@@ -224,6 +255,8 @@ export class AppointmentsController {
       message: 'Appointment refunded successfully.',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Patch('arrived/:id')
   async markArrived(@Param('id') id: mongoose.Types.ObjectId) {

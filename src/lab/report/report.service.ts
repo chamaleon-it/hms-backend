@@ -205,9 +205,7 @@ export class ReportService implements OnModuleInit {
     // Try to find existing bill for this report
     let existingBill;
     try {
-      existingBill = await this.billingService['billingModel'].findOne({
-        reportId: report._id,
-      });
+      existingBill = await this.billingService.getBillByReportId(report._id);
     } catch (e) {
       console.error('Error generating report items PDF:', e);
     }

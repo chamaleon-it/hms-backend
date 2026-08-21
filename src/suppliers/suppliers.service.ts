@@ -61,7 +61,7 @@ export class SuppliersService {
 
   async updateSupplier(id: string, dto: UpdateSupplierDto) {
     return await this.supplierModel
-      .findByIdAndUpdate(id, dto, { new: true })
+      .findByIdAndUpdate(id, dto, { new: true , runValidators: true })
       .exec();
   }
 }

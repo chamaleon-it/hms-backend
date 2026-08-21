@@ -24,9 +24,9 @@ export class UploadsController {
     }
 
     const isAllowed =
-      file.mimetype.startsWith('image/') ||
+      (file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml') ||
       file.mimetype === 'application/pdf' ||
-      /\.(pdf|jpg|jpeg|png|webp|gif|svg)$/i.test(file.originalname);
+      /\.(pdf|jpg|jpeg|png|webp|gif)$/i.test(file.originalname);
 
     if (!isAllowed) {
       throw new BadRequestException(

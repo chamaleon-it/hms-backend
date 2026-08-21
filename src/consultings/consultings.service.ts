@@ -200,7 +200,7 @@ export class ConsultingsService {
       throw new BadRequestException('Please provide a valid consulting id');
     }
     const data = await this.consultingModel
-      .findByIdAndUpdate(id, { therapyCompleted: completed }, { new: true })
+      .findByIdAndUpdate(id, { therapyCompleted: completed }, { new: true , runValidators: true })
       .populate('therapy')
       .lean();
     return data;
@@ -211,7 +211,7 @@ export class ConsultingsService {
       throw new BadRequestException('Please provide a valid consulting id');
     }
     const data = await this.consultingModel
-      .findByIdAndUpdate(id, { procedureCompleted: completed }, { new: true })
+      .findByIdAndUpdate(id, { procedureCompleted: completed }, { new: true , runValidators: true })
       .lean();
     return data;
   }

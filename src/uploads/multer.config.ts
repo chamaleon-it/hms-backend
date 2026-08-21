@@ -22,9 +22,22 @@ export const storage = diskStorage({
   },
 });
 
-// No type filter (accept anything). Add size cap if you want.
+import { BadRequestException } from '@nestjs/common';
+
+// File filter (accept images except svg, and pdf)
 export const multerOptions = {
   storage,
+  fileFilter: (req: any, file: any, cb: any) => {
+    const isAllowed =
+      (file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml') ||
+      file.mimetype === 'application/pdf' ||
+      /\.(pdf|jpg|jpeg|png|webp|gif)$/i.test(file.originalname);
+    if (isAllowed) {
+      cb(null, true);
+    } else {
+      cb(new BadRequestException('Only PDF documents and image files are allowed. SVG is strictly prohibited.'), false);
+    }
+  },
   // Example size cap: 50 MB
   limits: { fileSize: 50 * 1024 * 1024 },
 };

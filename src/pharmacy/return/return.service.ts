@@ -86,19 +86,17 @@ export class ReturnService {
     }
 
     const validReasonForQuantityAdd = [
-      ReturnReason.AdverseReaction,
       ReturnReason.DoctorChangedRx,
       ReturnReason.NotRequired,
       ReturnReason.Other,
-      ReturnReason.QualityIssue,
       ReturnReason.WrongItem,
     ];
     const items = createReturnDto.items.filter(
       (item) => validReasonForQuantityAdd.includes(item.reason) || !item.reason,
     );
-    items.forEach(async (item) => {
-      await this.itemsService.increaseItem(item.name, item.quantity);
-    });
+    await Promise.all(
+      items.map((item) => this.itemsService.increaseItem(item.name, item.quantity))
+    );
 
     return data;
   }

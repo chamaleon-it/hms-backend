@@ -14,6 +14,9 @@ import { CreateBillingDto } from './dto/create-billing.dto';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import mongoose from 'mongoose';
 import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
@@ -25,9 +28,11 @@ import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('billing')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class BillingController {
   constructor(private readonly billingService: BillingService) { }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Post()
   async generateBill(
@@ -42,6 +47,8 @@ export class BillingController {
       data,
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Get()
   async getBills(
@@ -61,6 +68,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Get('drop-down')
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
     const data = await this.billingService.getBillDropDown(getBillDropDownDto);
@@ -70,6 +79,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Get('single')
   async getSingleCustomerBill(@Query('q') q: string) {
     const data = await this.billingService.getSingleCustomerBill(q);
@@ -78,6 +89,8 @@ export class BillingController {
       message: 'Single bill were retrieved successfully',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Post('billing_item')
   async addBillingItem(
@@ -94,6 +107,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Get('billing_items')
   async getBillingItems(
     @Query() getBillingItemDto: GetBillingItemDto,
@@ -108,6 +123,8 @@ export class BillingController {
       message: 'billing item retrieved successfully',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Patch('billing_item/:id')
   async updateBillingItem(
@@ -126,6 +143,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Delete('billing_item')
   async deleteBillingItem(
     @Query('item') item: string,
@@ -138,6 +157,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Get('report/:reportId')
   async getBillByReportId(
     @Param('reportId') reportId: mongoose.Types.ObjectId,
@@ -149,6 +170,8 @@ export class BillingController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
+
   @Get(':id')
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.billingService.getBill(id);
@@ -157,6 +180,8 @@ export class BillingController {
       message: 'Bill were retrieved successfully.',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Patch(':id')
   async updateBill(
@@ -169,6 +194,8 @@ export class BillingController {
       message: 'Bill updated successfully.',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Patch('add_payment/:id')
   async addPayment(
@@ -186,6 +213,8 @@ export class BillingController {
       message: 'Payment is added successfully.',
     };
   }
+
+  @Roles(...[UserRole.RECEPTION, UserRole.PHARMACY, UserRole.LAB, UserRole.DOCTOR])
 
   @Patch('mark_as_paid/:id')
   async markAsPaid(

@@ -13,6 +13,9 @@ import {
 import { OrdersService } from './orders.service';
 import mongoose from 'mongoose';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -22,9 +25,11 @@ import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Controller('pharmacy/orders')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) { }
+
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
@@ -34,6 +39,8 @@ export class OrdersController {
       data,
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get()
   async getOrders(@Query() query: GetOrdersDto) {
@@ -47,6 +54,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Get('single')
   async getSingleOrder(@Query('q') q: string) {
     const data = await this.ordersService.getSingleOrder(q);
@@ -56,6 +65,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Delete(':id')
   async deleteOrder(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.ordersService.deleteOrder(id);
@@ -64,6 +75,7 @@ export class OrdersController {
       message: 'Successfully removed the order',
     };
   }
+  @Roles(...[UserRole.ADMIN, UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
   @Get('customers')
   async getCustomers(@Query() query: GetCustomersDto) {
     const { data, total } = await this.ordersService.getCustomers(query);
@@ -75,6 +87,8 @@ export class OrdersController {
       message: 'All customers data were retrieved successfully.',
     };
   }
+
+  @Roles(...[UserRole.ADMIN, UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Get('customers/:patient')
   async getCustomer(@Param('patient') patient: string) {
@@ -89,6 +103,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.ADMIN, UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Get('patient/:patient')
   async getOrdersByPatient(@Param('patient') patient: string) {
     if (!mongoose.isValidObjectId(patient))
@@ -102,6 +118,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Patch('update')
   async updateOrder(@Body() dto: UpdateOrderDto) {
     const data = await this.ordersService.updateOrder(dto);
@@ -110,6 +128,7 @@ export class OrdersController {
       data,
     };
   }
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
   @Patch('complete/:id')
   async completeOrder(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -122,6 +141,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Post('repeat_order/:id')
   async repeatOrder(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.ordersService.repeatOrder(id);
@@ -131,6 +152,8 @@ export class OrdersController {
     };
   }
 
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
+
   @Patch('update_payment')
   async updatePayment(@Body() dto: UpdatePaymentDto) {
     const data = await this.ordersService.updatePayment(dto);
@@ -139,6 +162,8 @@ export class OrdersController {
       data,
     };
   }
+
+  @Roles(...[UserRole.PHARMACY, UserRole.RECEPTION, UserRole.DOCTOR])
 
   @Post('recover/:id')
   async recoverOrder(@Param('id') id: mongoose.Types.ObjectId) {

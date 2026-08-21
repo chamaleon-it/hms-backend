@@ -146,7 +146,7 @@ export class EmployeeService {
 
     // Set this one as inCharge
     const updated = await this.employeeModel
-      .findByIdAndUpdate(id, { inCharge: true }, { new: true })
+      .findByIdAndUpdate(id, { inCharge: true }, { new: true , runValidators: true })
       .lean()
       .exec();
 

@@ -140,7 +140,7 @@ export class PanelsService {
     if (isExist && dto.code !== null) {
       throw new BadRequestException('Test with this code already exists');
     }
-    const test = await this.testModel.findByIdAndUpdate(id, dto, { new: true });
+    const test = await this.testModel.findByIdAndUpdate(id, dto, { new: true , runValidators: true });
     return test;
   }
 

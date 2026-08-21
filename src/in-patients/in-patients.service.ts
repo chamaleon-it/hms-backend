@@ -145,7 +145,7 @@ export class InPatientsService {
     }
 
     const updated = await this.inPatientModel
-      .findByIdAndUpdate(id, updateData, { new: true })
+      .findByIdAndUpdate(id, updateData, { new: true , runValidators: true })
       .populate('patientId', 'name mrn')
       .exec();
 
