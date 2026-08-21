@@ -20,23 +20,6 @@ export class PatientsService {
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
   ) { }
 
-
-
-  async hello() {
-    const session = await this.patientModel.startSession()
-
-    session.startTransaction()
-
-    session.abortTransaction()
-
-    session.commitTransaction()
-
-    session.endSession()
-
-
-
-  }
-
   private async generateUniqueMRN(): Promise<string> {
     const lastRecord = await this.patientModel
       .findOne({ mrn: { $regex: /^\d{1,5}$/ } })
