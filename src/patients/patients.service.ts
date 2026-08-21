@@ -21,13 +21,22 @@ export class PatientsService {
   ) {}
 
   private async generateUniqueMRN(): Promise<string> {
-    const counterDoc = await (this.patientModel.db.collection('counters') as any).findOneAndUpdate(
-      { _id: 'patient_mrn' },
-      { $inc: { seq: 1 } },
-      { returnDocument: 'after', upsert: true }
-    );
-    const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
-    return nextNumber.toString().padStart(5, '0');
+    let isUnique = false;
+    let finalMrn = '';
+    while (!isUnique) {
+      const counterDoc = await (this.patientModel.db.collection('counters') as any).findOneAndUpdate(
+        { _id: 'patient_mrn' },
+        { $inc: { seq: 1 } },
+        { returnDocument: 'after', upsert: true }
+      );
+      const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
+      finalMrn = nextNumber.toString().padStart(5, '0');
+      const existing = await this.patientModel.exists({ mrn: finalMrn });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+    return finalMrn;
   }
 
   async register(

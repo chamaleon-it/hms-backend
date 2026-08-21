@@ -89,13 +89,22 @@ export class BillingService {
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
     const prefixWithHyphen = prefix.endsWith('-') ? prefix : `${prefix}-`;
-    const counterDoc = await (this.billingModel.db.collection('counters') as any).findOneAndUpdate(
-      { _id: prefixWithHyphen },
-      { $inc: { seq: 1 } },
-      { returnDocument: 'after', upsert: true }
-    );
-    const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
-    return `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
+    let isUnique = false;
+    let finalMrn = '';
+    while (!isUnique) {
+      const counterDoc = await (this.billingModel.db.collection('counters') as any).findOneAndUpdate(
+        { _id: prefixWithHyphen },
+        { $inc: { seq: 1 } },
+        { returnDocument: 'after', upsert: true }
+      );
+      const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
+      finalMrn = `${prefixWithHyphen}${nextNumber.toString().padStart(5, '0')}`;
+      const existing = await this.billingModel.exists({ mrn: finalMrn });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+    return finalMrn;
   }
 
   async generateBill(createBill: CreateBillingDto) {

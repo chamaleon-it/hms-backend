@@ -31,13 +31,22 @@ export class OrdersService {
 
   private async generateUniqueMRN(): Promise<string> {
     const prefix = 'ORD-';
-    const counterDoc = await (this.orderModel.db.collection('counters') as any).findOneAndUpdate(
-      { _id: prefix },
-      { $inc: { seq: 1 } },
-      { returnDocument: 'after', upsert: true }
-    );
-    const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
-    return `${prefix}${nextNumber.toString().padStart(5, '0')}`;
+    let isUnique = false;
+    let finalMrn = '';
+    while (!isUnique) {
+      const counterDoc = await (this.orderModel.db.collection('counters') as any).findOneAndUpdate(
+        { _id: prefix },
+        { $inc: { seq: 1 } },
+        { returnDocument: 'after', upsert: true }
+      );
+      const nextNumber = counterDoc.seq || (counterDoc.value ? counterDoc.value.seq : 1);
+      finalMrn = `${prefix}${nextNumber.toString().padStart(5, '0')}`;
+      const existing = await this.orderModel.exists({ mrn: finalMrn });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+    return finalMrn;
   }
 
   async createOrder(order: CreateOrderDto) {
