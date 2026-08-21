@@ -18,11 +18,11 @@ import mongoose from 'mongoose';
 import { AddTestDto } from './dto/add-test.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 @Controller('lab/panels')
+@UseGuards(JwtAuthGuard)
 export class PanelsController {
-  constructor(private readonly panelsService: PanelsService) {}
+  constructor(private readonly panelsService: PanelsService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   async createPanel(
     @Body() createPanelDto: CreatePanelDto,
     @GetUser() user: JWTUserInterface,
@@ -45,7 +45,6 @@ export class PanelsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
   async deletePanel(@Param('id') id: string) {
     await this.panelsService.deletePanel(id);
     return {
@@ -54,7 +53,6 @@ export class PanelsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
   async updatePanel(
     @Param('id') id: string,
     @Body() updatePanelDto: CreatePanelDto,
@@ -67,7 +65,6 @@ export class PanelsController {
   }
 
   @Post('create_test')
-  @UseGuards(JwtAuthGuard)
   async createTest(
     @Body() dto: CreateTestDto,
     @GetUser() user: JWTUserInterface,
@@ -81,7 +78,6 @@ export class PanelsController {
   }
 
   @Get('tests')
-  // @UseGuards(JwtAuthGuard)
   async getTests() {
     const data = await this.panelsService.getTests();
     return {
@@ -91,7 +87,6 @@ export class PanelsController {
   }
 
   @Patch('test/:id')
-  @UseGuards(JwtAuthGuard)
   async updateTest(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() dto: CreateTestDto,
@@ -124,7 +119,6 @@ export class PanelsController {
   }
 
   @Delete('test/:id')
-  @UseGuards(JwtAuthGuard)
   async deleteTest(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.panelsService.deleteTest(id);
     return {
@@ -134,7 +128,6 @@ export class PanelsController {
   }
 
   @Post('groups')
-  @UseGuards(JwtAuthGuard)
   async createGroup(
     @Body() dto: CreateGroupDto,
     @GetUser() user: JWTUserInterface,
@@ -151,14 +144,12 @@ export class PanelsController {
   }
 
   @Patch('groups/:name')
-  @UseGuards(JwtAuthGuard)
   async updateGroup(@Param('name') name: string, @Body() dto: CreateGroupDto) {
     const data = await this.panelsService.updateGroup(name, dto);
     return { message: 'Group updated successfully', data };
   }
 
   @Delete('groups/:name')
-  @UseGuards(JwtAuthGuard)
   async deleteGroup(@Param('name') name: string) {
     await this.panelsService.deleteGroup(name);
     return { message: 'Group deleted successfully' };

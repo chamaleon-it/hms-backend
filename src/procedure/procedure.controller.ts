@@ -7,15 +7,18 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ProcedureService } from './procedure.service';
 import { CreateProcedureDto } from './dto/create-procedure.dto';
 import { UpdateProcedureDto } from './dto/update-procedure.dto';
 import { SubProcedureDto } from './dto/sub-procedure.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('procedure')
+@UseGuards(JwtAuthGuard)
 export class ProcedureController {
-  constructor(private readonly procedureService: ProcedureService) {}
+  constructor(private readonly procedureService: ProcedureService) { }
 
   @Post()
   async create(@Body() dto: CreateProcedureDto): Promise<any> {

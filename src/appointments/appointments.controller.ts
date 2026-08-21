@@ -19,10 +19,10 @@ import mongoose from 'mongoose';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('appointments')
+@UseGuards(JwtAuthGuard)
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(private readonly appointmentsService: AppointmentsService) { }
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async createAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
@@ -38,7 +38,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('list')
   async getAppointments(
     @Query() getListDto: GetListDto,
@@ -56,21 +55,19 @@ export class AppointmentsController {
     });
     return {
       data,
-      message: 'Appointment retrived successfully',
+      message: 'Appointment retrieved successfully',
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('single/:id')
   async getSingleAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getSingleAppointment(id);
     return {
       data,
-      message: 'Single appointment is retrived.',
+      message: 'Single appointment is retrieved.',
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('statistics')
   async getStatistics(
     @GetUser() user: JWTUserInterface,
@@ -81,11 +78,10 @@ export class AppointmentsController {
     const data = await this.appointmentsService.getStatistics(doctorFilter);
     return {
       data,
-      message: 'Appointment statistics retrived successfully',
+      message: 'Appointment statistics retrieved successfully',
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
   async calenderMonthly(
     @GetUser() user: JWTUserInterface,
@@ -104,7 +100,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('/calender/weekly')
   async calenderWeekly(
     @GetUser() user: JWTUserInterface,
@@ -125,7 +120,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('update_status/:id')
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -153,7 +147,7 @@ export class AppointmentsController {
     );
     return {
       data,
-      message: 'Booked slot all retrived successfully',
+      message: 'Booked slot all retrieved successfully',
     };
   }
 
@@ -162,7 +156,7 @@ export class AppointmentsController {
     const data = await this.appointmentsService.getPatientAppointment(patient);
     return {
       data,
-      message: 'patient appointment are retrived successfully',
+      message: 'patient appointment are retrieved successfully',
     };
   }
 
@@ -214,7 +208,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('refund/:id')
   async refundAppointment(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -232,7 +225,6 @@ export class AppointmentsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('arrived/:id')
   async markArrived(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.markArrived(id);

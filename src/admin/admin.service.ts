@@ -42,7 +42,7 @@ export class AdminService {
     private reportModel: Model<ReportDocument>,
     @InjectModel(Therapy.name)
     private therapyModel: Model<TherapyDocument>,
-  ) {}
+  ) { }
 
   async getDashboardStats() {
     const totalUsers = await this.userModel.countDocuments();
@@ -534,7 +534,7 @@ export class AdminService {
         }
       });
     } catch (err) {
-      // Ignore report errors if any
+      console.log(err)
     }
 
     // Build trend chart data safely

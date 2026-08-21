@@ -18,10 +18,10 @@ import { ProcessTreatmentDto } from './dto/process-treatment.dto';
 import { RepeatTreatmentDto } from './dto/repeat-treatment.dto';
 import { GetTreatmentsDto } from './dto/get-treatments.dto';
 
-@UseGuards(JwtAuthGuard)
 @Controller('treatment')
+@UseGuards(JwtAuthGuard)
 export class TreatmentController {
-  constructor(private readonly treatmentService: TreatmentService) {}
+  constructor(private readonly treatmentService: TreatmentService) { }
 
   @Post()
   async create(@Body() createTreatmentDto: CreateTreatmentDto) {

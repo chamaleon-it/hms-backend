@@ -14,10 +14,10 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('consultings')
+@UseGuards(JwtAuthGuard)
 export class ConsultingsController {
-  constructor(private readonly consultingsService: ConsultingsService) {}
+  constructor(private readonly consultingsService: ConsultingsService) { }
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async create(
     @Body() consultingDto: ConsultingDto,
@@ -30,12 +30,11 @@ export class ConsultingsController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
   @Get('/patient/:patientId')
   async getPatientConsultings(@Param('patientId') patientId: string) {
     const data = await this.consultingsService.getPatientConsultings(patientId);
     return {
-      message: 'Patient consultation record retrived',
+      message: 'Patient consultation record retrieved',
       data,
     };
   }

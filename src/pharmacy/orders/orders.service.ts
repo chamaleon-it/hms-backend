@@ -27,7 +27,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     const prefix = 'ORD-';
@@ -704,8 +704,8 @@ export class OrdersService {
     return data;
   }
 
-  updateOrder(dto: UpdateOrderDto) {
-    const order = this.orderModel
+  async updateOrder(dto: UpdateOrderDto) {
+    const order = await this.orderModel
       .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
       .lean();
     if (!order) {
@@ -738,8 +738,8 @@ export class OrdersService {
             userObjId,
             patientObj?.name || (order as any).customerName,
             patientObj?.phoneNumber ||
-              (order as any).customerPhone ||
-              patientObj?.phone,
+            (order as any).customerPhone ||
+            patientObj?.phone,
             (order as any).doctorName || (order as any).doctor,
             (order as any).pharmacistName || (order as any).pharmacist,
             patientObj?.mrn || (order as any).mrn,
@@ -798,33 +798,31 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    if (true) {
-      const items = await Promise.all(
-        data.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
+    const items = await Promise.all(
+      data.items.map(async (item) => {
+        const itemData = await this.itemsService.getItem(item.name);
 
-          const unitPrice = itemData.unitPrice;
-          const quantity = item.quantity;
+        const unitPrice = itemData.unitPrice;
+        const quantity = item.quantity;
 
-          return {
-            name: itemData.name,
-            unitPrice,
-            quantity,
-            discount: 0,
-            gst: 0,
-            total: unitPrice * quantity,
-          };
-        }),
-      );
+        return {
+          name: itemData.name,
+          unitPrice,
+          quantity,
+          discount: 0,
+          gst: 0,
+          total: unitPrice * quantity,
+        };
+      }),
+    );
 
-      await this.billingService.generateBill({
-        patient: data.patient,
-        items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-        discount: data.discount ?? 0,
-        doctor: existOrder.doctorName || 'Self',
-      });
-    }
+    await this.billingService.generateBill({
+      patient: data.patient,
+      items,
+      user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+      discount: data.discount ?? 0,
+      doctor: existOrder.doctorName || 'Self',
+    });
 
     return data;
   }

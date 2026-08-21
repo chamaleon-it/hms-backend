@@ -49,3 +49,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /uploads
 /backups
 /release
+/backend.log

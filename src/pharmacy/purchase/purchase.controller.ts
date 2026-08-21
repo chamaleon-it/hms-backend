@@ -7,11 +7,11 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 
 @Controller('pharmacy/purchase')
+@UseGuards(JwtAuthGuard)
 export class PurchaseController {
-  constructor(private readonly purchaseService: PurchaseService) {}
+  constructor(private readonly purchaseService: PurchaseService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   async createPurchase(
     @Body() createPurchaseDto: CreatePurchaseDto,
     @GetUser() user: JWTUserInterface,
