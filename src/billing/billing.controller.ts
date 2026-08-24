@@ -71,8 +71,11 @@ export class BillingController {
   }
 
   @Get('single')
-  async getSingleCustomerBill(@Query('q') q: string) {
-    const data = await this.billingService.getSingleCustomerBill(q);
+  async getSingleCustomerBill(
+    @Query('q') q: string,
+    @Query('role') role?: string,
+  ) {
+    const data = await this.billingService.getSingleCustomerBill(q, role);
     return {
       data,
       message: 'Single bill were retrieved successfully',

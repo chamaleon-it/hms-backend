@@ -597,12 +597,30 @@ export class OrdersService {
         .exec();
     }
 
-    const bills: any[] = await this.billingModel
-      .find({
-        patient: { $in: patients.map((e) => e._id) },
-      })
-      .lean()
-      .exec();
+    const isPharmacyBill = (b: any) => {
+      const userRole = (b.user?.role || '').toLowerCase();
+      if (userRole.includes('pharmacy')) return true;
+      if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
+      if (b.reportId || b.tokenNumber || b.token) return false;
+      const noteStr = String(b.note || '').toLowerCase();
+      if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+      const items = b.items || [];
+      if (items.length === 0) return false;
+      return items.some((it: any) => {
+        const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
+        return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+      });
+    };
+
+    const bills: any[] = (
+      await this.billingModel
+        .find({
+          patient: { $in: patients.map((e) => e._id) },
+        })
+        .populate('user', 'role')
+        .lean()
+        .exec()
+    ).filter(isPharmacyBill);
 
     const data = patients.map((e) => {
       const patientBills = bills.filter(
@@ -632,7 +650,22 @@ export class OrdersService {
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {
-    const [sampleBill, bills] = await Promise.all([
+    const isPharmacyBill = (b: any) => {
+      const userRole = (b.user?.role || '').toLowerCase();
+      if (userRole.includes('pharmacy')) return true;
+      if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
+      if (b.reportId || b.tokenNumber || b.token) return false;
+      const noteStr = String(b.note || '').toLowerCase();
+      if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+      const items = b.items || [];
+      if (items.length === 0) return false;
+      return items.some((it: any) => {
+        const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
+        return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+      });
+    };
+
+    const [sampleBill, rawBills] = await Promise.all([
       this.billingModel
         .findOne({ patient: patientId })
         .populate('patient')
@@ -641,10 +674,13 @@ export class OrdersService {
         .exec(),
       this.billingModel
         .find({ patient: patientId })
+        .populate('user', 'role')
         .sort({ createdAt: -1 })
         .lean()
         .exec(),
     ]);
+
+    const bills = rawBills.filter(isPharmacyBill);
 
     const patient = sampleBill?.patient ?? null;
 
