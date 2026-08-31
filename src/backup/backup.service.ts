@@ -1,6 +1,12 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
+import { Cron } from '@nestjs/schedule';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -11,86 +17,157 @@ export class BackupService {
 
   constructor(@InjectConnection() private readonly connection: Connection) {
     if (!fs.existsSync(this.backupDir)) {
-      fs.mkdirSync(this.backupDir);
+      fs.mkdirSync(this.backupDir, { recursive: true });
     }
   }
 
-  async backupDatabase(): Promise<{ message: string; backupId: string }> {
-    const session = await this.connection.startSession();
+  /**
+   * Automatically runs daily at 5:00 AM (05:00) and 5:00 PM (17:00)
+   */
+  @Cron('0 5,17 * * *')
+  async handleScheduledBackup() {
+    this.logger.log('Starting automated scheduled database backup at 5:00...');
     try {
-      const timestamp = new Date().toISOString().replace(/:/g, '-');
-      const backupFile = path.join(this.backupDir, `${timestamp}.json`);
-
-      if (!this.connection.db) {
-        throw new Error('Database connection not established');
-      }
-
-      const collections = await this.connection.db.listCollections().toArray();
-      const backupData: Record<string, any[]> = {};
-
-      for (const collectionInfo of collections) {
-        const collectionName = collectionInfo.name;
-        const data = await this.connection.db
-          .collection(collectionName)
-          .find({})
-          .toArray();
-
-        backupData[collectionName] = data;
-      }
-
-      fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
-
-      this.logger.log(`Backup created at ${backupFile}`);
-      return { message: 'Backup created successfully', backupId: timestamp };
+      const result = await this.backupDatabase();
+      this.logger.log(
+        `Automated scheduled backup completed successfully with ID: ${result.backupId}`,
+      );
     } catch (error) {
-      this.logger.error('Backup failed', error);
-      throw error;
-    } finally {
-      await session.endSession();
+      this.logger.error('Automated scheduled backup failed', error);
     }
   }
 
-  async listBackups() {
+  /**
+   * Backs up all database collections into a timestamped directory
+   * with individual <database name>.<collection name>.json files (Compass format).
+   */
+  async backupDatabase(): Promise<{ message: string; backupId: string }> {
+    if (!this.connection.db) {
+      throw new Error('Database connection not established');
+    }
+
+    const timestamp = new Date().toISOString().replace(/:/g, '-');
+    const backupFolder = path.join(this.backupDir, timestamp);
+
+    if (!fs.existsSync(backupFolder)) {
+      fs.mkdirSync(backupFolder, { recursive: true });
+    }
+
+    const dbName = this.connection.db.databaseName || this.connection.name || 'hms';
+    const collections = await this.connection.db.listCollections().toArray();
+
+    for (const collectionInfo of collections) {
+      const collectionName = collectionInfo.name;
+
+      // Skip internal system collections if present
+      if (collectionName.startsWith('system.')) {
+        continue;
+      }
+
+      const data = await this.connection.db
+        .collection(collectionName)
+        .find({})
+        .toArray();
+
+      const fileName = `${dbName}.${collectionName}.json`;
+      const filePath = path.join(backupFolder, fileName);
+
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    }
+
+    this.logger.log(
+      `Backup created successfully at ${backupFolder} (${collections.length} collections)`,
+    );
+    return {
+      message: 'Backup created successfully',
+      backupId: timestamp,
+    };
+  }
+
+  /**
+   * Lists all available backups (both folder backups and legacy JSON files).
+   */
+  async listBackups(): Promise<string[]> {
     if (!fs.existsSync(this.backupDir)) {
       return [];
     }
-    const files = fs
-      .readdirSync(this.backupDir)
-      .filter((f) => f.endsWith('.json'));
-    // Return names without extension for cleaner ID
-    return files.map((f) => path.basename(f, '.json')).reverse();
-  }
 
-  async restoreDatabase(backupId: string) {
-    // Try to find the file. backupId matches the filename without extension or with?
-    // Let's assume input is just timestamp (ID).
-    let backupPath = path.join(this.backupDir, `${backupId}.json`);
+    const entries = fs.readdirSync(this.backupDir, { withFileTypes: true });
+    const backupIds = new Set<string>();
 
-    // Fallback for backward compatibility if user checks old folders?
-    // The user asked to change it, so let's stick to the new single file format strictly for now.
-    if (!fs.existsSync(backupPath)) {
-      // fallback: check if it was just passed with extension
-      if (fs.existsSync(path.join(this.backupDir, backupId))) {
-        backupPath = path.join(this.backupDir, backupId);
-      } else {
-        throw new Error(`Backup ${backupId} not found`);
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        backupIds.add(entry.name);
+      } else if (entry.isFile() && entry.name.endsWith('.json')) {
+        backupIds.add(path.basename(entry.name, '.json'));
       }
     }
 
-    const session = await this.connection.startSession();
+    return Array.from(backupIds).sort().reverse();
+  }
+
+  /**
+   * Restores the database from a backup folder or legacy backup file.
+   */
+  async restoreDatabase(backupId: string) {
+    const folderPath = path.join(this.backupDir, backupId);
+    const legacyFilePath = path.join(this.backupDir, `${backupId}.json`);
+
+    if (!this.connection.db) {
+      throw new Error('Database connection not established');
+    }
+
+    const db = this.connection.db;
 
     try {
-      if (!this.connection.db) {
-        throw new Error('Database connection not established');
-      }
+      if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+        // --- NEW FORMAT: Folder with <dbname>.<collection>.json files ---
+        const files = fs
+          .readdirSync(folderPath)
+          .filter((f) => f.endsWith('.json'));
 
-      const db = this.connection.db;
+        if (files.length === 0) {
+          throw new BadRequestException(
+            `Backup folder ${backupId} contains no JSON files`,
+          );
+        }
 
-      await session.withTransaction(async () => {
-        const fileContent = fs.readFileSync(backupPath, 'utf-8');
+        for (const file of files) {
+          const baseName = path.basename(file, '.json');
+          // Extract collection name from "<dbname>.<collection>" or just "<collection>"
+          let collectionName = baseName;
+          if (baseName.includes('.')) {
+            const dotIdx = baseName.indexOf('.');
+            collectionName = baseName.substring(dotIdx + 1);
+          }
+
+          const filePath = path.join(folderPath, file);
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          const data = JSON.parse(fileContent);
+
+          const collections = await db
+            .listCollections({ name: collectionName })
+            .toArray();
+          if (collections.length > 0) {
+            await db.collection(collectionName).deleteMany({});
+          }
+
+          if (Array.isArray(data) && data.length > 0) {
+            const dataToInsert = this.restoreRecursively(data);
+            const chunkSize = 500;
+            for (let i = 0; i < dataToInsert.length; i += chunkSize) {
+              const chunk = dataToInsert.slice(i, i + chunkSize);
+              await db.collection(collectionName).insertMany(chunk);
+            }
+          }
+        }
+
+        this.logger.log(`Database restored successfully from folder ${backupId}`);
+        return { message: 'Database restored successfully' };
+      } else if (fs.existsSync(legacyFilePath)) {
+        // --- LEGACY FORMAT: Single JSON file containing dictionary of collections ---
+        const fileContent = fs.readFileSync(legacyFilePath, 'utf-8');
         const backupData = JSON.parse(fileContent);
-
-        // backupData should be { collectionName: [documents] }
         const collectionNames = Object.keys(backupData);
 
         for (const collectionName of collectionNames) {
@@ -100,25 +177,29 @@ export class BackupService {
             .listCollections({ name: collectionName })
             .toArray();
           if (collections.length > 0) {
-            await db.collection(collectionName).deleteMany({}, { session });
+            await db.collection(collectionName).deleteMany({});
           }
 
           if (Array.isArray(data) && data.length > 0) {
             const dataToInsert = this.restoreRecursively(data);
-            await db
-              .collection(collectionName)
-              .insertMany(dataToInsert, { session });
+            const chunkSize = 500;
+            for (let i = 0; i < dataToInsert.length; i += chunkSize) {
+              const chunk = dataToInsert.slice(i, i + chunkSize);
+              await db.collection(collectionName).insertMany(chunk);
+            }
           }
         }
-      });
 
-      this.logger.log(`Database restored from ${backupId}`);
-      return { message: 'Database restored successfully' };
+        this.logger.log(
+          `Database restored successfully from legacy file ${backupId}.json`,
+        );
+        return { message: 'Database restored successfully' };
+      } else {
+        throw new NotFoundException(`Backup ${backupId} not found`);
+      }
     } catch (error) {
       this.logger.error('Restore failed', error);
       throw error;
-    } finally {
-      await session.endSession();
     }
   }
 
@@ -126,20 +207,29 @@ export class BackupService {
     if (Array.isArray(item)) {
       return item.map((i) => this.restoreRecursively(i));
     } else if (item !== null && typeof item === 'object') {
+      // Extended JSON format: { "$oid": "..." } or { "$date": "..." }
+      if (item.$oid && typeof item.$oid === 'string') {
+        return new Types.ObjectId(item.$oid);
+      }
+      if (
+        item.$date &&
+        (typeof item.$date === 'string' || typeof item.$date === 'number')
+      ) {
+        return new Date(item.$date);
+      }
+
       const newItem: any = {};
       for (const key of Object.keys(item)) {
-        // If the key is _id or any other field, we check the value
         newItem[key] = this.restoreRecursively(item[key]);
       }
       return newItem;
     } else if (typeof item === 'string') {
-      // Check if string is a valid ObjectId (24 hex characters)
+      // Check if string is a valid 24-hex ObjectId
       if (/^[0-9a-fA-F]{24}$/.test(item)) {
         return new Types.ObjectId(item);
       }
 
       // Check if string is a valid ISO 8601 date
-      // Example: 2026-01-16T08:53:46.889Z
       const isoDateRegExp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
       if (isoDateRegExp.test(item)) {
         const date = new Date(item);
@@ -159,3 +249,4 @@ export class BackupService {
     return this.restoreDatabase(backups[0]);
   }
 }
+
