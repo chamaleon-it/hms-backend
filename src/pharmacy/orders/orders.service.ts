@@ -54,10 +54,32 @@ export class OrdersService {
     );
     if (autoGenerateBill) {
       const items = await Promise.all(
-        order.items.map(async (item) => {
+        order.items.map(async (item: any) => {
           const itemData = await this.itemsService.getItem(item.name);
+          const batches = (itemData as any).batches || [];
+          let targetBatch: any = null;
+          if (item.batchId) {
+            targetBatch = batches.find(
+              (b: any) => String(b._id) === String(item.batchId),
+            );
+          }
+          if (!targetBatch && item.batchNumber && item.batchNumber !== '-') {
+            targetBatch = batches.find(
+              (b: any) => b.batchNumber === item.batchNumber,
+            );
+          }
+          if (!targetBatch && (itemData as any).activeBatch) {
+            targetBatch = batches.find(
+              (b: any) => String(b._id) === String((itemData as any).activeBatch),
+            );
+          }
+          if (!targetBatch && batches.length > 0) {
+            targetBatch =
+              batches.find((b: any) => (Number(b.quantity) || 0) > 0) || batches[0];
+          }
 
-          const unitPrice = itemData.unitPrice;
+          const unitPrice =
+            targetBatch?.unitPrice || targetBatch?.mrp || itemData.unitPrice || 0;
           const quantity = item.quantity;
 
           return {
@@ -614,10 +636,32 @@ export class OrdersService {
 
     if (true) {
       const items = await Promise.all(
-        data.items.map(async (item) => {
+        data.items.map(async (item: any) => {
           const itemData = await this.itemsService.getItem(item.name);
+          const batches = (itemData as any).batches || [];
+          let targetBatch: any = null;
+          if (item.batchId) {
+            targetBatch = batches.find(
+              (b: any) => String(b._id) === String(item.batchId),
+            );
+          }
+          if (!targetBatch && item.batchNumber && item.batchNumber !== '-') {
+            targetBatch = batches.find(
+              (b: any) => b.batchNumber === item.batchNumber,
+            );
+          }
+          if (!targetBatch && (itemData as any).activeBatch) {
+            targetBatch = batches.find(
+              (b: any) => String(b._id) === String((itemData as any).activeBatch),
+            );
+          }
+          if (!targetBatch && batches.length > 0) {
+            targetBatch =
+              batches.find((b: any) => (Number(b.quantity) || 0) > 0) || batches[0];
+          }
 
-          const unitPrice = itemData.unitPrice;
+          const unitPrice =
+            targetBatch?.unitPrice || targetBatch?.mrp || itemData.unitPrice || 0;
           const quantity = item.quantity;
 
           return {
