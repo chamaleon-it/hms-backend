@@ -145,6 +145,9 @@ export class User {
   @Prop({ type: Boolean, default: false })
   emailVerified: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  isDeleted: boolean;
+
   @Prop({ type: String, default: null, select: false })
   consultationValues: string;
 

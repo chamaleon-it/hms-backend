@@ -65,4 +65,42 @@ export class CreateUserDto {
   @IsNumber({}, { message: 'Consultation fee must be a number.' })
   @IsOptional()
   consultationFee?: number;
+
+  @IsString({ message: 'Phone number must be a string.' })
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString({ message: 'Specialization must be a string.' })
+  @IsOptional()
+  specialization?: string;
+
+  @IsString({ message: 'Department must be a string.' })
+  @IsOptional()
+  department?: string;
+
+  @IsString({ message: 'Address must be a string.' })
+  @IsOptional()
+  address?: string;
+
+  @IsString({ message: 'Hospital must be a string.' })
+  @IsOptional()
+  hospital?: string;
+
+  @IsString({ message: 'Status must be a string.' })
+  @IsOptional()
+  status?: string;
+
+  @IsString({ message: 'Profile pic must be a string.' })
+  @IsOptional()
+  profilePic?: string;
+
+  @IsString({ message: 'Signature must be a string.' })
+  @IsOptional()
+  signature?: string;
+
+  @IsOptional()
+  availability?: any;
+
+  @IsOptional()
+  isDeleted?: boolean;
 }

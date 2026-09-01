@@ -102,4 +102,15 @@ export class UpdateUserDto {
   @IsNumber({}, { message: 'Consultation fee must be a number' })
   @IsOptional()
   consultationFee?: number;
+
+  @IsString({ message: 'Department must be a string' })
+  @IsOptional()
+  department?: string | null;
+
+  @IsString({ message: 'Address must be a string' })
+  @IsOptional()
+  address?: string | null;
+
+  @IsOptional()
+  isDeleted?: boolean;
 }

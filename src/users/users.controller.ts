@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -55,11 +57,23 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('doctors')
-  async getAllDoctors() {
-    const data = await this.usersService.getAllDoctors();
+  async getAllDoctors(@Query('includeDeleted') includeDeleted?: string) {
+    const data = await this.usersService.getAllDoctors(
+      includeDeleted === 'true',
+    );
     return {
       data,
       message: 'All doctors data retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deleteUser(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.usersService.softDeleteUser(id);
+    return {
+      message: 'Doctor soft deleted successfully.',
+      data,
     };
   }
 

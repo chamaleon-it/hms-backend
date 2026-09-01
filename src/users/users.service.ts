@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/createUser.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserRole } from './schemas/user.schema';
+import { User, UserRole, UserStatus } from './schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -104,15 +104,31 @@ export class UsersService {
     return token;
   }
 
-  async getAllDoctors() {
+  async getAllDoctors(includeDeleted: boolean = false) {
+    const filter: any = { role: UserRole.DOCTOR };
+    if (!includeDeleted) {
+      filter.isDeleted = { $ne: true };
+    }
     const data = await this.userModel
-      .find({ role: UserRole.DOCTOR })
+      .find(filter)
       .select(
-        'name email phoneNumber address profilePic consultationFee qualification specialization department designation licenseNo',
+        'name username email phoneNumber address profilePic signature availability consultationFee qualification specialization department designation licenseNo status isDeleted createdAt updatedAt',
       )
       .sort({ name: 1 })
       .lean();
     return data;
+  }
+
+  async softDeleteUser(id: mongoose.Types.ObjectId) {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      { isDeleted: true, status: UserStatus.INACTIVE },
+      { new: true },
+    );
+    if (!user) {
+      throw new NotFoundException('Doctor not found.');
+    }
+    return user;
   }
 
   async getUsersByRole(role: string) {
