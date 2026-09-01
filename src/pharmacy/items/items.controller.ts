@@ -20,10 +20,10 @@ import mongoose from 'mongoose';
 import type { Response } from 'express';
 
 @Controller('pharmacy/items')
+@UseGuards(JwtAuthGuard)
 export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
+  constructor(private readonly itemsService: ItemsService) { }
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async addItems(
     @GetUser() user: JWTUserInterface,
@@ -36,7 +36,6 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   async getItems(@Query() query: GetItemsDto) {
     const data = await this.itemsService.getItems(query);
@@ -60,7 +59,6 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateItem(
     @Body() addItemDto: AddItemDto,
@@ -73,7 +71,6 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async deleteItem(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.itemsService.deleteItem(id);
@@ -94,7 +91,6 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('add_batch/:id')
   async addBatchItems(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -114,12 +110,4 @@ export class ItemsController {
     };
   }
 
-  @Get('addmrp')
-  async addMrp() {
-    const data = await this.itemsService.addMRP();
-    return {
-      data,
-      message: 'Mrp added successfully',
-    };
-  }
 }

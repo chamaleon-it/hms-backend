@@ -25,11 +25,11 @@ import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('billing')
+@UseGuards(JwtAuthGuard)
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   async generateBill(
     @Body() createBill: CreateBillingDto,
     @GetUser() user: JWTUserInterface,
@@ -44,7 +44,6 @@ export class BillingController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
   async getBills(
     @GetUser() user: JWTUserInterface,
     @Query() getBillisDto: GetBillisDto,
@@ -54,7 +53,7 @@ export class BillingController {
       getBillisDto,
     );
     return {
-      message: 'All bills were retrived successfully.',
+      message: 'All bills were retrieved successfully.',
       data,
       total,
       page: Number(getBillisDto.page),
@@ -63,25 +62,26 @@ export class BillingController {
   }
 
   @Get('drop-down')
-  // @UseGuards(JwtAuthGuard)
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
     const data = await this.billingService.getBillDropDown(getBillDropDownDto);
     return {
       data,
-      message: 'Bill drop down retrived successfully',
+      message: 'Bill drop down retrieved successfully',
     };
   }
 
   @Get('single')
-  async getSingleCustomerBill(@Query('q') q: string) {
-    const data = await this.billingService.getSingleCustomerBill(q);
+  async getSingleCustomerBill(
+    @Query('q') q: string,
+    @Query('role') role?: string,
+  ) {
+    const data = await this.billingService.getSingleCustomerBill(q, role);
     return {
       data,
-      message: 'Single bill were retrived successfully',
+      message: 'Single bill were retrieved successfully',
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('billing_item')
   async addBillingItem(
     @Body() addBillingItemDto: AddBillingItemDto,
@@ -97,7 +97,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('billing_items')
   async getBillingItems(
     @Query() getBillingItemDto: GetBillingItemDto,
@@ -109,11 +108,10 @@ export class BillingController {
     );
     return {
       data,
-      message: 'billing item retrived successfully',
+      message: 'billing item retrieved successfully',
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('billing_item/:id')
   async updateBillingItem(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -131,7 +129,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete('billing_item')
   async deleteBillingItem(
     @Query('item') item: string,
@@ -145,7 +142,6 @@ export class BillingController {
   }
 
   @Get('report/:reportId')
-  @UseGuards(JwtAuthGuard)
   async getBillByReportId(
     @Param('reportId') reportId: mongoose.Types.ObjectId,
   ) {
@@ -157,17 +153,15 @@ export class BillingController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.billingService.getBill(id);
     return {
       data,
-      message: 'Bill were retrived successfully.',
+      message: 'Bill were retrieved successfully.',
     };
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
   async updateBill(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateBillDto: UpdateBillingDto,
@@ -180,7 +174,6 @@ export class BillingController {
   }
 
   @Patch('add_payment/:id')
-  @UseGuards(JwtAuthGuard)
   async addPayment(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() addPaymentDto: AddPaymentDto,
@@ -198,7 +191,6 @@ export class BillingController {
   }
 
   @Patch('mark_as_paid/:id')
-  @UseGuards(JwtAuthGuard)
   async markAsPaid(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() markAsPaidDto: MarkAsPaidDto,

@@ -27,7 +27,7 @@ export class OrdersService {
     private readonly itemsService: ItemsService,
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     const prefix = 'ORD-';
@@ -597,12 +597,30 @@ export class OrdersService {
         .exec();
     }
 
-    const bills: any[] = await this.billingModel
-      .find({
-        patient: { $in: patients.map((e) => e._id) },
-      })
-      .lean()
-      .exec();
+    const isPharmacyBill = (b: any) => {
+      const userRole = (b.user?.role || '').toLowerCase();
+      if (userRole.includes('pharmacy')) return true;
+      if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
+      if (b.reportId || b.tokenNumber || b.token) return false;
+      const noteStr = String(b.note || '').toLowerCase();
+      if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+      const items = b.items || [];
+      if (items.length === 0) return false;
+      return items.some((it: any) => {
+        const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
+        return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+      });
+    };
+
+    const bills: any[] = (
+      await this.billingModel
+        .find({
+          patient: { $in: patients.map((e) => e._id) },
+        })
+        .populate('user', 'role')
+        .lean()
+        .exec()
+    ).filter(isPharmacyBill);
 
     const data = patients.map((e) => {
       const patientBills = bills.filter(
@@ -632,7 +650,22 @@ export class OrdersService {
   }
 
   async getCustomer(patientId: mongoose.Types.ObjectId) {
-    const [sampleBill, bills] = await Promise.all([
+    const isPharmacyBill = (b: any) => {
+      const userRole = (b.user?.role || '').toLowerCase();
+      if (userRole.includes('pharmacy')) return true;
+      if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
+      if (b.reportId || b.tokenNumber || b.token) return false;
+      const noteStr = String(b.note || '').toLowerCase();
+      if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+      const items = b.items || [];
+      if (items.length === 0) return false;
+      return items.some((it: any) => {
+        const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
+        return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+      });
+    };
+
+    const [sampleBill, rawBills] = await Promise.all([
       this.billingModel
         .findOne({ patient: patientId })
         .populate('patient')
@@ -641,10 +674,13 @@ export class OrdersService {
         .exec(),
       this.billingModel
         .find({ patient: patientId })
+        .populate('user', 'role')
         .sort({ createdAt: -1 })
         .lean()
         .exec(),
     ]);
+
+    const bills = rawBills.filter(isPharmacyBill);
 
     const patient = sampleBill?.patient ?? null;
 
@@ -704,8 +740,8 @@ export class OrdersService {
     return data;
   }
 
-  updateOrder(dto: UpdateOrderDto) {
-    const order = this.orderModel
+  async updateOrder(dto: UpdateOrderDto) {
+    const order = await this.orderModel
       .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
       .lean();
     if (!order) {
@@ -738,8 +774,8 @@ export class OrdersService {
             userObjId,
             patientObj?.name || (order as any).customerName,
             patientObj?.phoneNumber ||
-              (order as any).customerPhone ||
-              patientObj?.phone,
+            (order as any).customerPhone ||
+            patientObj?.phone,
             (order as any).doctorName || (order as any).doctor,
             (order as any).pharmacistName || (order as any).pharmacist,
             patientObj?.mrn || (order as any).mrn,
@@ -798,33 +834,31 @@ export class OrdersService {
     newOrder.assignedTo = existOrder.assignedTo;
     const data = await this.orderModel.create(newOrder);
 
-    if (true) {
-      const items = await Promise.all(
-        data.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
+    const items = await Promise.all(
+      data.items.map(async (item) => {
+        const itemData = await this.itemsService.getItem(item.name);
 
-          const unitPrice = itemData.unitPrice;
-          const quantity = item.quantity;
+        const unitPrice = itemData.unitPrice;
+        const quantity = item.quantity;
 
-          return {
-            name: itemData.name,
-            unitPrice,
-            quantity,
-            discount: 0,
-            gst: 0,
-            total: unitPrice * quantity,
-          };
-        }),
-      );
+        return {
+          name: itemData.name,
+          unitPrice,
+          quantity,
+          discount: 0,
+          gst: 0,
+          total: unitPrice * quantity,
+        };
+      }),
+    );
 
-      await this.billingService.generateBill({
-        patient: data.patient,
-        items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-        discount: data.discount ?? 0,
-        doctor: existOrder.doctorName || 'Self',
-      });
-    }
+    await this.billingService.generateBill({
+      patient: data.patient,
+      items,
+      user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+      discount: data.discount ?? 0,
+      doctor: existOrder.doctorName || 'Self',
+    });
 
     return data;
   }

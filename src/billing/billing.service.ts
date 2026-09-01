@@ -924,12 +924,35 @@ export class BillingService {
     return data;
   }
 
-  async getSingleCustomerBill(q: string) {
-    const data = await this.billingModel
+  async getSingleCustomerBill(q: string, role?: string) {
+    let data = await this.billingModel
       .find({ patient: q })
       .populate('patient', 'name phoneNumber gender dateOfBirth mrn address')
+      .populate('user', 'name role email')
+      .sort({ createdAt: -1 })
       .lean()
       .exec();
+
+    if (role) {
+      data = data.filter((bill: any) => {
+        const userRole = (bill.user?.role || '').toLowerCase();
+        if (role.toLowerCase() === 'pharmacy') {
+          if (userRole.includes('pharmacy')) return true;
+          if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
+          if (bill.reportId || bill.tokenNumber || bill.token) return false;
+          const noteStr = String(bill.note || '').toLowerCase();
+          if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+          const items = bill.items || [];
+          if (items.length === 0) return false;
+          return items.some((it: any) => {
+            const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
+            return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+          });
+        }
+        return new RegExp(`^${role}$`, 'i').test(userRole);
+      });
+    }
+
     for (const bill of data) {
       if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
         const doc = await this.usersService.getUserById(bill.doctor);

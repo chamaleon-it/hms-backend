@@ -19,7 +19,7 @@ import mongoose from 'mongoose';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   //create
   @Post()
@@ -39,7 +39,7 @@ export class UsersController {
 
     return {
       data,
-      message: 'user profile retrived',
+      message: 'user profile retrieved',
     };
   }
 
@@ -53,16 +53,17 @@ export class UsersController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('doctors')
   async getAllDoctors() {
     const data = await this.usersService.getAllDoctors();
     return {
       data,
-      message: 'All doctors data retrived successfully',
+      message: 'All doctors data retrieved successfully',
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('role/:role')
   async getUsersByRole(@Param('role') role: string) {
     const data = await this.usersService.getUsersByRole(role);
@@ -72,13 +73,13 @@ export class UsersController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('pharmacy_wholesaler')
   async getAllPharmacyWholesaler() {
     const data = await this.usersService.getAllPharmacyWholesaler();
     return {
       data,
-      message: 'All pharmacy wholesaler data retrived successfully',
+      message: 'All pharmacy wholesaler data retrieved successfully',
     };
   }
 
@@ -125,10 +126,11 @@ export class UsersController {
   }
 
   @Get('doctor_availability/:id')
+  @UseGuards(JwtAuthGuard)
   async getDoctorAvailability(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.usersService.getDoctorAvailability(id);
     return {
-      message: 'Doctor availability retrived successfully',
+      message: 'Doctor availability retrieved successfully',
       data,
     };
   }
@@ -151,7 +153,7 @@ export class UsersController {
   async getConsultationValues(@GetUser() user: JWTUserInterface) {
     const data = await this.usersService.getConsultationValues(user.id);
     return {
-      message: 'Consultation value retrived successfully',
+      message: 'Consultation value retrieved successfully',
       data,
     };
   }

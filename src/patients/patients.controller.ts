@@ -21,10 +21,10 @@ import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 
 @Controller('patients')
+@UseGuards(JwtAuthGuard)
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(private readonly patientsService: PatientsService) { }
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async register(
     @Body() patientRegisterDto: PatientRegisterDto,
@@ -47,7 +47,7 @@ export class PatientsController {
     return {
       data,
       total,
-      message: 'All Patient data are retrived successfully',
+      message: 'All Patient data are retrieved successfully',
     };
   }
 
@@ -56,7 +56,7 @@ export class PatientsController {
     const data = await this.patientsService.getSinglePatient(id);
     return {
       data,
-      message: 'Patient data retrived successfully',
+      message: 'Patient data retrieved successfully',
     };
   }
 
@@ -77,7 +77,7 @@ export class PatientsController {
     const data = await this.patientsService.statistics();
     return {
       data,
-      message: 'Patient statistics retrived successfully',
+      message: 'Patient statistics retrieved successfully',
     };
   }
 

@@ -20,7 +20,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
@@ -40,7 +40,8 @@ export class UsersService {
     }
     createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     const user = await this.userModel.create(createUserDto);
-    return user;
+    const { password, ...data } = user.toObject();
+    return data;
   }
 
   async getProfile(user: JWTUserInterface) {

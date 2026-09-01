@@ -18,7 +18,7 @@ export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
-  ) {}
+  ) { }
 
   private async generateUniqueMRN(): Promise<string> {
     const lastRecord = await this.patientModel

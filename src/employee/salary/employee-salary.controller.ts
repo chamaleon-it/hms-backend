@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { EmployeeSalaryService } from './employee-salary.service';
 import {
@@ -15,10 +16,12 @@ import {
 } from './dto/create-salary.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
 import { PaySalaryDto } from './dto/pay-salary.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('employee-salary')
+@UseGuards(JwtAuthGuard)
 export class EmployeeSalaryController {
-  constructor(private readonly salaryService: EmployeeSalaryService) {}
+  constructor(private readonly salaryService: EmployeeSalaryService) { }
 
   @Post()
   async create(@Body() createSalaryDto: CreateSalaryDto) {

@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Param } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseGuards } from '@nestjs/common';
 import { BackupService } from './backup.service';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('backup')
+@UseGuards(JwtAuthGuard)
 export class BackupController {
-  constructor(private readonly backupService: BackupService) {}
+  constructor(private readonly backupService: BackupService) { }
 
   @Post('create')
   async createBackup() {

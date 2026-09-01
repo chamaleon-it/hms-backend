@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ReturnService } from './return.service';
 import { CreateReturnDto } from './dto/create-return.dto';
 import mongoose from 'mongoose';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('pharmacy/return')
+@UseGuards(JwtAuthGuard)
 export class ReturnController {
-  constructor(private readonly returnService: ReturnService) {}
+  constructor(private readonly returnService: ReturnService) { }
 
   @Post()
   async create(@Body() createReturnDto: CreateReturnDto) {
@@ -21,7 +23,7 @@ export class ReturnController {
     const data = await this.returnService.findAll();
     return {
       data,
-      message: 'All return retrived successfully',
+      message: 'All return retrieved successfully',
     };
   }
 
@@ -30,7 +32,7 @@ export class ReturnController {
     const data = await this.returnService.findByPatient(patientId);
     return {
       data,
-      message: 'Return data for the patient retrived successfully',
+      message: 'Return data for the patient retrieved successfully',
     };
   }
 
@@ -38,7 +40,7 @@ export class ReturnController {
   async findOne(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.returnService.findOne(id);
     return {
-      message: 'successfully retrived the return data',
+      message: 'successfully retrieved the return data',
       data,
     };
   }

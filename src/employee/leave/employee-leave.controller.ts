@@ -7,14 +7,17 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { EmployeeLeaveService } from './employee-leave.service';
 import { CreateLeaveDto } from './dto/create-leave.dto';
 import { UpdateLeaveDto, UpdateLeaveStatusDto } from './dto/update-leave.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('employee-leave')
+@UseGuards(JwtAuthGuard)
 export class EmployeeLeaveController {
-  constructor(private readonly leaveService: EmployeeLeaveService) {}
+  constructor(private readonly leaveService: EmployeeLeaveService) { }
 
   @Post()
   async create(@Body() createLeaveDto: CreateLeaveDto) {

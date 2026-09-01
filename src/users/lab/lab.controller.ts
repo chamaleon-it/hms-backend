@@ -10,7 +10,7 @@ import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 @Controller('users/lab')
 export class LabController {
-  constructor(private readonly labService: LabService) {}
+  constructor(private readonly labService: LabService) { }
 
   @Patch('general')
   @UseGuards(JwtAuthGuard)
@@ -52,12 +52,12 @@ export class LabController {
   }
 
   @Get('')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getLab() {
     const data = await this.labService.getLab();
     return {
       data,
-      message: 'All labs were retrived successfully.',
+      message: 'All labs were retrieved successfully.',
     };
   }
 

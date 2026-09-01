@@ -7,15 +7,18 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { TherapyService } from './therapy.service';
 import { CreateTherapyDto } from './dto/create-therapy.dto';
 import { UpdateTherapyDto } from './dto/update-therapy.dto';
 import { SubTherapyDto } from './dto/sub-therapy.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('therapy')
+@UseGuards(JwtAuthGuard)
 export class TherapyController {
-  constructor(private readonly therapyService: TherapyService) {}
+  constructor(private readonly therapyService: TherapyService) { }
 
   @Post()
   async create(@Body() dto: CreateTherapyDto): Promise<any> {

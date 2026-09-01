@@ -22,8 +22,9 @@ import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 @Controller('pharmacy/orders')
+@UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
@@ -42,7 +43,7 @@ export class OrdersController {
       total,
       page: Number(query.page),
       limit: Number(query.limit),
-      message: 'All orders where retrived successfully',
+      message: 'All orders where retrieved successfully',
     };
   }
 
@@ -51,7 +52,7 @@ export class OrdersController {
     const data = await this.ordersService.getSingleOrder(q);
     return {
       data,
-      message: 'Single order were retrived successfully',
+      message: 'Single order were retrieved successfully',
     };
   }
 
@@ -71,7 +72,7 @@ export class OrdersController {
       total,
       page: Number(query.page),
       limit: Number(query.limit),
-      message: 'All customers data were retrived successfully.',
+      message: 'All customers data were retrieved successfully.',
     };
   }
 
@@ -84,7 +85,7 @@ export class OrdersController {
     );
     return {
       data,
-      message: 'Customer data were retrived successfully.',
+      message: 'Customer data were retrieved successfully.',
     };
   }
 
@@ -110,7 +111,6 @@ export class OrdersController {
     };
   }
   @Patch('complete/:id')
-  @UseGuards(JwtAuthGuard)
   async completeOrder(
     @Param('id') id: mongoose.Types.ObjectId,
     @GetUser() user: JWTUserInterface,

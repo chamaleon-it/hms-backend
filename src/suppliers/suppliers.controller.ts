@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { RegisterSupplierDto } from './dto/register-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-suppllier.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('suppliers')
+@UseGuards(JwtAuthGuard)
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) {}
+  constructor(private readonly suppliersService: SuppliersService) { }
 
   @Post()
   async registerSupplier(@Body() dto: RegisterSupplierDto) {
@@ -18,7 +20,7 @@ export class SuppliersController {
   @Get()
   async findAll() {
     return {
-      message: 'All suppliers were retrived successfully',
+      message: 'All suppliers were retrieved successfully',
       data: await this.suppliersService.findAll(),
     };
   }
@@ -26,7 +28,7 @@ export class SuppliersController {
   @Get('get_id_and_name')
   async getIdAndName() {
     return {
-      message: 'Supplier id was retrived successfully',
+      message: 'Supplier id was retrieved successfully',
       data: await this.suppliersService.getIdAndName(),
     };
   }
@@ -34,7 +36,7 @@ export class SuppliersController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return {
-      message: 'Supplier was retrived successfully',
+      message: 'Supplier was retrieved successfully',
       data: await this.suppliersService.findOne(id),
     };
   }

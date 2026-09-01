@@ -22,7 +22,7 @@ import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) {}
+  constructor(private readonly reportService: ReportService) { }
   @Post()
   @UseGuards(JwtAuthGuard)
   async createReport(@Body() dto: CreateReportDto) {
@@ -42,11 +42,12 @@ export class ReportController {
     const data = await this.reportService.getReport(user.id, dto);
     return {
       data,
-      message: 'All Lab report retrived successfully.',
+      message: 'All Lab report retrieved successfully.',
     };
   }
 
   @Post('sample_collected/:id')
+  @UseGuards(JwtAuthGuard)
   async sampleCollected(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() dto: SampleCollectedDto,
@@ -59,6 +60,7 @@ export class ReportController {
   }
 
   @Post('start_test/:id')
+  @UseGuards(JwtAuthGuard)
   async startTest(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.startTest(id);
     return {
@@ -68,6 +70,7 @@ export class ReportController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async deleteReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.deleteReport(id);
     return {
@@ -97,6 +100,7 @@ export class ReportController {
   }
 
   @Get(`patient/:id`)
+  @UseGuards(JwtAuthGuard)
   async getPatientReports(@Param('id') patient: mongoose.Types.ObjectId) {
     const data = await this.reportService.getPatientReports(patient);
     return {
@@ -106,25 +110,28 @@ export class ReportController {
   }
 
   @Get('patients')
+  @UseGuards(JwtAuthGuard)
   async getPatients(@Query() query: any) {
     const { data, total } = await this.reportService.getPatients(query);
     return {
       data,
       total,
-      message: 'All patient data retrived',
+      message: 'All patient data retrieved',
     };
   }
 
   @Get('statistics')
+  @UseGuards(JwtAuthGuard)
   async getStatistics() {
     const data = await this.reportService.getStatistics();
     return {
       data,
-      message: 'All statistics retrived',
+      message: 'All statistics retrieved',
     };
   }
 
   @Post('mark_as_flagged/:id')
+  @UseGuards(JwtAuthGuard)
   async markAsFlagged(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.markAsFlagged(id);
     return {
@@ -133,6 +140,7 @@ export class ReportController {
     };
   }
   @Post('mark_as_unflagged/:id')
+  @UseGuards(JwtAuthGuard)
   async markAsUnflagged(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.markAsUnflagged(id);
     return {
@@ -142,6 +150,7 @@ export class ReportController {
   }
 
   @Post('reset_timer/:id')
+  @UseGuards(JwtAuthGuard)
   async resetTimer(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() dto: { duration: number },
@@ -154,6 +163,7 @@ export class ReportController {
   }
 
   @Post('recover/:id')
+  @UseGuards(JwtAuthGuard)
   async recoverReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.recoverReport(id);
     return {
@@ -163,6 +173,7 @@ export class ReportController {
   }
 
   @Post('repeat/:id')
+  @UseGuards(JwtAuthGuard)
   async repeatReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.repeatReport(id);
     return {
