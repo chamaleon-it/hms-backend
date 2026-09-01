@@ -49,13 +49,13 @@ export class AddItemDto {
   @IsNotEmpty({ message: 'Category is required.' })
   category!: string;
 
-  @IsOptional()
   @IsString({ message: 'Supplier must be a string.' })
   @Transform(trim)
+  @IsOptional()
   supplier?: string;
 
   @IsOptional()
-  @IsString({ message: 'Supplier must be a string.' })
+  @IsString({ message: 'Manufacturer must be a string.' })
   @Transform(trim)
   manufacturer?: string;
 
