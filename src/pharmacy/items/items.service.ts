@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import mongoose, { Model } from 'mongoose';
 import { AddItemDto } from './dto/add-items.dto';
@@ -13,11 +14,49 @@ import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
 
 @Injectable()
-export class ItemsService {
+export class ItemsService implements OnModuleInit {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
   ) { }
+
+  async onModuleInit() {
+    this.syncItemQuantitiesFromBatches().catch((err) => {
+      console.error('Failed to sync item quantities from batches:', err);
+    });
+  }
+
+  async syncItemQuantitiesFromBatches() {
+    try {
+      const itemsWithBatches = await this.itemModel
+        .find({ 'batches.0': { $exists: true } })
+        .select('_id quantity batches')
+        .lean();
+
+      const bulkOps: any[] = [];
+      for (const item of itemsWithBatches) {
+        const batchTotal = (item.batches || []).reduce(
+          (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+          0,
+        );
+        if (item.quantity !== batchTotal) {
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: item._id },
+              update: { $set: { quantity: batchTotal } },
+            },
+          });
+        }
+      }
+
+      if (bulkOps.length > 0) {
+        await this.itemModel.bulkWrite(bulkOps);
+        console.log(`[ItemsService] Synced quantity for ${bulkOps.length} items from batches.`);
+      }
+    } catch (err) {
+      console.error('Error syncing item quantities from batches:', err);
+    }
+  }
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -187,12 +226,21 @@ export class ItemsService {
         : Promise.resolve(0),
     ]);
 
-    // const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
-    //   ...filter,
-    //   quantity: { $lte: Number(lowStockThreshold ?? 20) },
-    // }) : 0;
+    const processedItems = items.map((item: any) => {
+      if (item.batches && item.batches.length > 0) {
+        const totalBatchQty = item.batches.reduce(
+          (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+          0,
+        );
+        return {
+          ...item,
+          quantity: totalBatchQty,
+        };
+      }
+      return item;
+    });
 
-    return { items, total, lowStockCount };
+    return { items: processedItems, total, lowStockCount };
   }
 
   async getItem(id: mongoose.Types.ObjectId) {
@@ -204,6 +252,13 @@ export class ItemsService {
 
     if (!data) {
       throw new NotFoundException('Item not found.');
+    }
+
+    if (data.batches && data.batches.length > 0) {
+      data.quantity = data.batches.reduce(
+        (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+        0,
+      );
     }
 
     return data;
@@ -329,6 +384,13 @@ export class ItemsService {
       });
     }
 
+    if (item.batches && item.batches.length > 0) {
+      item.quantity = item.batches.reduce(
+        (sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+        0,
+      );
+    }
+
     await item.save();
     return item;
   }
@@ -372,6 +434,13 @@ export class ItemsService {
       if (targetBatch) {
         targetBatch.quantity += quantity;
       }
+    }
+
+    if (item.batches && item.batches.length > 0) {
+      item.quantity = item.batches.reduce(
+        (sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+        0,
+      );
     }
 
     await item.save();
