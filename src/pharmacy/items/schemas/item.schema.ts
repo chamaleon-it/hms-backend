@@ -143,6 +143,7 @@ export class Item {
         schemaAmt: { type: Number, default: 0 },
         total: { type: Number, default: 0 },
         supplier: { type: String, required: true },
+        isDeleted: { type: Boolean, default: false },
         createdAt: { type: Date, default: Date.now },
       },
     ],
@@ -161,6 +162,7 @@ export class Item {
     schemaAmt?: number;
     total?: number;
     supplier: string;
+    isDeleted?: boolean;
     createdAt: Date;
   }[];
 }

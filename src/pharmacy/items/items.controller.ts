@@ -161,6 +161,19 @@ export class ItemsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/batches/:batchId')
+  async deleteBatchItem(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.itemsService.deleteBatchItem(id, batchId);
+    return {
+      data,
+      message: 'Batch deleted successfully',
+    };
+  }
+
   @Get('addmrp')
   async addMrp() {
     const data = await this.itemsService.addMRP();
