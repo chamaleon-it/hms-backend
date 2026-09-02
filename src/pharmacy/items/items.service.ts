@@ -13,6 +13,9 @@ import { GetItemsDto } from './dto/get-items.dto';
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
 
+export const isBatchActive = (b: any): boolean =>
+  Boolean(b && !b.isDeleted && b.isActive !== false && b.status !== 'Inactive');
+
 @Injectable()
 export class ItemsService implements OnModuleInit {
   constructor(
@@ -36,7 +39,7 @@ export class ItemsService implements OnModuleInit {
       const bulkOps: any[] = [];
       for (const item of itemsWithBatches) {
         const batchTotal = (item.batches || [])
-          .filter((b: any) => !b.isDeleted)
+          .filter((b: any) => isBatchActive(b))
           .reduce(
             (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
             0,
@@ -230,14 +233,15 @@ export class ItemsService implements OnModuleInit {
 
     const processedItems = items.map((item: any) => {
       if (item.batches && item.batches.length > 0) {
-        const activeBatches = item.batches.filter((b: any) => !b.isDeleted);
+        const nonDeletedBatches = item.batches.filter((b: any) => !b.isDeleted);
+        const activeBatches = nonDeletedBatches.filter((b: any) => isBatchActive(b));
         const totalBatchQty = activeBatches.reduce(
           (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
           0,
         );
         return {
           ...item,
-          batches: activeBatches,
+          batches: nonDeletedBatches,
           quantity: totalBatchQty,
         };
       }
@@ -260,10 +264,12 @@ export class ItemsService implements OnModuleInit {
 
     if (data.batches && data.batches.length > 0) {
       data.batches = data.batches.filter((b: any) => !b.isDeleted);
-      data.quantity = data.batches.reduce(
-        (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
-        0,
-      );
+      data.quantity = data.batches
+        .filter((b: any) => isBatchActive(b))
+        .reduce(
+          (sum: number, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
+          0,
+        );
     }
 
     return data;
@@ -334,7 +340,7 @@ export class ItemsService implements OnModuleInit {
     }
 
     if (item.batches && item.batches.length > 0 && quantity > 0) {
-      const activeBatches = (item.batches as any[]).filter((b: any) => !b.isDeleted);
+      const activeBatches = (item.batches as any[]).filter((b: any) => isBatchActive(b));
       let targetBatch: any = null;
 
       if (batchIdOrNumber) {
@@ -392,7 +398,7 @@ export class ItemsService implements OnModuleInit {
 
     if (item.batches && item.batches.length > 0) {
       item.quantity = (item.batches as any[])
-        .filter((b: any) => !b.isDeleted)
+        .filter((b: any) => isBatchActive(b))
         .reduce(
           (sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
           0,
@@ -419,7 +425,7 @@ export class ItemsService implements OnModuleInit {
     }
 
     if (item.batches && item.batches.length > 0 && quantity > 0) {
-      const activeBatches = (item.batches as any[]).filter((b: any) => !b.isDeleted);
+      const activeBatches = (item.batches as any[]).filter((b: any) => isBatchActive(b));
       let targetBatch: any = null;
       if (batchIdOrNumber) {
         const targetStr = String(batchIdOrNumber).trim();
@@ -447,7 +453,7 @@ export class ItemsService implements OnModuleInit {
 
     if (item.batches && item.batches.length > 0) {
       item.quantity = (item.batches as any[])
-        .filter((b: any) => !b.isDeleted)
+        .filter((b: any) => isBatchActive(b))
         .reduce(
           (sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
           0,
@@ -504,12 +510,13 @@ export class ItemsService implements OnModuleInit {
     item.purchasePrice = batchData.purchasePrice;
     item.supplier = batchData.supplier;
 
-    // Auto-set active batch: nearest future expiry (skip expired batches)
+    // Auto-set active batch: nearest future expiry (skip expired or inactive batches)
     const now = new Date();
     let nearestBatch: any = null;
     let nearestExpiry: Date | null = null;
 
     for (const batch of item.batches as any[]) {
+      if (!isBatchActive(batch)) continue;
       const exp = new Date(batch.expiryDate);
       if (exp > now) {
         if (!nearestExpiry || exp < nearestExpiry) {
@@ -522,7 +529,11 @@ export class ItemsService implements OnModuleInit {
     const lastBatch = item.batches.length
       ? (item.batches[item.batches.length - 1] as any)
       : null;
-    item.activeBatch = nearestBatch?._id ?? lastBatch?._id ?? null;
+    item.activeBatch = nearestBatch?._id ?? (isBatchActive(lastBatch) ? lastBatch?._id : null);
+
+    item.quantity = (item.batches as any[])
+      .filter((b: any) => isBatchActive(b))
+      .reduce((sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0), 0);
 
     await item.save();
 
@@ -541,6 +552,10 @@ export class ItemsService implements OnModuleInit {
     const batch = (item.batches as any).id(batchId);
     if (!batch) {
       throw new BadRequestException('Batch not found in this item.');
+    }
+
+    if (!isBatchActive(batch)) {
+      throw new BadRequestException('Inactive batch cannot be set as active batch.');
     }
 
     item.activeBatch = batchId;
@@ -576,11 +591,26 @@ export class ItemsService implements OnModuleInit {
     if (updateBatchDto.schemaAmt !== undefined) batch.schemaAmt = updateBatchDto.schemaAmt;
     if (updateBatchDto.total !== undefined) batch.total = updateBatchDto.total;
     if (updateBatchDto.supplier !== undefined) batch.supplier = updateBatchDto.supplier;
+    if (updateBatchDto.isActive !== undefined) {
+      batch.isActive = updateBatchDto.isActive;
+      batch.status = updateBatchDto.isActive ? 'Active' : 'Inactive';
+    }
+    if (updateBatchDto.status !== undefined) {
+      batch.status = updateBatchDto.status;
+      batch.isActive = updateBatchDto.status.toLowerCase() === 'active';
+    }
 
-    // Recalculate total item quantity from all non-deleted batches
-    item.quantity = (item.batches as any[])
-      .filter((b: any) => !b.isDeleted)
-      .reduce((sum, b: any) => sum + (b.quantity || 0), 0);
+    // Recalculate total item quantity from all non-deleted active batches
+    const activeBatches = (item.batches as any[]).filter((b: any) => isBatchActive(b));
+    item.quantity = activeBatches.reduce((sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0), 0);
+
+    // If edited batch became inactive and was activeBatch, switch
+    if (!isBatchActive(batch) && item.activeBatch && String(item.activeBatch) === String(batchId)) {
+      const remainingWithStock = activeBatches.filter(
+        (b: any) => (Number(b.quantity) || 0) > 0,
+      );
+      item.activeBatch = remainingWithStock[0]?._id ?? activeBatches[0]?._id ?? null;
+    }
 
     // If edited batch is active batch or sole batch, sync item-level fields
     const isActive = item.activeBatch && String(item.activeBatch) === String(batchId);
@@ -598,9 +628,10 @@ export class ItemsService implements OnModuleInit {
     return item;
   }
 
-  async deleteBatchItem(
+  async toggleBatchStatus(
     itemId: mongoose.Types.ObjectId,
     batchId: mongoose.Types.ObjectId,
+    status?: boolean | string,
   ) {
     const item = await this.itemModel.findById(itemId);
     if (!item) {
@@ -612,18 +643,27 @@ export class ItemsService implements OnModuleInit {
       throw new BadRequestException('Batch not found in this item.');
     }
 
-    // Soft delete
-    batch.isDeleted = true;
+    let newIsActive: boolean;
+    if (typeof status === 'boolean') {
+      newIsActive = status;
+    } else if (typeof status === 'string') {
+      newIsActive = status.toLowerCase() === 'active';
+    } else {
+      newIsActive = !isBatchActive(batch);
+    }
 
-    // Recalculate total item quantity from all non-deleted batches
-    const activeBatches = (item.batches as any[]).filter((b: any) => !b.isDeleted);
+    batch.isActive = newIsActive;
+    batch.status = newIsActive ? 'Active' : 'Inactive';
+
+    // Recalculate total item quantity from all non-deleted active batches
+    const activeBatches = (item.batches as any[]).filter((b: any) => isBatchActive(b));
     item.quantity = activeBatches.reduce(
       (sum, b: any) => sum + Math.max(0, Number(b.quantity) || 0),
       0,
     );
 
-    // If the deleted batch was the active batch, switch to another non-deleted batch with stock or first active
-    if (item.activeBatch && String(item.activeBatch) === String(batchId)) {
+    // If deactivated batch was the active batch, switch to another active batch with stock or first active
+    if (!newIsActive && item.activeBatch && String(item.activeBatch) === String(batchId)) {
       const remainingWithStock = activeBatches.filter(
         (b: any) => (Number(b.quantity) || 0) > 0,
       );
@@ -632,6 +672,14 @@ export class ItemsService implements OnModuleInit {
 
     await item.save();
     return item;
+  }
+
+  async deleteBatchItem(
+    itemId: mongoose.Types.ObjectId,
+    batchId: mongoose.Types.ObjectId,
+  ) {
+    // Instead of deleting, mark inactive as requested
+    return this.toggleBatchStatus(itemId, batchId, false);
   }
 
   async getSuppliers() {

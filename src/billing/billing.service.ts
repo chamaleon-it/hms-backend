@@ -70,16 +70,21 @@ export class BillingService {
           .lean();
 
         if (foundItem) {
+          const isBatchActive = (b: any) =>
+            b && !b.isDeleted && b.isActive !== false && b.status !== 'Inactive';
+
           let activeBatchData = foundItem.activeBatch
             ? foundItem.batches?.find(
-                (b: any) => String(b._id) === String(foundItem.activeBatch),
+                (b: any) =>
+                  String(b._id) === String(foundItem.activeBatch) &&
+                  isBatchActive(b),
               )
             : null;
 
           if (!activeBatchData && foundItem.batches?.length) {
             const now = new Date();
             const futureBatches = foundItem.batches
-              .filter((b: any) => new Date(b.expiryDate) > now)
+              .filter((b: any) => isBatchActive(b) && new Date(b.expiryDate) > now)
               .sort(
                 (a: any, b: any) =>
                   new Date(a.expiryDate).getTime() -
@@ -87,7 +92,7 @@ export class BillingService {
               );
             activeBatchData =
               futureBatches[0] ||
-              foundItem.batches[foundItem.batches.length - 1];
+              foundItem.batches.filter((b: any) => isBatchActive(b)).pop();
           }
 
           if (activeBatchData) {

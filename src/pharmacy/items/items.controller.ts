@@ -162,6 +162,20 @@ export class ItemsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Patch(':id/batches/:batchId/status')
+  async toggleBatchStatus(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: mongoose.Types.ObjectId,
+    @Body('status') status?: boolean | string,
+  ) {
+    const data = await this.itemsService.toggleBatchStatus(id, batchId, status);
+    return {
+      data,
+      message: 'Batch status updated successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id/batches/:batchId')
   async deleteBatchItem(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -170,7 +184,7 @@ export class ItemsController {
     const data = await this.itemsService.deleteBatchItem(id, batchId);
     return {
       data,
-      message: 'Batch deleted successfully',
+      message: 'Batch marked as inactive',
     };
   }
 

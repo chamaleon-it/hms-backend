@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsInt,
   IsNumber,
@@ -105,4 +106,12 @@ export class UpdateBatchDto {
   @IsString({ message: 'Supplier must be a string.' })
   @Transform(trim)
   supplier?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

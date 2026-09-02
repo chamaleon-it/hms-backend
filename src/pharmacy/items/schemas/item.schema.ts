@@ -143,6 +143,8 @@ export class Item {
         schemaAmt: { type: Number, default: 0 },
         total: { type: Number, default: 0 },
         supplier: { type: String, required: true },
+        isActive: { type: Boolean, default: true },
+        status: { type: String, default: 'Active' },
         isDeleted: { type: Boolean, default: false },
         createdAt: { type: Date, default: Date.now },
       },
@@ -162,6 +164,8 @@ export class Item {
     schemaAmt?: number;
     total?: number;
     supplier: string;
+    isActive?: boolean;
+    status?: string;
     isDeleted?: boolean;
     createdAt: Date;
   }[];
