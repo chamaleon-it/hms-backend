@@ -61,7 +61,7 @@ export class PurchaseEntryService {
     return await this.purchaseEntryModel
       .find({ supplier: id })
       .populate('supplier', 'name paymentTerms balance')
-      .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .populate('items.item', 'name generic hsnCode sku unitPrice mrp')
       .exec();
   }
 
@@ -69,7 +69,7 @@ export class PurchaseEntryService {
     return await this.purchaseEntryModel
       .findById(id)
       .populate('supplier', 'name paymentTerms balance')
-      .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .populate('items.item', 'name generic hsnCode sku unitPrice mrp')
       .exec();
   }
 
