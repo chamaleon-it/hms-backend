@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -50,8 +50,10 @@ export class CreateOrderDto {
   @IsOptional()
   mrn?: string;
 
+  @Transform(({ value }) => (!value || value === '' ? undefined : value))
   @IsMongoId({ message: 'Patient ID must be a valid MongoDB ObjectId' })
-  patient: mongoose.Types.ObjectId;
+  @IsOptional()
+  patient?: mongoose.Types.ObjectId;
 
   @IsOptional()
   doctor: mongoose.Types.ObjectId;

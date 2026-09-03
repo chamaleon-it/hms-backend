@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsMongoId,
@@ -59,9 +59,10 @@ export class CreateBillingDto {
   @IsOptional()
   user!: mongoose.Types.ObjectId;
 
+  @Transform(({ value }) => (!value || value === '' ? undefined : value))
   @IsMongoId()
-  @IsNotEmpty()
-  patient: mongoose.Types.ObjectId;
+  @IsOptional()
+  patient?: mongoose.Types.ObjectId;
 
   @IsString()
   @IsOptional()

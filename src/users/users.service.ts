@@ -75,7 +75,14 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found.');
     }
-    return user.pharmacy.billing;
+    return user?.pharmacy?.billing ?? {
+      prefix: 'INV',
+      defaultGst: 5,
+      roundOff: false,
+      autoPrintAfterSave: false,
+      autoGenerateBill: false,
+      autoGeneratePrescription: false,
+    };
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {

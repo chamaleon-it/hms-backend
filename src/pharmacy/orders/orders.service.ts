@@ -103,7 +103,7 @@ export class OrdersService {
 
       data.billNo = bill.mrn;
 
-      if (order.allergies) {
+      if (order.allergies && order.patient) {
         await this.patientModel.findByIdAndUpdate(order.patient, {
           allergies: order.allergies,
         });
