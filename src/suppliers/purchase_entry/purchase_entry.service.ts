@@ -52,18 +52,98 @@ export class PurchaseEntryService {
     return data;
   }
 
+  async findAll(query?: {
+    search?: string;
+    status?: string;
+    supplier?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number | string;
+    limit?: number | string;
+  }) {
+    const filter: any = {};
+    if (query?.supplier) {
+      filter.supplier = query.supplier;
+    }
+    if (query?.status && query.status !== 'all') {
+      filter.paymentStatus = query.status;
+    }
+    if (query?.search && query.search.trim()) {
+      filter.invoiceNumber = { $regex: query.search.trim(), $options: 'i' };
+    }
+    if (query?.startDate || query?.endDate) {
+      const dateCond: any = {};
+      if (query.startDate) dateCond.$gte = new Date(query.startDate);
+      if (query.endDate) {
+        const end = new Date(query.endDate);
+        if (typeof query.endDate === 'string' && query.endDate.length <= 10) {
+          end.setHours(23, 59, 59, 999);
+        }
+        dateCond.$lte = end;
+      }
+      filter.$or = [
+        { invoiceDate: dateCond },
+        { createdAt: dateCond },
+      ];
+    }
+
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Number(query?.limit) || 10);
+    const skip = (page - 1) * limit;
+
+    const total = await this.purchaseEntryModel.countDocuments(filter).exec();
+
+    // Calculate summary statistics across matching entries
+    const summaryAgg = await this.purchaseEntryModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalValue: { $sum: '$total' },
+          totalPaid: { $sum: '$paidAmount' },
+        },
+      },
+    ]);
+
+    const stats = {
+      totalEntries: total,
+      totalValue: summaryAgg[0]?.totalValue || 0,
+      totalPaid: summaryAgg[0]?.totalPaid || 0,
+      totalDue: Math.max(0, (summaryAgg[0]?.totalValue || 0) - (summaryAgg[0]?.totalPaid || 0)),
+    };
+
+    const data = await this.purchaseEntryModel
+      .find(filter)
+      .populate('supplier', 'name phone contactPerson email gstin address paymentTerms balance')
+      .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      stats,
+    };
+  }
+
   async findBySupplier(id: string) {
     return await this.purchaseEntryModel
       .find({ supplier: id })
-      .populate('supplier', 'name paymentTerms balance')
+      .populate('supplier', 'name phone contactPerson email gstin address paymentTerms balance')
       .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .sort({ createdAt: -1 })
       .exec();
   }
 
   async findById(id: string) {
     return await this.purchaseEntryModel
       .findById(id)
-      .populate('supplier', 'name paymentTerms balance')
+      .populate('supplier', 'name phone contactPerson email gstin address paymentTerms balance')
       .populate('items.item', 'name generic hsnCode sku unitPrice')
       .exec();
   }

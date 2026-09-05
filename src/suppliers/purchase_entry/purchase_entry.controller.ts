@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { PurchaseEntryService } from './purchase_entry.service';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
@@ -17,8 +17,17 @@ export class PurchaseEntryController {
     };
   }
 
+  @Get()
+  async findAll(@Query() query: any) {
+    const result = await this.purchaseEntryService.findAll(query);
+    return {
+      ...result,
+      message: 'Purchase Entries Retrieved Successfully',
+    };
+  }
+
   @Get('/supplier/:id')
-  async findAll(@Param('id') id: string) {
+  async findBySupplier(@Param('id') id: string) {
     return {
       data: await this.purchaseEntryService.findBySupplier(id),
       message: 'Purchase Entry Found Successfully',
