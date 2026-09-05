@@ -343,8 +343,11 @@ export class BillingService {
       const dayEnd = new Date(date);
       dayEnd.setHours(23, 59, 59, 999);
       match.createdAt = { $gte: dayStart, $lte: dayEnd };
-    } else if (startDate && endDate) {
-      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    } else if (startDate || endDate) {
+      const dateFilter: any = {};
+      if (startDate) dateFilter.$gte = new Date(startDate);
+      if (endDate) dateFilter.$lte = new Date(endDate);
+      match.createdAt = dateFilter;
     }
 
     if (method) {
