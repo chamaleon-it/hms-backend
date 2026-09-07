@@ -186,6 +186,91 @@ export class ItemsService {
     return { items, total, lowStockCount };
   }
 
+  async getInventoryStats(lowStockThreshold = 20) {
+    const threshold = Number(lowStockThreshold) || 20;
+    const baseFilter = { status: { $ne: ItemStatus.Deleted } };
+
+    const [statsResult, highestMoving, lowestMoving] = await Promise.all([
+      this.itemModel.aggregate([
+        { $match: baseFilter },
+        {
+          $group: {
+            _id: null,
+            totalItems: { $sum: 1 },
+            totalQuantity: { $sum: '$quantity' },
+            totalValue: {
+              $sum: {
+                $multiply: [
+                  { $max: ['$quantity', 0] },
+                  { $ifNull: ['$unitPrice', 0] },
+                ],
+              },
+            },
+            outOfStockCount: {
+              $sum: { $cond: [{ $lte: ['$quantity', 0] }, 1, 0] },
+            },
+            lowStockCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $gt: ['$quantity', 0] },
+                      { $lte: ['$quantity', threshold] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+      this.itemModel
+        .findOne({ ...baseFilter, soldQuantity: { $gt: 0 } })
+        .sort({ soldQuantity: -1 })
+        .select('name generic sku soldQuantity unitPrice')
+        .lean(),
+      this.itemModel
+        .findOne(baseFilter)
+        .sort({ soldQuantity: 1 })
+        .select('name generic sku soldQuantity unitPrice')
+        .lean(),
+    ]);
+
+    const stats = statsResult[0] || {
+      totalItems: 0,
+      totalQuantity: 0,
+      totalValue: 0,
+      outOfStockCount: 0,
+      lowStockCount: 0,
+    };
+
+    return {
+      totalValue: stats.totalValue || 0,
+      totalItems: stats.totalItems || 0,
+      totalQuantity: stats.totalQuantity || 0,
+      lowStockCount: stats.lowStockCount || 0,
+      outOfStockCount: stats.outOfStockCount || 0,
+      highestMoving: highestMoving
+        ? {
+            id: (highestMoving as any)._id,
+            name: (highestMoving as any).name,
+            generic: (highestMoving as any).generic,
+            soldQuantity: (highestMoving as any).soldQuantity || 0,
+          }
+        : null,
+      lowestMoving: lowestMoving
+        ? {
+            id: (lowestMoving as any)._id,
+            name: (lowestMoving as any).name,
+            generic: (lowestMoving as any).generic,
+            soldQuantity: (lowestMoving as any).soldQuantity || 0,
+          }
+        : null,
+    };
+  }
+
   async getItem(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');
