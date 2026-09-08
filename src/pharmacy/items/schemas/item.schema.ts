@@ -102,7 +102,7 @@ export class Item {
   @Prop({ type: String, default: '-' })
   rackLocation: string;
 
-  @Prop({ type: Number, default: 0 })
+  @Prop({ type: Number, default: 1, min: 1 })
   packing: number;
 
   @Prop({ type: Number, default: 0 })

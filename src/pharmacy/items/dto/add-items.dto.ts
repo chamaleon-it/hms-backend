@@ -114,6 +114,8 @@ export class AddItemDto {
   rackLocation?: string;
 
   @IsOptional()
+  @IsNumber({}, { message: 'Packing must be a number.' })
+  @Min(1, { message: 'Packing must be at least 1.' })
   packing?: number;
 
   @IsOptional()

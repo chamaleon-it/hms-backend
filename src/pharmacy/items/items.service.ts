@@ -66,6 +66,10 @@ export class ItemsService {
       addItemDto.manufacturer = '-';
     }
 
+    if (addItemDto.packing === undefined || addItemDto.packing < 1) {
+      addItemDto.packing = 1;
+    }
+
     const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
 
     const data = await this.itemModel.create({
@@ -288,6 +292,10 @@ export class ItemsService {
   async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');
+    }
+
+    if (addItemDto.packing !== undefined && addItemDto.packing < 1) {
+      addItemDto.packing = 1;
     }
 
     const data = await this.itemModel
