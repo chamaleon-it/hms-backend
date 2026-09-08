@@ -201,23 +201,56 @@ export class ItemsService {
           $group: {
             _id: null,
             totalItems: { $sum: 1 },
-            totalQuantity: { $sum: '$quantity' },
+            totalQuantity: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $isNumber: '$quantity' },
+                      { $gt: ['$quantity', 0] },
+                    ],
+                  },
+                  '$quantity',
+                  0,
+                ],
+              },
+            },
             totalValue: {
               $sum: {
-                $multiply: [
-                  { $max: ['$quantity', 0] },
-                  { $ifNull: ['$unitPrice', 0] },
+                $cond: [
+                  {
+                    $and: [
+                      { $isNumber: '$quantity' },
+                      { $gt: ['$quantity', 0] },
+                      { $isNumber: '$unitPrice' },
+                      { $gt: ['$unitPrice', 0] },
+                    ],
+                  },
+                  { $multiply: ['$quantity', '$unitPrice'] },
+                  0,
                 ],
               },
             },
             outOfStockCount: {
-              $sum: { $cond: [{ $lte: ['$quantity', 0] }, 1, 0] },
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $not: [{ $isNumber: '$quantity' }] },
+                      { $lte: ['$quantity', 0] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
             },
             lowStockCount: {
               $sum: {
                 $cond: [
                   {
                     $and: [
+                      { $isNumber: '$quantity' },
                       { $gt: ['$quantity', 0] },
                       { $lte: ['$quantity', threshold] },
                     ],
@@ -250,10 +283,22 @@ export class ItemsService {
       lowStockCount: 0,
     };
 
+    const rawTotalValue = Number(stats.totalValue);
+    const safeTotalValue =
+      Number.isFinite(rawTotalValue) && !isNaN(rawTotalValue)
+        ? Math.round(rawTotalValue * 100) / 100
+        : 0;
+
+    const rawTotalQuantity = Number(stats.totalQuantity);
+    const safeTotalQuantity =
+      Number.isFinite(rawTotalQuantity) && !isNaN(rawTotalQuantity)
+        ? Math.round(rawTotalQuantity * 100) / 100
+        : 0;
+
     return {
-      totalValue: stats.totalValue || 0,
+      totalValue: safeTotalValue,
       totalItems: stats.totalItems || 0,
-      totalQuantity: stats.totalQuantity || 0,
+      totalQuantity: safeTotalQuantity,
       lowStockCount: stats.lowStockCount || 0,
       outOfStockCount: stats.outOfStockCount || 0,
       highestMoving: highestMoving
