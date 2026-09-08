@@ -251,6 +251,161 @@ export class ItemsService implements OnModuleInit {
     return { items: processedItems, total, lowStockCount };
   }
 
+  async getInventoryStats(lowStockThreshold = 20) {
+    const threshold = Number(lowStockThreshold) || 20;
+    const baseFilter = { status: { $ne: ItemStatus.Deleted } };
+
+    const pipeline: any[] = [
+      { $match: baseFilter },
+      {
+        $addFields: {
+          activeBatches: {
+            $filter: {
+              input: { $ifNull: ['$batches', []] },
+              as: 'b',
+              cond: {
+                $and: [
+                  { $ne: ['$$b.isDeleted', true] },
+                  { $ne: ['$$b.isActive', false] },
+                  { $ne: ['$$b.status', 'Inactive'] },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          itemEffectiveStock: {
+            $cond: [
+              { $gt: [{ $size: { $ifNull: ['$batches', []] } }, 0] },
+              {
+                $reduce: {
+                  input: '$activeBatches',
+                  initialValue: 0,
+                  in: {
+                    $add: [
+                      '$$value',
+                      { $max: [{ $ifNull: ['$$this.quantity', 0] }, 0] },
+                    ],
+                  },
+                },
+              },
+              { $max: [{ $ifNull: ['$quantity', 0] }, 0] },
+            ],
+          },
+          itemEffectiveValue: {
+            $cond: [
+              { $gt: [{ $size: { $ifNull: ['$batches', []] } }, 0] },
+              {
+                $reduce: {
+                  input: '$activeBatches',
+                  initialValue: 0,
+                  in: {
+                    $add: [
+                      '$$value',
+                      {
+                        $multiply: [
+                          { $max: [{ $ifNull: ['$$this.quantity', 0] }, 0] },
+                          {
+                            $cond: [
+                              {
+                                $gt: [{ $ifNull: ['$$this.unitPrice', 0] }, 0],
+                              },
+                              '$$this.unitPrice',
+                              { $ifNull: ['$unitPrice', 0] },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+              {
+                $multiply: [
+                  { $max: [{ $ifNull: ['$quantity', 0] }, 0] },
+                  { $ifNull: ['$unitPrice', 0] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalItems: { $sum: 1 },
+          totalQuantity: { $sum: '$itemEffectiveStock' },
+          totalValue: { $sum: '$itemEffectiveValue' },
+          outOfStockCount: {
+            $sum: { $cond: [{ $lte: ['$itemEffectiveStock', 0] }, 1, 0] },
+          },
+          lowStockCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gt: ['$itemEffectiveStock', 0] },
+                    { $lte: ['$itemEffectiveStock', threshold] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    const [statsResult, highestMoving, lowestMoving] = await Promise.all([
+      this.itemModel.aggregate(pipeline),
+      this.itemModel
+        .findOne({ ...baseFilter, soldQuantity: { $gt: 0 } })
+        .sort({ soldQuantity: -1 })
+        .select('name generic sku soldQuantity unitPrice')
+        .lean(),
+      this.itemModel
+        .findOne(baseFilter)
+        .sort({ soldQuantity: 1 })
+        .select('name generic sku soldQuantity unitPrice')
+        .lean(),
+    ]);
+
+    const stats = statsResult[0] || {
+      totalItems: 0,
+      totalQuantity: 0,
+      totalValue: 0,
+      outOfStockCount: 0,
+      lowStockCount: 0,
+    };
+
+    return {
+      totalValue: Math.round((stats.totalValue || 0) * 100) / 100,
+      totalItems: stats.totalItems || 0,
+      totalQuantity: Math.round((stats.totalQuantity || 0) * 100) / 100,
+      lowStockCount: stats.lowStockCount || 0,
+      outOfStockCount: stats.outOfStockCount || 0,
+      highestMoving: highestMoving
+        ? {
+            id: (highestMoving as any)._id,
+            name: (highestMoving as any).name,
+            generic: (highestMoving as any).generic,
+            soldQuantity: (highestMoving as any).soldQuantity || 0,
+          }
+        : null,
+      lowestMoving: lowestMoving
+        ? {
+            id: (lowestMoving as any)._id,
+            name: (lowestMoving as any).name,
+            generic: (lowestMoving as any).generic,
+            soldQuantity: (lowestMoving as any).soldQuantity || 0,
+          }
+        : null,
+    };
+  }
+
   async getItem(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');

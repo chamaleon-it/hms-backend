@@ -61,6 +61,18 @@ export class ItemsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('stats')
+  async getInventoryStats(
+    @Query('lowStockThreshold') lowStockThreshold?: number,
+  ) {
+    const data = await this.itemsService.getInventoryStats(lowStockThreshold);
+    return {
+      data,
+      message: 'Inventory stats retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getItem(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.itemsService.getItem(id);
