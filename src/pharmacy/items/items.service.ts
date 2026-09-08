@@ -474,6 +474,39 @@ export class ItemsService {
     return item;
   }
 
+  async deleteBatch(
+    id: mongoose.Types.ObjectId,
+    batchId: string,
+    deductStock = false,
+  ) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    const batchIndex = item.batches.findIndex(
+      (b: any) =>
+        b._id?.toString() === batchId.toString() ||
+        b.batchNumber === batchId,
+    );
+
+    if (batchIndex === -1) {
+      throw new BadRequestException('Batch not found');
+    }
+
+    const batch = item.batches[batchIndex];
+
+    if (deductStock) {
+      item.quantity = Math.max(0, (item.quantity || 0) - (Number(batch.quantity) || 0));
+    }
+
+    item.batches.splice(batchIndex, 1);
+
+    await item.save();
+
+    return item;
+  }
+
   async getSuppliers() {
     const data = await this.itemModel.distinct('supplier').lean();
     return data.filter((supplier) => supplier !== '' && supplier !== '-');

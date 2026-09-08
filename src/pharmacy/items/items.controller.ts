@@ -85,6 +85,36 @@ export class ItemsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Delete(':id/batches/:batchId')
+  async deleteBatch(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: string,
+    @Query('deductStock') deductStock?: string,
+  ) {
+    const shouldDeduct = deductStock === 'true';
+    const data = await this.itemsService.deleteBatch(id, batchId, shouldDeduct);
+    return {
+      data,
+      message: 'Batch deleted successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('delete_batch/:id/:batchId')
+  async deleteBatchAlias(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: string,
+    @Query('deductStock') deductStock?: string,
+  ) {
+    const shouldDeduct = deductStock === 'true';
+    const data = await this.itemsService.deleteBatch(id, batchId, shouldDeduct);
+    return {
+      data,
+      message: 'Batch deleted successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async deleteItem(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.itemsService.deleteItem(id);
