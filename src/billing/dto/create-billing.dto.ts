@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   IsArray,
   IsMongoId,
@@ -54,14 +54,44 @@ export class CreateBillingItemDto {
   expiryDate?: Date;
 }
 
+export class BillingCustomerDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsOptional()
+  age?: number;
+
+  @IsString()
+  @IsOptional()
+  gender?: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+}
+
 export class CreateBillingDto {
   @IsMongoId()
   @IsOptional()
   user!: mongoose.Types.ObjectId;
 
+  @Transform(({ value }) => (!value || value === '' ? undefined : value))
   @IsMongoId()
-  @IsNotEmpty()
-  patient: mongoose.Types.ObjectId;
+  @IsOptional()
+  patient?: mongoose.Types.ObjectId;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BillingCustomerDto)
+  customer?: BillingCustomerDto;
+
+  @IsOptional()
+  isWalkIn?: boolean;
 
   @IsString()
   @IsOptional()

@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -45,16 +45,40 @@ export class OrderItemDto {
   batchId?: string;
 }
 
+export class CustomerDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsOptional()
+  age?: number;
+
+  @IsString()
+  @IsOptional()
+  gender?: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+}
+
 export class CreateOrderDto {
   @IsString({ message: 'MRN must be a string' })
   @IsOptional()
   mrn?: string;
 
+  @Transform(({ value }) => (!value || value === '' ? undefined : value))
   @IsMongoId({ message: 'Patient ID must be a valid MongoDB ObjectId' })
-  patient: mongoose.Types.ObjectId;
-
   @IsOptional()
-  doctor: mongoose.Types.ObjectId;
+  patient?: mongoose.Types.ObjectId;
+
+  @Transform(({ value }) => (!value || value === '' ? undefined : value))
+  @IsOptional()
+  doctor?: mongoose.Types.ObjectId;
 
   @IsArray({ message: 'Items must be an array' })
   @ArrayMinSize(1, { message: 'At least one item is required' })
@@ -86,4 +110,12 @@ export class CreateOrderDto {
 
   @IsOptional()
   pharmacist?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CustomerDto)
+  customer?: CustomerDto;
+
+  @IsOptional()
+  isWalkIn?: boolean;
 }

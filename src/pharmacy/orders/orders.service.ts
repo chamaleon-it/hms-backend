@@ -48,11 +48,27 @@ export class OrdersService {
   async createOrder(order: CreateOrderDto) {
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
+
+    if (order.isWalkIn || (!order.patient && (order.customer || !order.patient))) {
+      order.isWalkIn = true;
+      if (!order.customer) {
+        order.customer = { name: '-' };
+      } else if (!order.customer.name?.trim()) {
+        order.customer.name = '-';
+      }
+    }
+
     const data = await this.orderModel.create(order);
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      configuration().in_house_pharmacy_id,
-    );
-    if (autoGenerateBill) {
+    let autoGenerateBill = false;
+    try {
+      const billingConfig = await this.usersService.getPharmacyBilling(
+        configuration().in_house_pharmacy_id,
+      );
+      autoGenerateBill = billingConfig?.autoGenerateBill ?? false;
+    } catch {
+      autoGenerateBill = false;
+    }
+    if (autoGenerateBill || order.isWalkIn) {
       const items = await Promise.all(
         order.items.map(async (item: any) => {
           const itemData = await this.itemsService.getItem(item.name);
@@ -89,21 +105,26 @@ export class OrdersService {
             discount: 0,
             gst: 0,
             total: unitPrice * quantity,
+            batchNumber: targetBatch?.batchNumber || (itemData as any).batchNumber,
+            expiryDate: targetBatch?.expiryDate || (itemData as any).expiryDate,
           };
         }),
       );
 
       const bill = await this.billingService.generateBill({
         patient: order.patient,
+        customer: order.customer,
+        isWalkIn: order.isWalkIn,
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: order.discount ?? 0,
         doctor: 'Self',
+        rxId: data.mrn,
       });
 
       data.billNo = bill.mrn;
 
-      if (order.allergies) {
+      if (order.allergies && order.patient) {
         await this.patientModel.findByIdAndUpdate(order.patient, {
           allergies: order.allergies,
         });
@@ -158,7 +179,27 @@ export class OrdersService {
       this.orderModel.countDocuments(filter),
     ]);
 
-    return { data, total };
+    const formattedData = data.map((order) => {
+      const orderObj: any = order.toObject ? order.toObject() : order;
+      if (orderObj.isWalkIn && !orderObj.patient && orderObj.customer) {
+        orderObj.patient = {
+          name:
+            orderObj.customer.name &&
+            orderObj.customer.name !== 'Walk-In Customer'
+              ? orderObj.customer.name
+              : '-',
+          age: orderObj.customer.age,
+          gender: orderObj.customer.gender,
+          phoneNumber: orderObj.customer.phoneNumber,
+          address: orderObj.customer.address,
+          mrn: 'Walk-In',
+          isWalkIn: true,
+        };
+      }
+      return orderObj;
+    });
+
+    return { data: formattedData, total };
   }
 
   async deleteOrder(id: mongoose.Types.ObjectId) {
@@ -192,7 +233,7 @@ export class OrdersService {
       $or: [{ mrn: searchRegex }, { billNo: searchRegex }],
     };
 
-    const data = await this.orderModel
+    const data: any = await this.orderModel
       .findOne(filter)
       .populate('patient')
       .populate('doctor', 'name phoneNumber specialization')
@@ -201,6 +242,21 @@ export class OrdersService {
 
     if (!data) {
       throw new NotFoundException('Order not found.');
+    }
+
+    if (data.isWalkIn && !data.patient && data.customer) {
+      data.patient = {
+        name:
+          data.customer.name && data.customer.name !== 'Walk-In Customer'
+            ? data.customer.name
+            : '-',
+        age: data.customer.age,
+        gender: data.customer.gender,
+        phoneNumber: data.customer.phoneNumber,
+        address: data.customer.address,
+        mrn: 'Walk-In',
+        isWalkIn: true,
+      };
     }
 
     return data;

@@ -51,6 +51,18 @@ export class BillingService {
   }
 
   async generateBill(createBill: CreateBillingDto) {
+    if (
+      createBill.isWalkIn ||
+      (!createBill.patient && (createBill.customer || !createBill.patient))
+    ) {
+      createBill.isWalkIn = true;
+      if (!createBill.customer) {
+        createBill.customer = { name: '-' };
+      } else if (!createBill.customer.name?.trim()) {
+        createBill.customer.name = '-';
+      }
+    }
+
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
@@ -285,6 +297,36 @@ export class BillingService {
               preserveNullAndEmptyArrays: true,
             },
           },
+          {
+            $addFields: {
+              patient: {
+                $cond: {
+                  if: { $ifNull: ['$patient._id', false] },
+                  then: '$patient',
+                  else: {
+                    name: {
+                      $cond: [
+                        {
+                          $or: [
+                            { $eq: ['$customer.name', 'Walk-In Customer'] },
+                            { $not: ['$customer.name'] },
+                          ],
+                        },
+                        '-',
+                        '$customer.name',
+                      ],
+                    },
+                    age: '$customer.age',
+                    gender: '$customer.gender',
+                    phoneNumber: '$customer.phoneNumber',
+                    address: '$customer.address',
+                    mrn: 'Walk-In',
+                    isWalkIn: true,
+                  },
+                },
+              },
+            },
+          },
         ],
       },
     });
@@ -300,13 +342,27 @@ export class BillingService {
   async getBill(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('Please provide a valid bill id');
-    const data = await this.billingModel
+    const data: any = await this.billingModel
       .findById(id)
       .populate('patient')
       .populate('items')
       .lean()
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
+    if (data.isWalkIn && !data.patient && data.customer) {
+      data.patient = {
+        name:
+          data.customer.name && data.customer.name !== 'Walk-In Customer'
+            ? data.customer.name
+            : '-',
+        age: data.customer.age,
+        gender: data.customer.gender,
+        phoneNumber: data.customer.phoneNumber,
+        address: data.customer.address,
+        mrn: 'Walk-In',
+        isWalkIn: true,
+      };
+    }
     return data;
   }
 

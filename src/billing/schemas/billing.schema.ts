@@ -36,8 +36,34 @@ export class Billing {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient', required: true })
-  patient: Types.ObjectId;
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Patient',
+    required: false,
+    default: null,
+  })
+  patient?: Types.ObjectId;
+
+  @Prop({
+    type: {
+      name: { type: String, default: '-' },
+      age: { type: Number, default: null },
+      gender: { type: String, default: null },
+      phoneNumber: { type: String, default: null },
+      address: { type: String, default: null },
+    },
+    default: null,
+  })
+  customer?: {
+    name?: string;
+    age?: number;
+    gender?: string;
+    phoneNumber?: string;
+    address?: string;
+  };
+
+  @Prop({ type: Boolean, default: false })
+  isWalkIn: boolean;
 
   @Prop({ type: String, default: 'Self' })
   doctor: string;

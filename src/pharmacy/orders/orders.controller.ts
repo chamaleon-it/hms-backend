@@ -30,8 +30,13 @@ export class OrdersController {
 
   @Post()
   async create(@Body() dto: CreateOrderDto) {
-    if (!dto.doctor)
+    if (
+      !dto.doctor &&
+      configuration().in_doctor_id &&
+      mongoose.isValidObjectId(configuration().in_doctor_id)
+    ) {
       dto.doctor = new mongoose.Types.ObjectId(configuration().in_doctor_id);
+    }
     const data = await this.ordersService.createOrder(dto);
     return {
       message: 'Order created successfully',

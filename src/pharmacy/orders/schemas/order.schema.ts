@@ -64,12 +64,18 @@ export class Order {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient',
-    required: true,
+    required: false,
+    default: null,
   })
-  patient: Types.ObjectId;
+  patient?: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
-  doctor: Types.ObjectId;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    default: null,
+  })
+  doctor?: Types.ObjectId;
 
   @Prop({ type: [OrderItemSchema], default: [] })
   items: OrderItem[];
@@ -119,6 +125,30 @@ export class Order {
 
   @Prop({ default: false })
   isDeleted: boolean;
+
+  @Prop({
+    type: {
+      name: { type: String, default: '-' },
+      age: { type: Number, default: null },
+      gender: { type: String, default: null },
+      phoneNumber: { type: String, default: null },
+      address: { type: String, default: null },
+    },
+    default: null,
+  })
+  customer?: {
+    name?: string;
+    age?: number;
+    gender?: string;
+    phoneNumber?: string;
+    address?: string;
+  };
+
+  @Prop({ default: false })
+  isWalkIn: boolean;
+
+  @Prop({ default: null })
+  allergies?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
