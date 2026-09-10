@@ -17,11 +17,7 @@ export enum AppointmentType {
 export enum AppointmentStatus {
   UPCOMING = 'Upcoming',
   CONSULTED = 'Consulted',
-  OBSERVATION = 'Observation',
-  COMPLETED = 'Completed',
   NOT_SHOW = 'Not show',
-  ADMIT = 'Admit',
-  TEST = 'Test',
 }
 
 @Schema({

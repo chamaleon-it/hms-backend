@@ -168,11 +168,7 @@ export class AppointmentsService {
       today: 0,
       upcoming: 0,
       consulted: 0,
-      observation: 0,
-      completed: 0,
       notShow: 0,
-      test: 0,
-      admit: 0,
     };
 
     stats.today = results.reduce((acc: number, r) => acc + r.count, 0);
@@ -185,22 +181,8 @@ export class AppointmentsService {
         case AppointmentStatus.CONSULTED:
           stats.consulted = r.count;
           break;
-        case AppointmentStatus.OBSERVATION:
-          stats.observation = r.count;
-          break;
-        case AppointmentStatus.COMPLETED:
-          stats.completed = r.count;
-          break;
         case AppointmentStatus.NOT_SHOW:
           stats.notShow = r.count;
-          break;
-
-        case AppointmentStatus.TEST:
-          stats.test = r.count;
-          break;
-
-        case AppointmentStatus.ADMIT:
-          stats.admit = r.count;
           break;
       }
     }
