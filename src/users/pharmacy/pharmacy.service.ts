@@ -40,8 +40,6 @@ export class PharmacyService {
       {
         $set: {
           'pharmacy.billing.prefix': dto.prefix,
-          'pharmacy.billing.defaultGst': dto.defaultGst,
-          'pharmacy.billing.roundOff': dto.roundOff,
           'pharmacy.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
           'pharmacy.billing.autoGenerateBill': dto.autoGenerateBill,
           'pharmacy.billing.autoGeneratePrescription':

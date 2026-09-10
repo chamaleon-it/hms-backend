@@ -32,12 +32,6 @@ export class CreateBillingItemDto {
   @Type(() => Number)
   @Min(0)
   @IsOptional()
-  gst?: number;
-
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @IsOptional()
   discount?: number;
 
   @IsNumber()
@@ -82,29 +76,7 @@ export class CreateBillingDto {
   @Type(() => Number)
   @Min(0)
   @IsOptional()
-  insurance?: number;
-
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @IsOptional()
   discount?: number;
-
-  @IsString()
-  @IsOptional()
-  payer?: string;
-
-  @IsString()
-  @IsOptional()
-  policyNo?: string;
-
-  @IsString()
-  @IsOptional()
-  tpa?: string;
-
-  @IsString()
-  @IsOptional()
-  preAuthNo?: string;
 
   @IsString()
   @IsOptional()

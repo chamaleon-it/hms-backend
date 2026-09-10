@@ -108,9 +108,6 @@ export class Item {
   @Prop({ type: Number, default: 0 })
   noOfPacking: number;
 
-  @Prop({ type: Number, default: 0 })
-  gst: number;
-
   @Prop({
     enum: ItemStatus,
     default: ItemStatus.Active,

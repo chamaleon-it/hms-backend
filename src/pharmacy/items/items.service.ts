@@ -384,7 +384,7 @@ export class ItemsService {
   async decreaseItem(
     id: mongoose.Types.ObjectId,
     quantity: number,
-    user: mongoose.Types.ObjectId,
+    user?: mongoose.Types.ObjectId,
   ) {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);

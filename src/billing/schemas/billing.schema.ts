@@ -13,9 +13,6 @@ export class BillingItem {
   unitPrice: number;
 
   @Prop({ required: true, type: Number, default: 0 })
-  gst: number;
-
-  @Prop({ required: true, type: Number, default: 0 })
   discount: number;
 
   @Prop({ required: true, type: Number, default: 0 })
@@ -46,31 +43,13 @@ export class Billing {
   online: number;
 
   @Prop({ type: Number, default: 0 })
-  insurance: number;
-
-  @Prop({ type: Number, default: 0 })
   discount: number;
-
-  @Prop({ type: String, required: false })
-  payer?: string;
-
-  @Prop({ type: String, required: false })
-  policyNo?: string;
-
-  @Prop({ type: String, required: false })
-  tpa?: string;
-
-  @Prop({ type: String, required: false })
-  preAuthNo?: string;
 
   @Prop({ type: String, required: false })
   note?: string;
 
   @Prop({ type: String, required: true, unique: true })
   mrn: string;
-
-  @Prop({ type: Boolean, required: true, default: false })
-  roundOff: boolean;
 
   @Prop({
     type: String,

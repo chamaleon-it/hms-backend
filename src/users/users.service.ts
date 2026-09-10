@@ -56,8 +56,9 @@ export class UsersService {
   }
 
   async getPharmacyInventoryAllowNegativeStock(
-    id: mongoose.Types.ObjectId,
+    id?: mongoose.Types.ObjectId,
   ): Promise<boolean> {
+    if (!id) return false;
     const user = await this.userModel
       .findById(id)
       .select('pharmacy.inventory.allowNegativeStock')
@@ -102,14 +103,6 @@ export class UsersService {
       .find({ role: UserRole.DOCTOR })
       .select('name email phoneNumber address profilePic specialization')
       .sort({ name: 1 })
-      .lean();
-    return data;
-  }
-
-  async getAllPharmacyWholesaler() {
-    const data = await this.userModel
-      .find({ role: UserRole.PHARMACY_WHOLESALER })
-      .select('name email phoneNumber address profilePic')
       .lean();
     return data;
   }

@@ -109,7 +109,6 @@ export class ReportService implements OnModuleInit {
           quantity: 1,
           unitPrice: group.price || 0,
           total: group.price || 0,
-          gst: 0,
           discount: 0,
         });
         total += group.price || 0;
@@ -132,7 +131,6 @@ export class ReportService implements OnModuleInit {
             quantity: 1,
             unitPrice: panel.price || 0,
             total: panel.price || 0,
-            gst: 0,
             discount: 0,
           });
           total += panel.price || 0;
@@ -168,7 +166,6 @@ export class ReportService implements OnModuleInit {
             quantity: 1,
             unitPrice: test.price || 0,
             total: test.price || 0,
-            gst: 0,
             discount: 0,
           });
           total += test.price || 0;
@@ -197,7 +194,6 @@ export class ReportService implements OnModuleInit {
         items,
         cash: 0,
         online: 0,
-        insurance: 0,
         discount: 0,
         reportId: report._id,
         status: 'Draft',

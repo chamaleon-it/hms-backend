@@ -65,7 +65,6 @@ export class OrdersService {
             unitPrice,
             quantity,
             discount: 0,
-            gst: 0,
             total: unitPrice * quantity,
           };
         }),
@@ -113,10 +112,6 @@ export class OrdersService {
 
     if (q === OrderStatus.Pending) {
       filter.status = OrderStatus.Pending;
-    } else if (q === OrderStatus.Filling) {
-      filter.status = OrderStatus.Filling;
-    } else if (q === OrderStatus.Ready) {
-      filter.status = OrderStatus.Ready;
     } else if (q === OrderStatus.Completed) {
       filter.status = OrderStatus.Completed;
     } else if (q === 'Deleted') {
@@ -193,7 +188,7 @@ export class OrdersService {
     const order = await this.orderModel
       .findOneAndUpdate(
         { _id: orderId, 'items.name': item },
-        { $set: { 'items.$.isPacked': true, status: OrderStatus.Filling } },
+        { $set: { 'items.$.isPacked': true } },
         { new: true },
       )
       .exec();
@@ -204,11 +199,6 @@ export class OrdersService {
       );
     }
 
-    const isFullyPacked = order.items.every((it) => Boolean(it.isPacked));
-    if (isFullyPacked && order.status !== OrderStatus.Ready) {
-      order.status = OrderStatus.Ready;
-      await order.save();
-    }
     const qty =
       order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
     await this.itemsService.decreaseItem(item, qty, user);
@@ -241,7 +231,6 @@ export class OrdersService {
         {
           $set: {
             'items.$[].isPacked': true,
-            status: OrderStatus.Ready,
           },
         },
       )
@@ -534,7 +523,7 @@ export class OrdersService {
 
     const totalPaid = bills.reduce((acc, bill) => {
       return (
-        acc + (bill.cash ?? 0) + (bill.online ?? 0) + (bill.insurance ?? 0)
+        acc + (bill.cash ?? 0) + (bill.online ?? 0)
       );
     }, 0);
 
@@ -569,15 +558,33 @@ export class OrdersService {
     return order;
   }
 
-  async completeOrder(id: mongoose.Types.ObjectId) {
-    const data = await this.orderModel
-      .findByIdAndUpdate(id, { status: OrderStatus.Completed }, { new: true })
-      .lean();
-    if (!data) {
+  async completeOrder(
+    id: mongoose.Types.ObjectId,
+    userId?: mongoose.Types.ObjectId,
+  ) {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    return data;
+    // If order was not completed yet, pack any unpacked items and reduce inventory
+    if (order.status !== OrderStatus.Completed) {
+      const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
+      if (unpacked.length > 0) {
+        for (const it of unpacked) {
+          await this.itemsService.decreaseItem(it.name, it.quantity, userId);
+        }
+      }
+
+      order.items = (order.items ?? []).map((item) => ({
+        ...item,
+        isPacked: true,
+      })) as any;
+      order.status = OrderStatus.Completed;
+      await order.save();
+    }
+
+    return order;
   }
 
   async repeatOrder(id: mongoose.Types.ObjectId) {
@@ -619,7 +626,6 @@ export class OrdersService {
             unitPrice,
             quantity,
             discount: 0,
-            gst: 0,
             total: unitPrice * quantity,
           };
         }),

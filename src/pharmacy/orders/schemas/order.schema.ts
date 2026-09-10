@@ -12,8 +12,6 @@ export enum OrderPriority {
 
 export enum OrderStatus {
   Pending = 'Pending',
-  Filling = 'Filling',
-  Ready = 'Ready',
   Failed = 'Failed',
   Canceled = 'Canceled',
   Completed = 'Completed',

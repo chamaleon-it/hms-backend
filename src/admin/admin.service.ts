@@ -47,10 +47,18 @@ export class AdminService {
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: { $add: ['$cash', '$online', '$insurance'] } },
-          totalCash: { $sum: '$cash' },
-          totalOnline: { $sum: '$online' },
-          totalInsurance: { $sum: '$insurance' },
+          totalRevenue: {
+            $sum: {
+              $add: [
+                { $ifNull: ['$cash', 0] },
+                { $ifNull: ['$online', 0] },
+                { $ifNull: ['$insurance', 0] },
+              ],
+            },
+          },
+          totalCash: { $sum: { $ifNull: ['$cash', 0] } },
+          totalOnline: { $sum: { $ifNull: ['$online', 0] } },
+          totalInsurance: { $sum: { $ifNull: ['$insurance', 0] } },
         },
       },
     ]);
@@ -91,7 +99,13 @@ export class AdminService {
         $project: {
           month: { $month: '$createdAt' },
           year: { $year: '$createdAt' },
-          amount: { $add: ['$cash', '$online', '$insurance'] },
+          amount: {
+            $add: [
+              { $ifNull: ['$cash', 0] },
+              { $ifNull: ['$online', 0] },
+              { $ifNull: ['$insurance', 0] },
+            ],
+          },
           role: '$creator.role',
         },
       },
@@ -349,10 +363,18 @@ export class AdminService {
         {
           $group: {
             _id: null,
-            totalRevenue: { $sum: { $add: ['$cash', '$online', '$insurance'] } },
-            totalCash: { $sum: '$cash' },
-            totalOnline: { $sum: '$online' },
-            totalInsurance: { $sum: '$insurance' },
+            totalRevenue: {
+              $sum: {
+                $add: [
+                  { $ifNull: ['$cash', 0] },
+                  { $ifNull: ['$online', 0] },
+                  { $ifNull: ['$insurance', 0] },
+                ],
+              },
+            },
+            totalCash: { $sum: { $ifNull: ['$cash', 0] } },
+            totalOnline: { $sum: { $ifNull: ['$online', 0] } },
+            totalInsurance: { $sum: { $ifNull: ['$insurance', 0] } },
           },
         },
       ]),

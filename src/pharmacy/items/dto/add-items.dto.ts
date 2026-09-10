@@ -122,9 +122,6 @@ export class AddItemDto {
   noOfpacking?: number;
 
   @IsOptional()
-  gst?: number;
-
-  @IsOptional()
   @IsEnum(ItemStatus, {
     message: `Status must be one of: ${Object.values(ItemStatus).join(', ')}.`,
   })

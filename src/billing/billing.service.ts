@@ -63,7 +63,6 @@ export class BillingService {
         const paidAmount =
           (createBill.cash ?? 0) +
           (createBill.online ?? 0) +
-          (createBill.insurance ?? 0) +
           (createBill.discount ?? 0);
         order.paidAmount =
           paidAmount >=
@@ -151,9 +150,9 @@ export class BillingService {
         itemsTotal: { $sum: '$items.total' },
         totalPaid: {
           $add: [
-            '$cash',
-            '$online',
-            '$insurance',
+            { $ifNull: ['$cash', 0] },
+            { $ifNull: ['$online', 0] },
+            { $ifNull: ['$insurance', 0] },
             { $ifNull: ['$discount', 0] },
           ],
         },
@@ -168,12 +167,7 @@ export class BillingService {
           $match: {
             transactionType: 'Sale',
             $expr: {
-              $lte: [
-                '$itemsTotal',
-                {
-                  $add: ['$totalPaid', { $cond: ['$roundOff', 1, 0] }],
-                },
-              ],
+              $lte: ['$itemsTotal', '$totalPaid'],
             },
           },
         });
@@ -184,12 +178,7 @@ export class BillingService {
             $and: [
               {
                 $expr: {
-                  $gt: [
-                    '$itemsTotal',
-                    {
-                      $add: ['$totalPaid', { $cond: ['$roundOff', 1, 0] }],
-                    },
-                  ],
+                  $gt: ['$itemsTotal', '$totalPaid'],
                 },
               },
               { totalPaid: { $gt: 0 } },
@@ -410,7 +399,6 @@ export class BillingService {
       {
         $set: {
           cash: addPaymentDto.cash,
-          insurance: addPaymentDto.insurance,
           online: addPaymentDto.online,
         },
       },

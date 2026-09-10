@@ -81,8 +81,6 @@ export class LabService {
       {
         $set: {
           'lab.billing.prefix': dto.prefix,
-          'lab.billing.defaultGst': dto.defaultGst,
-          'lab.billing.roundOff': dto.roundOff,
           'lab.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
         },
       },
