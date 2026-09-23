@@ -17,6 +17,34 @@ export class BillingItem {
 
   @Prop({ required: true, type: Number, default: 0 })
   total: number;
+
+  /** Snapshot of pharmacy item + batch at bill time (historical; not live inventory). */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Item', required: false })
+  itemId?: Types.ObjectId;
+
+  @Prop({ type: String, default: null })
+  batchId?: string | null;
+
+  @Prop({ type: String, default: null })
+  batchNumber?: string | null;
+
+  @Prop({ type: Date, default: null })
+  expiryDate?: Date | null;
+
+  @Prop({ type: Number, default: null })
+  mrp?: number | null;
+
+  @Prop({ type: Number, default: null })
+  purchasePrice?: number | null;
+
+  @Prop({ type: Number, default: null })
+  gst?: number | null;
+
+  @Prop({ type: String, default: null })
+  supplier?: string | null;
+
+  @Prop({ type: Number, default: null })
+  packing?: number | null;
 }
 export const BillingItemSchema = SchemaFactory.createForClass(BillingItem);
 

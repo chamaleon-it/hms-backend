@@ -285,6 +285,7 @@ export class AppointmentsService {
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
       doctor,
+      isDeleted: false,
     };
 
     const data = await this.appointmentModel
@@ -302,7 +303,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel
       .find({ patient })
       .populate('patient')
-      .populate('doctor', 'name specialization')
+      .populate('doctor', 'name specialization qualification designation')
       .sort({ date: -1 })
       .lean();
     return data;

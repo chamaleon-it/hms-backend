@@ -30,6 +30,20 @@ export class PurchaseEntryService {
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {
       throw new BadRequestException('Paid Amount is greater than Total Amount');
     }
+
+    const supplierCheck = await this.supplierModel
+      .findById(createPurchaseEntryDto.supplier)
+      .exec();
+    if (
+      !supplierCheck ||
+      supplierCheck.isDeleted ||
+      supplierCheck.status === 'Inactive'
+    ) {
+      throw new BadRequestException(
+        'Supplier is inactive or deleted and cannot receive new purchase entries',
+      );
+    }
+
     createPurchaseEntryDto.paymentStatus = this.resolvePaymentStatus(
       createPurchaseEntryDto.paidAmount ?? 0,
       createPurchaseEntryDto.total,

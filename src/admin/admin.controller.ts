@@ -88,6 +88,53 @@ export class AdminController {
     };
   }
 
+  @Patch('doctors/:id/availability')
+  async updateDoctorAvailability(
+    @Param('id') id: string,
+    @Body() body: { availability: any },
+  ) {
+    const data = await this.adminService.updateDoctorAvailability(
+      id,
+      body?.availability ?? body,
+    );
+    return {
+      data,
+      message: 'Doctor consultation schedule updated successfully',
+    };
+  }
+
+  @Delete('doctors/:id/availability')
+  async deleteDoctorAvailability(@Param('id') id: string) {
+    const data = await this.adminService.deleteDoctorAvailability(id);
+    return {
+      data,
+      message: 'Doctor consultation schedule cleared',
+    };
+  }
+
+  @Get('reports/summary')
+  async getReportsSummary(
+    @Query('mode') mode?: string,
+    @Query('date') date?: string,
+    @Query('month') month?: string,
+    @Query('billingType') billingType?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('department') department?: string,
+  ) {
+    const data = await this.adminService.getReportsSummary({
+      mode,
+      date,
+      month,
+      billingType,
+      paymentStatus,
+      department,
+    });
+    return {
+      data,
+      message: 'Admin report summary retrieved successfully',
+    };
+  }
+
   // --- Unified Billing ---
   @Get('billing')
   async getAdminBilling(

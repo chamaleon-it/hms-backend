@@ -50,6 +50,10 @@ export class Availability {
 
   @Prop({ type: [SchemaFactory.createForClass(Round)], default: [] })
   rounds?: Round[];
+
+  /** Slot length in minutes for booking UI (default 15 when unset). */
+  @Prop({ type: Number, default: 15, min: 5 })
+  slotIntervalMinutes?: number;
 }
 
 @Schema({
@@ -110,6 +114,10 @@ export class User {
 
   @Prop({ trim: true, default: null })
   qualification?: string;
+
+  /** Optional professional designation (e.g. Consultant, Senior Resident). */
+  @Prop({ trim: true, default: null })
+  designation?: string;
 
   @Prop({ trim: true, default: null })
   signature?: string;

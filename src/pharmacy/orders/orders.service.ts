@@ -48,6 +48,53 @@ export class OrdersService {
   async createOrder(order: CreateOrderDto) {
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
+
+    // Validate batch selection / stock before create (registered + walk-in share this path)
+    for (const item of order.items || []) {
+      if (item.batchId) {
+        const batchInfo = await this.itemsService.getItemBatches(
+          item.name,
+          'fefo',
+          true,
+        );
+        const batch = batchInfo.batches.find(
+          (b) =>
+            b.batchId === item.batchId || b.batchNumber === item.batchNumber,
+        );
+        if (!batch) {
+          throw new BadRequestException(
+            `Selected batch not found for item ${batchInfo.name}`,
+          );
+        }
+        if (batch.expired) {
+          throw new BadRequestException(
+            `Cannot order from expired batch ${batch.batchNumber}`,
+          );
+        }
+        const allowNeg =
+          await this.usersService.getPharmacyInventoryAllowNegativeStock(
+            new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+          );
+        if (!allowNeg && batch.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient batch stock for ${batchInfo.name} (${batch.batchNumber}). Available: ${batch.stock}`,
+          );
+        }
+        // Freeze snapshot fields on the order line
+        item.batchNumber = item.batchNumber || batch.batchNumber;
+        item.batchExpiryDate = item.batchExpiryDate || batch.expiryDate;
+        item.batchMrp = item.batchMrp ?? batch.mrp;
+        item.batchPurchasePrice =
+          item.batchPurchasePrice ?? batch.purchasePrice;
+        item.batchSellingPrice =
+          item.batchSellingPrice ?? batch.sellingPrice;
+        item.batchGst = item.batchGst ?? batch.gst;
+        item.batchStock = item.batchStock ?? batch.stock;
+        item.batchSupplier = item.batchSupplier || batch.supplier;
+        item.batchPacking = item.batchPacking ?? batch.packing;
+      }
+    }
+
     const data = await this.orderModel.create(order);
     const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
       configuration().in_house_pharmacy_id,
@@ -57,7 +104,8 @@ export class OrdersService {
         order.items.map(async (item) => {
           const itemData = await this.itemsService.getItem(item.name);
 
-          const unitPrice = itemData.unitPrice;
+          const unitPrice =
+            item.batchSellingPrice ?? itemData.unitPrice;
           const quantity = item.quantity;
 
           return {
@@ -66,6 +114,16 @@ export class OrdersService {
             quantity,
             discount: 0,
             total: unitPrice * quantity,
+            itemId: item.name,
+            batchId: item.batchId || undefined,
+            batchNumber: item.batchNumber || undefined,
+            expiryDate: item.batchExpiryDate || undefined,
+            mrp: item.batchMrp ?? itemData.mrp,
+            purchasePrice:
+              item.batchPurchasePrice ?? itemData.purchasePrice,
+            gst: item.batchGst ?? 0,
+            supplier: item.batchSupplier || itemData.supplier || undefined,
+            packing: item.batchPacking ?? itemData.packing ?? 1,
           };
         }),
       );
@@ -119,7 +177,7 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .populate('patient')
-        .populate('doctor', 'name phoneNumber specialization')
+        .populate('doctor', 'name phoneNumber specialization qualification designation')
         .populate('items.name')
         .sort({ createdAt: -1 })
         .exec(),
@@ -163,7 +221,7 @@ export class OrdersService {
     const data = await this.orderModel
       .findOne(filter)
       .populate('patient')
-      .populate('doctor', 'name phoneNumber specialization')
+      .populate('doctor', 'name phoneNumber specialization qualification designation')
       .populate('items.name')
       .lean();
 
@@ -196,7 +254,13 @@ export class OrdersService {
 
     const qty =
       order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
-    await this.itemsService.decreaseItem(item, qty, user);
+    const line = order.items.find((e) => String(e.name) === String(item));
+    await this.itemsService.decreaseItem(
+      item,
+      qty,
+      user,
+      (line as any)?.batchId || null,
+    );
   }
 
   async markAllAsPacked(
@@ -215,7 +279,12 @@ export class OrdersService {
     if (unpacked.length > 0) {
       await Promise.all(
         unpacked.map((it) =>
-          this.itemsService.decreaseItem(it.name, it.quantity, user),
+          this.itemsService.decreaseItem(
+            it.name,
+            it.quantity,
+            user,
+            (it as any).batchId || null,
+          ),
         ),
       );
     }
@@ -567,7 +636,12 @@ export class OrdersService {
       const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
       if (unpacked.length > 0) {
         for (const it of unpacked) {
-          await this.itemsService.decreaseItem(it.name, it.quantity, userId);
+          await this.itemsService.decreaseItem(
+            it.name,
+            it.quantity,
+            userId,
+            (it as any).batchId || null,
+          );
         }
       }
 
@@ -642,7 +716,7 @@ export class OrdersService {
     const data = await this.orderModel
       .findByIdAndUpdate(dto.orderId, dto, { new: true, runValidators: true })
       .populate('patient')
-      .populate('doctor', 'name phoneNumber specialization')
+      .populate('doctor', 'name phoneNumber specialization qualification designation')
       .populate('items.name')
       .lean();
 

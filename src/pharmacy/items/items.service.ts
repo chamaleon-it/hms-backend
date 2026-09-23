@@ -517,7 +517,12 @@ export class ItemsService {
     id: mongoose.Types.ObjectId,
     quantity: number,
     user?: mongoose.Types.ObjectId,
+    batchId?: string | null,
   ) {
+    if (batchId) {
+      return this.deductFromBatch(id, batchId, quantity, user);
+    }
+
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
 
@@ -525,29 +530,204 @@ export class ItemsService {
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
+
+    if (!allowNegativeStock && item.quantity < quantity) {
+      throw new BadRequestException(
+        `Insufficient stock for ${item.name}. Available: ${item.quantity}, requested: ${quantity}`,
+      );
+    }
+
     const newQuantity = allowNegativeStock
       ? item.quantity - quantity
       : Math.max(item.quantity - quantity, 0);
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
-      await item.save();
     }
 
-    if (quantity > 0 && newQuantity >= 0) {
-      const newSoldQuantity = item.soldQuantity + quantity;
-      item.soldQuantity = newSoldQuantity;
+    if (quantity > 0) {
+      item.soldQuantity = (item.soldQuantity || 0) + quantity;
       item.soldHistory.push({
         date: new Date(),
         quantity,
         unitPrice: item.unitPrice,
         total: item.unitPrice * quantity,
       });
-      await item.save();
     }
 
+    await item.save();
+    return item;
+  }
 
+  /**
+   * Sort helpers for manual batch pickers. FEFO = earliest expiry first;
+   * FIFO = earliest createdAt first. Expired batches are excluded by default.
+   */
+  sortBatches(
+    batches: any[],
+    mode: 'fefo' | 'fifo' = 'fefo',
+    opts: { includeExpired?: boolean } = {},
+  ) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let list = [...(batches || [])];
+    if (!opts.includeExpired) {
+      list = list.filter((b) => {
+        if (!b?.expiryDate) return true;
+        const exp = new Date(b.expiryDate);
+        exp.setHours(0, 0, 0, 0);
+        return exp >= now;
+      });
+    }
+    list.sort((a, b) => {
+      if (mode === 'fifo') {
+        return (
+          new Date(a.createdAt || 0).getTime() -
+          new Date(b.createdAt || 0).getTime()
+        );
+      }
+      const ae = new Date(a.expiryDate || 0).getTime();
+      const be = new Date(b.expiryDate || 0).getTime();
+      if (ae !== be) return ae - be;
+      return (
+        new Date(a.createdAt || 0).getTime() -
+        new Date(b.createdAt || 0).getTime()
+      );
+    });
+    return list;
+  }
 
+  async getItemBatches(
+    id: mongoose.Types.ObjectId,
+    sort: 'fefo' | 'fifo' = 'fefo',
+    includeExpired = false,
+  ) {
+    const item = await this.itemModel.findById(id).lean();
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    const sorted = this.sortBatches(item.batches || [], sort, {
+      includeExpired,
+    });
+
+    return {
+      itemId: item._id,
+      name: item.name,
+      packing: item.packing ?? 1,
+      unitPrice: item.unitPrice,
+      mrp: item.mrp,
+      gst: 0,
+      batches: sorted.map((b: any) => {
+        const exp = b.expiryDate ? new Date(b.expiryDate) : null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expired = exp
+          ? (() => {
+              const e = new Date(exp);
+              e.setHours(0, 0, 0, 0);
+              return e < today;
+            })()
+          : false;
+        return {
+          batchId: b._id?.toString?.() || b.batchNumber,
+          batchNumber: b.batchNumber,
+          expiryDate: b.expiryDate,
+          purchasePrice: b.purchasePrice,
+          sellingPrice: item.unitPrice,
+          mrp: item.mrp,
+          gst: 0,
+          stock: b.quantity,
+          supplier: b.supplier,
+          packing: item.packing ?? 1,
+          createdAt: b.createdAt,
+          expired,
+          available: !expired && (Number(b.quantity) || 0) > 0,
+        };
+      }),
+    };
+  }
+
+  async suggestBatch(
+    id: mongoose.Types.ObjectId,
+    sort: 'fefo' | 'fifo' = 'fefo',
+  ) {
+    const data = await this.getItemBatches(id, sort, false);
+    const pick = data.batches.find((b) => b.available);
+    return { suggested: pick || null, ...data };
+  }
+
+  async deductFromBatch(
+    itemId: mongoose.Types.ObjectId,
+    batchId: string,
+    quantity: number,
+    user?: mongoose.Types.ObjectId,
+  ) {
+    if (!quantity || quantity <= 0) {
+      throw new BadRequestException('Quantity must be positive');
+    }
+
+    const allowNegativeStock =
+      await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
+
+    const item = await this.itemModel.findById(itemId);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    const batchIndex = (item.batches || []).findIndex(
+      (b: any) =>
+        b._id?.toString() === batchId.toString() ||
+        b.batchNumber === batchId,
+    );
+    if (batchIndex === -1) {
+      throw new BadRequestException('Selected batch not found');
+    }
+
+    const batch: any = item.batches[batchIndex];
+    if (batch.expiryDate) {
+      const exp = new Date(batch.expiryDate);
+      exp.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (exp < today) {
+        throw new BadRequestException(
+          `Cannot sell from expired batch ${batch.batchNumber}`,
+        );
+      }
+    }
+
+    const batchQty = Number(batch.quantity) || 0;
+    if (!allowNegativeStock && batchQty < quantity) {
+      throw new BadRequestException(
+        `Insufficient batch stock for ${item.name} (${batch.batchNumber}). Available: ${batchQty}, requested: ${quantity}`,
+      );
+    }
+
+    batch.quantity = allowNegativeStock
+      ? batchQty - quantity
+      : Math.max(batchQty - quantity, 0);
+    item.markModified('batches');
+
+    if (!allowNegativeStock && item.quantity < quantity) {
+      throw new BadRequestException(
+        `Insufficient stock for ${item.name}. Available: ${item.quantity}, requested: ${quantity}`,
+      );
+    }
+
+    item.quantity = allowNegativeStock
+      ? item.quantity - quantity
+      : Math.max((item.quantity || 0) - quantity, 0);
+
+    item.soldQuantity = (item.soldQuantity || 0) + quantity;
+    item.soldHistory.push({
+      date: new Date(),
+      quantity,
+      unitPrice: item.unitPrice,
+      total: item.unitPrice * quantity,
+    });
+
+    await item.save();
     return item;
   }
 

@@ -13,6 +13,10 @@ import {
   ConsumableIssue,
   ConsumableIssueSchema,
 } from '../pharmacy/consumables/schemas/consumable-issue.schema';
+import {
+  PurchaseEntry,
+  PurchaseEntrySchema,
+} from '../suppliers/purchase_entry/schemas/purchase-entry.schema';
 
 @Module({
   imports: [
@@ -25,6 +29,7 @@ import {
       { name: Appointment.name, schema: AppointmentSchema },
       { name: Item.name, schema: ItemSchema },
       { name: ConsumableIssue.name, schema: ConsumableIssueSchema },
+      { name: PurchaseEntry.name, schema: PurchaseEntrySchema },
     ]),
   ],
   controllers: [AdminController],

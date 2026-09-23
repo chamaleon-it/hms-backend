@@ -85,6 +85,34 @@ export class ItemsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/batches')
+  async getItemBatches(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Query('sort') sort?: 'fefo' | 'fifo',
+    @Query('includeExpired') includeExpired?: string,
+  ) {
+    const data = await this.itemsService.getItemBatches(
+      id,
+      sort === 'fifo' ? 'fifo' : 'fefo',
+      includeExpired === 'true',
+    );
+    return {
+      data,
+      message: 'Batches retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getItem(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.itemsService.getItem(id);
+    return {
+      data,
+      message: 'Item retrieved successfully',
+    };
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Patch(':id')

@@ -12,27 +12,32 @@ import {
 
 class AvailabilityDto {
   @IsDateString()
-  startDate: string;
+  @IsOptional()
+  startDate?: string;
 
   @IsDateString()
-  endDate: string;
+  @IsOptional()
+  endDate?: string;
 
   @IsString()
   @IsOptional()
-  startTime: string;
+  startTime?: string;
 
   @IsString()
   @IsOptional()
-  endTime: string;
+  endTime?: string;
 
   @IsArray({ message: 'days must be an array' })
   @IsOptional()
-  days: string[];
+  days?: string[];
 
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => RoundsDto)
   rounds?: RoundsDto[];
+
+  @IsOptional()
+  slotIntervalMinutes?: number;
 }
 
 class RoundsDto {
@@ -72,6 +77,10 @@ export class UpdateUserDto {
   @IsString({ message: 'Qualification must be a string' })
   @IsOptional()
   qualification?: string | null;
+
+  @IsString({ message: 'Designation must be a string' })
+  @IsOptional()
+  designation?: string | null;
 
   @IsString({ message: 'Status must be a string' })
   @IsOptional()
