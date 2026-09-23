@@ -79,10 +79,9 @@ export class OrdersService {
               )
             : itemData.batches?.[0];
 
-          const unitPrice =
-            item.unitPrice ?? batch?.unitPrice ?? itemData.unitPrice ?? 0;
+          const unitPrice = item.unitPrice ?? batch?.unitPrice ?? 0;
           const quantity = item.quantity;
-          const gst = item.gst ?? batch?.gst ?? itemData.gst ?? 0;
+          const gst = item.gst ?? batch?.gst ?? 0;
 
           return {
             name: itemData.name,
@@ -859,7 +858,7 @@ export class OrdersService {
           : itemData.batches?.[0];
 
         const unitPrice =
-          (item as any).unitPrice ?? batch?.unitPrice ?? itemData.unitPrice ?? 0;
+          (item as any).unitPrice ?? batch?.unitPrice ?? 0;
         const quantity = item.quantity;
 
         return {
@@ -868,7 +867,7 @@ export class OrdersService {
           unitPrice,
           quantity,
           discount: 0,
-          gst: batch?.gst ?? itemData.gst ?? 0,
+          gst: batch?.gst ?? 0,
           total: unitPrice * quantity,
         };
       }),

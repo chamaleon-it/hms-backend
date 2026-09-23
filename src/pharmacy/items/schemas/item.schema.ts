@@ -81,27 +81,6 @@ export class Item {
   manufacturer?: string;
 
   @Prop({
-    required: false,
-    type: Number,
-    default: 0,
-  })
-  unitPrice?: number;
-
-  @Prop({
-    required: false,
-    type: Number,
-    default: 0,
-  })
-  mrp?: number;
-
-  @Prop({
-    required: false,
-    type: Number,
-    default: 0,
-  })
-  purchasePrice?: number;
-
-  @Prop({
     default: 0,
     type: Number,
   })

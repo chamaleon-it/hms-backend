@@ -106,8 +106,6 @@ export class ItemsService {
           unitPrice: addItemDto.unitPrice || 0,
           gst: addItemDto.gst || 0,
         },
-        addItemDto.unitPrice,
-        addItemDto.mrp,
       );
       return updatedItem; // ✅ return the DB-refreshed item with correct quantity
     }
@@ -194,12 +192,24 @@ export class ItemsService {
         const now = new Date();
         const targetDate = new Date();
         targetDate.setDate(now.getDate() + days);
-        filter.expiryDate = { $gte: now, $lte: targetDate };
+        (filter as any).$and = (filter as any).$and || [];
+        (filter as any).$and.push({
+          $or: [
+            { expiryDate: { $gte: now, $lte: targetDate } },
+            { 'batches.expiryDate': { $gte: now, $lte: targetDate } },
+          ],
+        });
       }
     }
 
     if (query.supplier) {
-      filter.supplier = query.supplier;
+      (filter as any).$and = (filter as any).$and || [];
+      (filter as any).$and.push({
+        $or: [
+          { supplier: query.supplier },
+          { 'batches.supplier': query.supplier },
+        ],
+      });
     }
 
     filter.status = { $ne: ItemStatus.Deleted };
@@ -355,7 +365,7 @@ export class ItemsService {
     }
 
     // If batch specified, deduct from that batch
-    let effectiveUnitPrice = item.unitPrice || 0;
+    let effectiveUnitPrice = 0;
     if (batchNumber && item.batches && item.batches.length > 0) {
       const batch = item.batches.find(
         (b) => b.batchNumber && b.batchNumber.toLowerCase() === batchNumber.trim().toLowerCase(),
@@ -367,6 +377,11 @@ export class ItemsService {
         if (batch.unitPrice) {
           effectiveUnitPrice = batch.unitPrice;
         }
+      }
+    } else if (item.batches && item.batches.length > 0) {
+      const batch = item.batches[0];
+      if (batch?.unitPrice) {
+        effectiveUnitPrice = batch.unitPrice;
       }
     }
 
@@ -429,16 +444,14 @@ export class ItemsService {
       unitPrice?: number;
       gst?: number;
     },
-    legacyUnitPrice?: number,
-    legacyMrp?: number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
 
-    const unitPrice = Number(batchData.unitPrice ?? legacyUnitPrice ?? 0);
-    const mrp = Number(batchData.mrp ?? legacyMrp ?? 0);
+    const unitPrice = Number(batchData.unitPrice ?? 0);
+    const mrp = Number(batchData.mrp ?? 0);
     const purchasePrice = Number(batchData.purchasePrice ?? 0);
     const packing = Number(batchData.packing ?? 0);
     const stripCount = Number(batchData.stripCount ?? 0);
@@ -489,8 +502,12 @@ export class ItemsService {
   }
 
   async getSuppliers() {
-    const data = await this.itemModel.distinct('supplier').lean();
-    return data.filter((supplier) => supplier !== '' && supplier !== '-');
+    const [itemSuppliers, batchSuppliers] = await Promise.all([
+      this.itemModel.distinct('supplier').lean(),
+      this.itemModel.distinct('batches.supplier').lean(),
+    ]);
+    const combined = Array.from(new Set([...itemSuppliers, ...batchSuppliers]));
+    return combined.filter((supplier) => supplier && supplier !== '' && supplier !== '-');
   }
 
 

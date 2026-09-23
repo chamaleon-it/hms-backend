@@ -44,9 +44,9 @@ export class PurchaseEntryService {
           expiryDate: item.expiryDate,
           purchasePrice: item.purchasePrice,
           supplier: supplier?.name || '-',
+          unitPrice: item.pack ? item.unitPrice / item.pack : item.unitPrice,
+          mrp: item.unitPrice,
         },
-        item.unitPrice / item.pack,
-        item.unitPrice,
       );
     }
     return data;
