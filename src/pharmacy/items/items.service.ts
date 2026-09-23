@@ -149,7 +149,8 @@ export class ItemsService {
     } = {};
 
     if (q) {
-      const searchRegex = { $regex: '^' + q, $options: 'i' };
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
       filter = {
         $or: [
           { name: searchRegex },
