@@ -51,12 +51,23 @@ export class OrdersService {
 
     // Validate batch selection / stock before create (registered + walk-in share this path)
     for (const item of order.items || []) {
-      if (item.batchId) {
-        const batchInfo = await this.itemsService.getItemBatches(
-          item.name,
-          'fefo',
-          true,
+      const batchInfo = await this.itemsService.getItemBatches(
+        item.name,
+        'fefo',
+        true,
+      );
+      const availableBatches = (batchInfo.batches || []).filter(
+        (b) => !b.expired && b.available !== false && b.stock > 0,
+      );
+
+      // When stocked batches exist, force an explicit batch pick (no silent FEFO)
+      if (availableBatches.length > 0 && !item.batchId) {
+        throw new BadRequestException(
+          `Batch selection is required for ${batchInfo.name}`,
         );
+      }
+
+      if (item.batchId) {
         const batch = batchInfo.batches.find(
           (b) =>
             b.batchId === item.batchId || b.batchNumber === item.batchNumber,
