@@ -124,4 +124,40 @@ export class ItemsController {
     };
   }
 
+  @Patch(':id/batch/:batchId')
+  async updateBatch(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: string,
+    @Body() body: {
+      batchNumber?: string;
+      expiryDate?: string;
+      quantity?: number;
+      packing?: number;
+      stripCount?: number;
+      mrp?: number;
+      unitPrice?: number;
+      purchasePrice?: number;
+      gst?: number;
+      supplier?: string;
+    },
+  ) {
+    const data = await this.itemsService.updateBatch(id, batchId, body);
+    return {
+      data,
+      message: 'Batch updated successfully',
+    };
+  }
+
+  @Patch(':id/batch/:batchId/toggle')
+  async toggleBatchStatus(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchId') batchId: string,
+  ) {
+    const data = await this.itemsService.toggleBatchStatus(id, batchId);
+    return {
+      data,
+      message: 'Batch status toggled successfully',
+    };
+  }
+
 }

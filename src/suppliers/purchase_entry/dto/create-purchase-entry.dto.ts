@@ -33,6 +33,10 @@ export class PurchaseItemDto {
   pack: number;
 
   @IsNumber()
+  @IsOptional()
+  noOfPack?: number;
+
+  @IsNumber()
   @IsNotEmpty()
   unitPrice: number;
 

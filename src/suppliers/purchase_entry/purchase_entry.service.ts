@@ -46,6 +46,8 @@ export class PurchaseEntryService {
           supplier: supplier?.name || '-',
           unitPrice: item.pack ? item.unitPrice / item.pack : item.unitPrice,
           mrp: item.unitPrice,
+          packing: item.pack,
+          stripCount: item.noOfPack,
         },
       );
     }

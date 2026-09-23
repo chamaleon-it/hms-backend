@@ -35,6 +35,12 @@ export class Batch {
   @Prop({ type: Number, default: 0 })
   quantity: number;
 
+  @Prop({ type: Number, default: 0 })
+  startingQuantity: number;
+
+  @Prop({ type: Boolean, default: true })
+  isActive: boolean;
+
   @Prop({ trim: true, default: '-' })
   supplier: string;
 
@@ -75,22 +81,7 @@ export class Item {
   category: string;
 
   @Prop({ trim: true, default: '-' })
-  supplier?: string;
-
-  @Prop({ trim: true, default: '-' })
   manufacturer?: string;
-
-  @Prop({
-    default: 0,
-    type: Number,
-  })
-  openingStockQuantity?: number;
-
-  @Prop({
-    type: Number,
-    default: 0,
-  })
-  quantity: number;
 
   @Prop({
     type: Number,
@@ -128,20 +119,8 @@ export class Item {
     patientMrn?: string;
   }[];
 
-  @Prop({ type: Date })
-  expiryDate?: Date;
-
   @Prop({ type: String, default: '-' })
   rackLocation: string;
-
-  @Prop({ type: Number, default: 0 })
-  packing?: number;
-
-  @Prop({ type: Number, default: 0 })
-  noOfPacking?: number;
-
-  @Prop({ type: Number, default: 0 })
-  gst?: number;
 
   @Prop({
     enum: ItemStatus,

@@ -81,33 +81,43 @@ export class ItemsService {
     }
 
     const openingQty =
-      addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+      (addItemDto as any).openingStockQuantity ?? (addItemDto as any).quantity ?? 0;
+
+    const batchNumber =
+      addItemDto.batchNumber || (openingQty > 0 ? 'BATCH-01' : undefined);
 
     const data = await this.itemModel.create({
-      ...addItemDto,
-      quantity: addItemDto.batchNumber ? 0 : openingQty, // will be incremented by addBatchItems if batch exists
+      name: addItemDto.name,
       pharmacy,
+      generic: addItemDto.generic,
+      hsnCode: addItemDto.hsnCode || '-',
+      sku: addItemDto.sku,
+      category: addItemDto.category,
+      manufacturer: addItemDto.manufacturer || '-',
+      rackLocation: addItemDto.rackLocation || '-',
+      status: addItemDto.status || ItemStatus.Active,
+      batches: [],
     });
 
-    if (addItemDto.batchNumber) {
+    if (batchNumber) {
       const updatedItem = await this.addBatchItems(
         data._id,
         {
-          batchNumber: addItemDto.batchNumber,
-          expiryDate: addItemDto?.expiryDate
-            ? new Date(addItemDto?.expiryDate)
+          batchNumber,
+          expiryDate: addItemDto.expiryDate
+            ? new Date(addItemDto.expiryDate)
             : new Date(),
           purchasePrice: addItemDto.purchasePrice || 0,
           quantity: openingQty,
-          supplier: addItemDto.supplier || '-',
-          packing: addItemDto.packing || 0,
+          supplier: (addItemDto as any).supplier || '-',
+          packing: (addItemDto as any).packing || 0,
           stripCount: (addItemDto as any).stripCount || (addItemDto as any).noOfpacking || 0,
           mrp: addItemDto.mrp || 0,
           unitPrice: addItemDto.unitPrice || 0,
-          gst: addItemDto.gst || 0,
+          gst: (addItemDto as any).gst || 0,
         },
       );
-      return updatedItem; // ✅ return the DB-refreshed item with correct quantity
+      return updatedItem;
     }
     return data;
   }
@@ -169,13 +179,25 @@ export class ItemsService {
     }
 
     if (stock && !lowStockItemsView && !slowMovingItemsView) {
-      const stockConditions: Record<string, number | Record<string, number>> = {
-        Instock: { $gte: 20 },
-        Low: { $gt: 0, $lt: 20 },
-        Out: 0,
-      };
-
-      filter.quantity = stockConditions[stock];
+      (filter as any).$and = (filter as any).$and || [];
+      if (stock === 'Instock') {
+        (filter as any).$and.push({
+          $expr: { $gte: [{ $sum: '$batches.quantity' }, 20] },
+        });
+      } else if (stock === 'Low') {
+        (filter as any).$and.push({
+          $expr: {
+            $and: [
+              { $gt: [{ $sum: '$batches.quantity' }, 0] },
+              { $lt: [{ $sum: '$batches.quantity' }, 20] },
+            ],
+          },
+        });
+      } else if (stock === 'Out') {
+        (filter as any).$and.push({
+          $expr: { $lte: [{ $sum: '$batches.quantity' }, 0] },
+        });
+      }
     }
 
     if (
@@ -183,7 +205,12 @@ export class ItemsService {
       !slowMovingItemsView &&
       (stock === 'Low' || stock === 'Out' || !stock)
     ) {
-      filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
+      (filter as any).$and = (filter as any).$and || [];
+      (filter as any).$and.push({
+        $expr: {
+          $lte: [{ $sum: '$batches.quantity' }, Number(lowStockThreshold ?? 20)],
+        },
+      });
     }
 
     if (query.expiry) {
@@ -192,24 +219,12 @@ export class ItemsService {
         const now = new Date();
         const targetDate = new Date();
         targetDate.setDate(now.getDate() + days);
-        (filter as any).$and = (filter as any).$and || [];
-        (filter as any).$and.push({
-          $or: [
-            { expiryDate: { $gte: now, $lte: targetDate } },
-            { 'batches.expiryDate': { $gte: now, $lte: targetDate } },
-          ],
-        });
+        filter['batches.expiryDate'] = { $gte: now, $lte: targetDate };
       }
     }
 
     if (query.supplier) {
-      (filter as any).$and = (filter as any).$and || [];
-      (filter as any).$and.push({
-        $or: [
-          { supplier: query.supplier },
-          { 'batches.supplier': query.supplier },
-        ],
-      });
+      filter['batches.supplier'] = query.supplier;
     }
 
     filter.status = { $ne: ItemStatus.Deleted };
@@ -217,15 +232,17 @@ export class ItemsService {
     const shouldCountLowStock = stock === 'Low' || stock === 'Out' || !stock;
     const lowStockFilter = {
       ...filter,
-      quantity: { $lte: Number(lowStockThreshold ?? 20) },
+      $expr: {
+        $lte: [{ $sum: '$batches.quantity' }, Number(lowStockThreshold ?? 20)],
+      },
     };
 
-    // Calculate slowMovingCount (items with quantity > 0 and soldInLast30Days <= 10)
+    // Calculate slowMovingCount (items with batch quantity > 0 and soldInLast30Days <= 10)
     const activeItemsForCount = await this.itemModel
-      .find(
-        { status: { $ne: ItemStatus.Deleted }, quantity: { $gt: 0 } },
-        { soldHistory: 1, quantity: 1 },
-      )
+      .find({
+        status: { $ne: ItemStatus.Deleted },
+        $expr: { $gt: [{ $sum: '$batches.quantity' }, 0] },
+      })
       .lean();
     const slowMovingCount = activeItemsForCount.filter(
       (it) => computeSoldInLast30Days(it) <= 10,
@@ -238,15 +255,22 @@ export class ItemsService {
       // Find all in-stock items matching filters
       const candidateFilter = {
         ...filter,
-        quantity: { $gt: 0 },
+        $expr: { $gt: [{ $sum: '$batches.quantity' }, 0] },
       };
       const candidateItems = await this.itemModel.find(candidateFilter).lean();
 
       const mappedCandidates = candidateItems
-        .map((it) => ({
-          ...it,
-          soldInLast30Days: computeSoldInLast30Days(it),
-        }))
+        .map((it) => {
+          const totalQty = (it.batches || []).reduce(
+            (sum: number, b: any) => sum + (Number(b.quantity) || 0),
+            0,
+          );
+          return {
+            ...it,
+            quantity: totalQty,
+            soldInLast30Days: computeSoldInLast30Days(it),
+          };
+        })
         .filter((it) => it.soldInLast30Days <= 10);
 
       // Sort by soldInLast30Days asc, then quantity desc
@@ -275,10 +299,17 @@ export class ItemsService {
       ]);
 
       total = count;
-      items = rawItems.map((it) => ({
-        ...it,
-        soldInLast30Days: computeSoldInLast30Days(it),
-      }));
+      items = rawItems.map((it) => {
+        const totalQty = (it.batches || []).reduce(
+          (sum: number, b: any) => sum + (Number(b.quantity) || 0),
+          0,
+        );
+        return {
+          ...it,
+          quantity: totalQty,
+          soldInLast30Days: computeSoldInLast30Days(it),
+        };
+      });
     }
 
     const lowStockCount = shouldCountLowStock
@@ -299,7 +330,15 @@ export class ItemsService {
       throw new NotFoundException('Item not found.');
     }
 
-    return data;
+    const totalQty = (data.batches || []).reduce(
+      (sum: number, b: any) => sum + (Number(b.quantity) || 0),
+      0,
+    );
+
+    return {
+      ...data,
+      quantity: totalQty,
+    };
   }
 
   async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
@@ -383,16 +422,9 @@ export class ItemsService {
       if (batch?.unitPrice) {
         effectiveUnitPrice = batch.unitPrice;
       }
-    }
-
-    // Keep item total quantity synchronized
-    if (item.batches && item.batches.length > 0) {
-      item.quantity = item.batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
-    } else {
-      const newQuantity = allowNegativeStock
-        ? item.quantity - quantity
-        : Math.max(item.quantity - quantity, 0);
-      item.quantity = newQuantity;
+      batch.quantity = allowNegativeStock
+        ? (batch.quantity || 0) - quantity
+        : Math.max((batch.quantity || 0) - quantity, 0);
     }
 
     if (quantity > 0) {
@@ -420,10 +452,9 @@ export class ItemsService {
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
-    const newQuantity = item.quantity + quantity;
 
-    if (newQuantity !== item.quantity) {
-      item.quantity = newQuantity;
+    if (item.batches && item.batches.length > 0) {
+      item.batches[0].quantity = (Number(item.batches[0].quantity) || 0) + quantity;
       await item.save();
     }
 
@@ -482,6 +513,7 @@ export class ItemsService {
       item.batches.push({
         batchNumber: batchData.batchNumber.trim(),
         quantity,
+        startingQuantity: quantity,
         expiryDate,
         purchasePrice,
         unitPrice,
@@ -489,27 +521,70 @@ export class ItemsService {
         packing,
         stripCount,
         gst,
+        isActive: true,
         supplier: batchData.supplier || '-',
         createdAt: new Date(),
       } as any);
     }
 
-    // Keep item total quantity synchronized
-    item.quantity = item.batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
     await item.save();
 
     return item;
   }
 
   async getSuppliers() {
-    const [itemSuppliers, batchSuppliers] = await Promise.all([
-      this.itemModel.distinct('supplier').lean(),
-      this.itemModel.distinct('batches.supplier').lean(),
-    ]);
-    const combined = Array.from(new Set([...itemSuppliers, ...batchSuppliers]));
-    return combined.filter((supplier) => supplier && supplier !== '' && supplier !== '-');
+    const batchSuppliers = await this.itemModel.distinct('batches.supplier').lean();
+    return batchSuppliers.filter((supplier) => supplier && supplier !== '' && supplier !== '-');
   }
 
+  async updateBatch(
+    itemId: mongoose.Types.ObjectId,
+    batchId: string,
+    data: {
+      batchNumber?: string;
+      expiryDate?: Date | string;
+      quantity?: number;
+      packing?: number;
+      stripCount?: number;
+      mrp?: number;
+      unitPrice?: number;
+      purchasePrice?: number;
+      gst?: number;
+      supplier?: string;
+    },
+  ) {
+    const item = await this.itemModel.findById(itemId);
+    if (!item) throw new BadRequestException('Item not found');
+
+    const batch = item.batches.find((b: any) => b._id?.toString() === batchId);
+    if (!batch) throw new BadRequestException('Batch not found');
+
+    if (data.batchNumber !== undefined) batch.batchNumber = data.batchNumber;
+    if (data.expiryDate !== undefined) (batch as any).expiryDate = new Date(data.expiryDate);
+    if (data.quantity !== undefined) batch.quantity = Number(data.quantity);
+    if (data.packing !== undefined) batch.packing = Number(data.packing);
+    if (data.stripCount !== undefined) batch.stripCount = Number(data.stripCount);
+    if (data.mrp !== undefined) batch.mrp = Number(data.mrp);
+    if (data.unitPrice !== undefined) batch.unitPrice = Number(data.unitPrice);
+    if (data.purchasePrice !== undefined) batch.purchasePrice = Number(data.purchasePrice);
+    if (data.gst !== undefined) batch.gst = Number(data.gst);
+    if (data.supplier !== undefined) batch.supplier = data.supplier;
+
+    await item.save();
+    return item;
+  }
+
+  async toggleBatchStatus(itemId: mongoose.Types.ObjectId, batchId: string) {
+    const item = await this.itemModel.findById(itemId);
+    if (!item) throw new BadRequestException('Item not found');
+
+    const batch = item.batches.find((b: any) => b._id?.toString() === batchId);
+    if (!batch) throw new BadRequestException('Batch not found');
+
+    (batch as any).isActive = !(batch as any).isActive;
+    await item.save();
+    return item;
+  }
 
   private delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
