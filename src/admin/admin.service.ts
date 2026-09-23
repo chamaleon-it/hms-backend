@@ -298,6 +298,7 @@ export class AdminService {
     q?: string;
     page?: string | number;
     limit?: string | number;
+    billingType?: string;
   }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
@@ -354,6 +355,32 @@ export class AdminService {
         .lean();
       const deptUserIds = deptUsers.map((u) => u._id);
       filter.user = { $in: deptUserIds };
+    }
+
+    const billingType = query.billingType;
+    if (billingType && billingType !== 'all') {
+      if (billingType === 'Sale') filter.transactionType = 'Sale';
+      else if (billingType === 'Return') filter.transactionType = 'Return';
+      else if (billingType === 'Lab')
+        filter.reportId = { $exists: true, $ne: null };
+      else if (billingType === 'Consultation') {
+        filter['items.name'] = { $regex: /consultation/i };
+      } else if (billingType === 'Dressing') {
+        filter['items.name'] = { $regex: /dressing/i };
+      } else if (billingType === 'Clinical') {
+        filter['items.name'] = {
+          $regex:
+            /procedure|injection|cannulation|extraction|catheterisation|enema|dressing/i,
+        };
+      } else if (billingType === 'Pharmacy') {
+        // Exclude consultation/clinical keyword lines; include non-catalogue style names
+        filter['items.name'] = {
+          $not: {
+            $regex:
+              /consultation|procedure|injection|cannulation|extraction|catheterisation|enema|dressing/i,
+          },
+        };
+      }
     }
 
     const [bills, total, totalsAgg] = await Promise.all([

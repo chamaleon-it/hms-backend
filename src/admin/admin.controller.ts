@@ -99,6 +99,7 @@ export class AdminController {
     @Query('q') q?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('billingType') billingType?: string,
   ) {
     const data = await this.adminService.getAdminBilling({
       department,
@@ -109,6 +110,7 @@ export class AdminController {
       q,
       page,
       limit,
+      billingType,
     });
     return {
       data,

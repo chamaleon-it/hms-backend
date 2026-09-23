@@ -80,11 +80,6 @@ export class OrdersService {
 
       data.billNo = bill.mrn;
 
-      if (order.allergies) {
-        await this.patientModel.findByIdAndUpdate(order.patient, {
-          allergies: order.allergies,
-        });
-      }
       await data.save();
     }
     return data;

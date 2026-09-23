@@ -472,8 +472,11 @@ export class ItemsService {
       addItemDto.packing = 1;
     }
 
+    // SKU is item identity — never rekey via update.
+    const { sku: _sku, ...updatePayload } = addItemDto;
+
     const data = await this.itemModel
-      .findByIdAndUpdate(id, addItemDto, { new: true, runValidators: true })
+      .findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true })
       .lean();
 
     if (!data) {

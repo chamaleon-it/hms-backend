@@ -115,6 +115,7 @@ export class BillingService {
       startDate,
       endDate,
       activeDate,
+      billingType,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
@@ -128,9 +129,6 @@ export class BillingService {
     if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
     }
-    // else if (q) {
-    //   match.mrn = { $regex: '^' + q, $options: 'i' };
-    // }
 
     if (!q && startDate && endDate) {
       match.createdAt = { $gte: startDate, $lte: endDate };
@@ -144,6 +142,14 @@ export class BillingService {
       } else if (method === 'Online') {
         match.online = { $ne: 0 };
       }
+    }
+
+    if (billingType === 'Sale') {
+      match.transactionType = 'Sale';
+    } else if (billingType === 'Return') {
+      match.transactionType = 'Return';
+    } else if (billingType === 'Lab') {
+      match.reportId = { $exists: true, $ne: null };
     }
 
     pipeline.push({ $match: match });
@@ -187,6 +193,82 @@ export class BillingService {
               },
               { totalPaid: { $gt: 0 } },
             ],
+          },
+        });
+      }
+    }
+
+    // Soft billing-type line heuristics (include-if-any). Catalogue names from billing_items.
+    if (
+      billingType &&
+      ['Consultation', 'Clinical', 'Pharmacy', 'Dressing'].includes(billingType)
+    ) {
+      const catalogue = await this.billingItemModel.find().select('item').lean();
+      const catalogueNames = catalogue.map((c) => c.item).filter(Boolean);
+      const clinicalKeywords = [
+        'procedure',
+        'injection',
+        'cannulation',
+        'extraction',
+        'catheterisation',
+        'enema',
+        'dressing',
+      ];
+
+      if (billingType === 'Consultation') {
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: { name: { $regex: /consultation/i } },
+            },
+          },
+        });
+      } else if (billingType === 'Dressing') {
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: { name: { $regex: /dressing/i } },
+            },
+          },
+        });
+      } else if (billingType === 'Clinical') {
+        pipeline.push({
+          $match: {
+            $or: [
+              {
+                'items.name': {
+                  $regex: new RegExp(clinicalKeywords.join('|'), 'i'),
+                },
+              },
+              ...(catalogueNames.length
+                ? [
+                    {
+                      $and: [
+                        { 'items.name': { $in: catalogueNames } },
+                        {
+                          'items.name': {
+                            $not: { $regex: /consultation/i },
+                          },
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+            ],
+          },
+        });
+      } else if (billingType === 'Pharmacy') {
+        // Include-if-any line that is not consultation and not in clinical catalogue
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: {
+                name: {
+                  $nin: catalogueNames,
+                  $not: { $regex: /consultation/i },
+                },
+              },
+            },
           },
         });
       }

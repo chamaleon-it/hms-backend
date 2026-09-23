@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { PurchaseEntryService } from './purchase_entry.service';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { SupplierBulkPaymentDto } from './dto/supplier-bulk-payment.dto';
 
 @Controller('purchase_entry')
 export class PurchaseEntryController {
@@ -20,6 +21,18 @@ export class PurchaseEntryController {
     return {
       data: await this.purchaseEntryService.findBySupplier(id),
       message: 'Purchase Entry Found Successfully',
+    };
+  }
+
+  /** Whole-amount FIFO payment across supplier outstanding invoices. */
+  @Post('/supplier/:id/pay')
+  async paySupplier(
+    @Param('id') id: string,
+    @Body() dto: SupplierBulkPaymentDto,
+  ) {
+    return {
+      data: await this.purchaseEntryService.paySupplierOutstanding(id, dto),
+      message: 'Supplier payment allocated successfully',
     };
   }
 

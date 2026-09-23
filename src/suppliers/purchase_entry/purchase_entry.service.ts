@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { PaymentStatus, PurchaseEntry } from './schemas/purchase-entry.schema';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { ItemsService } from 'src/pharmacy/items/items.service';
 import { Supplier } from '../schemas/supplier.schema';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { SupplierBulkPaymentDto } from './dto/supplier-bulk-payment.dto';
 
 @Injectable()
 export class PurchaseEntryService {
@@ -16,33 +17,41 @@ export class PurchaseEntryService {
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
   ) {}
 
+  private resolvePaymentStatus(paidAmount: number, total: number): PaymentStatus {
+    if (paidAmount <= 0) return PaymentStatus.PENDING;
+    if (paidAmount + 1e-9 >= total) return PaymentStatus.PAID;
+    return PaymentStatus.PARTIALLY_PAID;
+  }
+
   async create(createPurchaseEntryDto: CreatePurchaseEntryDto) {
+    if (createPurchaseEntryDto.transportCharge == null) {
+      createPurchaseEntryDto.transportCharge = 0;
+    }
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {
       throw new BadRequestException('Paid Amount is greater than Total Amount');
     }
-    if (createPurchaseEntryDto.paidAmount < createPurchaseEntryDto.total) {
-      createPurchaseEntryDto.paymentStatus = PaymentStatus.PARTIALLY_PAID;
-    }
-    if (createPurchaseEntryDto.paidAmount === createPurchaseEntryDto.total) {
-      createPurchaseEntryDto.paymentStatus = PaymentStatus.PAID;
-    }
-    if (createPurchaseEntryDto.paidAmount === 0) {
-      createPurchaseEntryDto.paymentStatus = PaymentStatus.PENDING;
-    }
+    createPurchaseEntryDto.paymentStatus = this.resolvePaymentStatus(
+      createPurchaseEntryDto.paidAmount ?? 0,
+      createPurchaseEntryDto.total,
+    );
 
     const data = await this.purchaseEntryModel.create(createPurchaseEntryDto);
     for (const item of createPurchaseEntryDto.items) {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
-        console.log(item)
-      await this.itemsService.addBatchItems(item.item, {
-        batchNumber: item.batch,
-        quantity: item.quantity,
-        expiryDate: item.expiryDate,
-        purchasePrice: item.purchasePrice,
-        supplier: supplier?.name || '-',
-      },item.unitPrice/item.pack,item.unitPrice);
+      await this.itemsService.addBatchItems(
+        item.item,
+        {
+          batchNumber: item.batch,
+          quantity: item.quantity,
+          expiryDate: item.expiryDate,
+          purchasePrice: item.purchasePrice,
+          supplier: supplier?.name || '-',
+        },
+        item.unitPrice / item.pack,
+        item.unitPrice,
+      );
     }
     return data;
   }
@@ -72,12 +81,107 @@ export class PurchaseEntryService {
       throw new BadRequestException('Paid Amount is greater than Total Amount');
     }
     data.paidAmount += addPaymentDto.paidAmount;
-    if (data.paidAmount === data.total) {
-      data.paymentStatus = PaymentStatus.PAID;
-    }
-    if (data.paidAmount < data.total) {
-      data.paymentStatus = PaymentStatus.PARTIALLY_PAID;
-    }
+    data.paymentStatus = this.resolvePaymentStatus(data.paidAmount, data.total);
     return await data.save();
+  }
+
+  /**
+   * Whole-amount supplier payment: FIFO allocate across outstanding invoices
+   * (oldest invoiceDate first, then createdAt/_id). Blocks overpayment —
+   * advances are not supported. Runs in a Mongo transaction.
+   */
+  async paySupplierOutstanding(
+    supplierId: string,
+    dto: SupplierBulkPaymentDto,
+  ) {
+    if (!mongoose.isValidObjectId(supplierId)) {
+      throw new BadRequestException('Invalid supplier ID');
+    }
+
+    const supplier = await this.supplierModel.findById(supplierId).exec();
+    if (!supplier || supplier.isDeleted) {
+      throw new BadRequestException('Supplier not found');
+    }
+
+    const amount = Number(dto.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Payment amount must be greater than 0');
+    }
+
+    const session = await this.purchaseEntryModel.db.startSession();
+    session.startTransaction();
+    try {
+      const outstanding = await this.purchaseEntryModel
+        .find({
+          supplier: new mongoose.Types.ObjectId(supplierId),
+          $expr: { $lt: ['$paidAmount', '$total'] },
+        })
+        .sort({ invoiceDate: 1, createdAt: 1, _id: 1 })
+        .session(session);
+
+      const totalOutstanding = outstanding.reduce(
+        (sum, entry) => sum + Math.max(0, entry.total - entry.paidAmount),
+        0,
+      );
+
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      if (round2(amount) > round2(totalOutstanding) + 1e-6) {
+        throw new BadRequestException(
+          `Payment amount (₹${round2(amount)}) exceeds total outstanding (₹${round2(totalOutstanding)}). Advances are not supported.`,
+        );
+      }
+
+      let remaining = round2(amount);
+      const allocations: Array<{
+        purchaseEntryId: string;
+        invoiceNumber: string;
+        allocated: number;
+        paidAmount: number;
+        total: number;
+        paymentStatus: PaymentStatus;
+      }> = [];
+
+      for (const entry of outstanding) {
+        if (remaining <= 0) break;
+        const due = round2(entry.total - entry.paidAmount);
+        if (due <= 0) continue;
+        const allocated = Math.min(remaining, due);
+        entry.paidAmount = round2(entry.paidAmount + allocated);
+        entry.paymentStatus = this.resolvePaymentStatus(
+          entry.paidAmount,
+          entry.total,
+        );
+        await entry.save({ session });
+        allocations.push({
+          purchaseEntryId: String(entry._id),
+          invoiceNumber: entry.invoiceNumber,
+          allocated,
+          paidAmount: entry.paidAmount,
+          total: entry.total,
+          paymentStatus: entry.paymentStatus,
+        });
+        remaining = round2(remaining - allocated);
+      }
+
+      const remainingOutstanding = round2(totalOutstanding - amount);
+      supplier.balance = remainingOutstanding;
+      await supplier.save({ session });
+
+      await session.commitTransaction();
+
+      return {
+        supplierId,
+        amountPaid: round2(amount),
+        previousOutstanding: round2(totalOutstanding),
+        remainingOutstanding,
+        paymentRef: dto.paymentRef || null,
+        allocations,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }

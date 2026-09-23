@@ -96,9 +96,10 @@ export class CreatePurchaseEntryDto {
   @IsNotEmpty()
   gst: number;
 
+  /** Deprecated for new entries — kept optional for backward compatibility; defaults to 0. */
   @IsNumber()
-  @IsNotEmpty()
-  transportCharge: number;
+  @IsOptional()
+  transportCharge?: number;
 
   @IsNumber()
   @IsNotEmpty()
