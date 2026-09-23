@@ -22,6 +22,15 @@ export class PharmacyService {
           address: dto.address,
           'pharmacy.general.owner': dto.owner,
           'pharmacy.general.gstin': dto.gstin,
+          ...(dto.slogan !== undefined && {
+            'pharmacy.general.slogan': dto.slogan,
+          }),
+          ...(dto.advertisement !== undefined && {
+            'pharmacy.general.advertisement': dto.advertisement,
+          }),
+          ...(dto.services !== undefined && {
+            'pharmacy.general.services': dto.services,
+          }),
         },
       },
       { new: true, runValidators: true }, // return updated document
@@ -44,6 +53,12 @@ export class PharmacyService {
           'pharmacy.billing.autoGenerateBill': dto.autoGenerateBill,
           'pharmacy.billing.autoGeneratePrescription':
             dto.autoGeneratePrescription,
+          ...(dto.printDualCopies !== undefined && {
+            'pharmacy.billing.printDualCopies': dto.printDualCopies,
+          }),
+          ...(dto.freeReconsultDays !== undefined && {
+            'pharmacy.billing.freeReconsultDays': dto.freeReconsultDays,
+          }),
         },
       },
       { new: true, runValidators: true },

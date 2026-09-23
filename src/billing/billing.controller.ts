@@ -154,6 +154,24 @@ export class BillingController {
     };
   }
 
+  @Get('reconsult_eligibility')
+  @UseGuards(JwtAuthGuard)
+  async getReconsultEligibility(
+    @Query('patientId') patientId: string,
+    @Query('doctorId') doctorId: string | undefined,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.getReconsultEligibility(
+      patientId,
+      doctorId,
+      user.id,
+    );
+    return {
+      data,
+      message: 'Reconsult eligibility retrieved successfully',
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {

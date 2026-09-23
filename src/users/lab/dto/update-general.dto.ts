@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateGeneralDto {
   @IsString({ message: 'Name must be a string' })
@@ -24,4 +30,17 @@ export class UpdateGeneralDto {
   @IsString({ message: 'Address must be a string' })
   @IsNotEmpty({ message: 'Address is required' })
   address: string;
+
+  @IsOptional()
+  @IsString({ message: 'Slogan must be a string' })
+  slogan?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Advertisement must be a string' })
+  advertisement?: string;
+
+  @IsOptional()
+  @IsArray({ message: 'Services must be an array' })
+  @IsString({ each: true, message: 'Each service must be a string' })
+  services?: string[];
 }

@@ -11,13 +11,17 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../users/schemas/user.schema';
 
 @Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('stats')
-  @UseGuards(JwtAuthGuard)
   async getDashboardStats() {
     const data = await this.adminService.getDashboardStats();
     return {
@@ -26,9 +30,20 @@ export class AdminController {
     };
   }
 
+  @Get('pnl')
+  async getProfitAndLoss(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const data = await this.adminService.getProfitAndLoss(startDate, endDate);
+    return {
+      data,
+      message: 'Profit and loss retrieved successfully',
+    };
+  }
+
   // --- Doctor Endpoints ---
   @Get('doctors')
-  @UseGuards(JwtAuthGuard)
   async getDoctors() {
     const data = await this.adminService.getDoctors();
     return {
@@ -38,7 +53,6 @@ export class AdminController {
   }
 
   @Get('doctors/:id')
-  @UseGuards(JwtAuthGuard)
   async getDoctorById(@Param('id') id: string) {
     const data = await this.adminService.getDoctorById(id);
     return {
@@ -48,7 +62,6 @@ export class AdminController {
   }
 
   @Post('doctors')
-  @UseGuards(JwtAuthGuard)
   async createDoctor(@Body() body: any) {
     const data = await this.adminService.createDoctor(body);
     return {
@@ -58,7 +71,6 @@ export class AdminController {
   }
 
   @Patch('doctors/:id')
-  @UseGuards(JwtAuthGuard)
   async updateDoctor(@Param('id') id: string, @Body() body: any) {
     const data = await this.adminService.updateDoctor(id, body);
     return {
@@ -68,7 +80,6 @@ export class AdminController {
   }
 
   @Delete('doctors/:id')
-  @UseGuards(JwtAuthGuard)
   async deleteDoctor(@Param('id') id: string) {
     const data = await this.adminService.deleteDoctor(id);
     return {
@@ -79,7 +90,6 @@ export class AdminController {
 
   // --- Unified Billing ---
   @Get('billing')
-  @UseGuards(JwtAuthGuard)
   async getAdminBilling(
     @Query('department') department?: string,
     @Query('status') status?: string,

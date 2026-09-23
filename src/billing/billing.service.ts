@@ -18,6 +18,8 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { Consulting } from 'src/consultings/schemas/consulting.schema';
+import { User } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class BillingService {
@@ -25,6 +27,8 @@ export class BillingService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private readonly usersService: UsersService,
   ) { }
 
@@ -435,5 +439,78 @@ export class BillingService {
       .lean()
       .exec();
     return data;
+  }
+
+  /**
+   * Free re-consultation eligibility based on last consulting record
+   * and pharmacy.billing.freeReconsultDays (default 7).
+   */
+  async getReconsultEligibility(
+    patientId: string,
+    doctorId?: string,
+    pharmacyUserId?: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(patientId)) {
+      throw new BadRequestException('Invalid patientId');
+    }
+
+    let freeDays = 7;
+    if (pharmacyUserId && mongoose.isValidObjectId(pharmacyUserId)) {
+      const pharmacyUser = await this.userModel
+        .findById(pharmacyUserId)
+        .select('pharmacy.billing.freeReconsultDays')
+        .lean();
+      const configured = (pharmacyUser as any)?.pharmacy?.billing
+        ?.freeReconsultDays;
+      if (typeof configured === 'number' && configured >= 0) {
+        freeDays = configured;
+      }
+    }
+
+    const filter: Record<string, unknown> = {
+      patient: new mongoose.Types.ObjectId(patientId),
+    };
+    if (doctorId && mongoose.isValidObjectId(doctorId)) {
+      filter.doctor = new mongoose.Types.ObjectId(doctorId);
+    }
+
+    const lastConsult = await this.consultingModel
+      .findOne(filter)
+      .sort({ createdAt: -1 })
+      .select('createdAt doctor')
+      .lean();
+
+    if (!lastConsult) {
+      return {
+        eligible: false,
+        freeDays,
+        reason: 'No prior consultation found',
+        lastConsultAt: null,
+        daysSinceLastConsult: null,
+        suggestedFee: null,
+      };
+    }
+
+    const lastConsultAt = new Date((lastConsult as any).createdAt);
+    const now = new Date();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysSinceLastConsult = Math.floor(
+      (now.getTime() - lastConsultAt.getTime()) / msPerDay,
+    );
+    const eligible = daysSinceLastConsult <= freeDays;
+
+    return {
+      eligible,
+      freeDays,
+      reason: eligible
+        ? `Within free re-consultation window (${freeDays} days)`
+        : `Outside free window (${daysSinceLastConsult} days since last consult)`,
+      lastConsultAt: lastConsultAt.toISOString(),
+      daysSinceLastConsult,
+      suggestedFee: eligible ? 0 : null,
+      doctorId: (lastConsult as any).doctor
+        ? String((lastConsult as any).doctor)
+        : null,
+    };
   }
 }

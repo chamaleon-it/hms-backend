@@ -9,6 +9,7 @@ export enum UserRole {
   PHARMACY = 'Pharmacy',
   LAB = 'Lab',
   ADMIN = 'Admin',
+  SUPER_ADMIN = 'Super Admin',
 }
 
 export enum UserStatus {
@@ -130,12 +131,17 @@ export class User {
       general: {
         owner: { type: String, default: null, trim: true },
         gstin: { type: String, default: null, trim: true, uppercase: true },
+        slogan: { type: String, default: null, trim: true },
+        advertisement: { type: String, default: null, trim: true },
+        services: { type: [String], default: [] },
       },
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         autoPrintAfterSave: { type: Boolean, default: false },
         autoGenerateBill: { type: Boolean, default: false },
         autoGeneratePrescription: { type: Boolean, default: false },
+        printDualCopies: { type: Boolean, default: true },
+        freeReconsultDays: { type: Number, default: 7 },
       },
       inventory: {
         lowStockThreshold: { type: Number, default: 20 },
@@ -154,11 +160,17 @@ export class User {
     general: {
       owner: string | null;
       gstin: string | null;
+      slogan: string | null;
+      advertisement: string | null;
+      services: string[];
     };
     billing: {
       prefix: string;
       autoPrintAfterSave: boolean;
       autoGenerateBill: boolean;
+      autoGeneratePrescription?: boolean;
+      printDualCopies?: boolean;
+      freeReconsultDays?: number;
     };
     inventory: {
       lowStockThreshold: number;
@@ -178,6 +190,9 @@ export class User {
       general: {
         owner: { type: String, default: null, trim: true },
         gstin: { type: String, default: null, trim: true, uppercase: true },
+        slogan: { type: String, default: null, trim: true },
+        advertisement: { type: String, default: null, trim: true },
+        services: { type: [String], default: [] },
       },
       catalogue: {
         showProfilesOnPatientBill: { type: Boolean, default: false },
@@ -186,6 +201,7 @@ export class User {
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         autoPrintAfterSave: { type: Boolean, default: false },
+        printDualCopies: { type: Boolean, default: true },
       },
       notifications: {
         whatsapp: { type: Boolean, default: false },
@@ -205,10 +221,14 @@ export class User {
     general: {
       owner: string | null;
       gstin: string | null;
+      slogan: string | null;
+      advertisement: string | null;
+      services: string[];
     };
     billing: {
       prefix: string;
       autoPrintAfterSave: boolean;
+      printDualCopies?: boolean;
     };
     catalogue: {
       showProfilesOnPatientBill: boolean;

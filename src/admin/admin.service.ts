@@ -12,6 +12,11 @@ import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import { Pharmacist, PharmacistDocument } from '../pharmacy/pharmacist/schemas/pharmacist.schema';
 import { Technician, TechnicianDocument } from '../lab/technician/schemas/technician.schema';
 import { Appointment, AppointmentDocument } from '../appointments/schemas/appointment.schema';
+import { Item, ItemDocument } from '../pharmacy/items/schemas/item.schema';
+import {
+  ConsumableIssue,
+  ConsumableIssueDocument,
+} from '../pharmacy/consumables/schemas/consumable-issue.schema';
 
 @Injectable()
 export class AdminService {
@@ -22,6 +27,9 @@ export class AdminService {
     @InjectModel(Pharmacist.name) private pharmacistModel: Model<PharmacistDocument>,
     @InjectModel(Technician.name) private technicianModel: Model<TechnicianDocument>,
     @InjectModel(Appointment.name) private appointmentModel: Model<AppointmentDocument>,
+    @InjectModel(Item.name) private itemModel: Model<ItemDocument>,
+    @InjectModel(ConsumableIssue.name)
+    private consumableIssueModel: Model<ConsumableIssueDocument>,
   ) {}
 
   async getDashboardStats() {
@@ -390,6 +398,192 @@ export class AdminService {
         totalCash: 0,
         totalOnline: 0,
         totalInsurance: 0,
+      },
+    };
+  }
+
+  /**
+   * Profit & Loss for a date range.
+   * Revenue = billing cash + online (sales only).
+   * COGS = item soldHistory totals priced at purchasePrice (or sold unitPrice fallback).
+   * Consumable expense = issued consumables cost (not sales).
+   * Does not invent other operating expenses.
+   */
+  async getProfitAndLoss(startDate?: string, endDate?: string) {
+    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
+    const end = endDate ? new Date(endDate) : new Date();
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException('Invalid startDate or endDate');
+    }
+    end.setHours(23, 59, 59, 999);
+
+    const round2 = (n: number) =>
+      Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+
+    const [revenueAgg, cogsAgg, consumableAgg, billCount] = await Promise.all([
+      this.billingModel.aggregate([
+        {
+          $match: {
+            transactionType: 'Sale',
+            createdAt: { $gte: start, $lte: end },
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'owner',
+          },
+        },
+        { $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: null,
+            totalCash: { $sum: { $ifNull: ['$cash', 0] } },
+            totalOnline: { $sum: { $ifNull: ['$online', 0] } },
+            totalDiscount: { $sum: { $ifNull: ['$discount', 0] } },
+            pharmacyRevenue: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$owner.role', UserRole.PHARMACY] },
+                      { $eq: ['$owner.role', UserRole.ADMIN] },
+                      { $eq: ['$owner.role', UserRole.SUPER_ADMIN] },
+                      { $and: [{ $ne: ['$owner.role', UserRole.LAB] }, { $not: ['$reportId'] }] },
+                    ],
+                  },
+                  {
+                    $add: [
+                      { $ifNull: ['$cash', 0] },
+                      { $ifNull: ['$online', 0] },
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
+            labRevenue: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$owner.role', UserRole.LAB] },
+                      { $ifNull: ['$reportId', false] },
+                    ],
+                  },
+                  {
+                    $add: [
+                      { $ifNull: ['$cash', 0] },
+                      { $ifNull: ['$online', 0] },
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+      this.itemModel.aggregate([
+        { $unwind: { path: '$soldHistory', preserveNullAndEmptyArrays: false } },
+        {
+          $match: {
+            'soldHistory.date': { $gte: start, $lte: end },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            cogs: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$soldHistory.quantity', 0] },
+                  {
+                    $cond: [
+                      { $gt: [{ $ifNull: ['$purchasePrice', 0] }, 0] },
+                      '$purchasePrice',
+                      { $ifNull: ['$soldHistory.unitPrice', 0] },
+                    ],
+                  },
+                ],
+              },
+            },
+            unitsSold: { $sum: { $ifNull: ['$soldHistory.quantity', 0] } },
+            salesValue: { $sum: { $ifNull: ['$soldHistory.total', 0] } },
+          },
+        },
+      ]),
+      this.consumableIssueModel.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lte: end },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalCost: { $sum: { $ifNull: ['$totalCost', 0] } },
+            quantity: { $sum: { $ifNull: ['$quantity', 0] } },
+          },
+        },
+      ]),
+      this.billingModel.countDocuments({
+        transactionType: 'Sale',
+        createdAt: { $gte: start, $lte: end },
+      }),
+    ]);
+
+    const revenue = revenueAgg[0] || {
+      totalCash: 0,
+      totalOnline: 0,
+      totalDiscount: 0,
+      pharmacyRevenue: 0,
+      labRevenue: 0,
+    };
+    const cogs = cogsAgg[0] || { cogs: 0, unitsSold: 0, salesValue: 0 };
+    const consumables = consumableAgg[0] || { totalCost: 0, quantity: 0 };
+
+    const totalRevenue = round2(
+      (revenue.totalCash || 0) + (revenue.totalOnline || 0),
+    );
+    const costOfGoodsSold = round2(cogs.cogs || 0);
+    const consumableExpense = round2(consumables.totalCost || 0);
+    const grossProfit = round2(totalRevenue - costOfGoodsSold);
+    const netProfit = round2(grossProfit - consumableExpense);
+
+    return {
+      period: {
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      },
+      revenue: {
+        cash: round2(revenue.totalCash || 0),
+        online: round2(revenue.totalOnline || 0),
+        discount: round2(revenue.totalDiscount || 0),
+        pharmacy: round2(revenue.pharmacyRevenue || 0),
+        lab: round2(revenue.labRevenue || 0),
+        total: totalRevenue,
+        billCount,
+      },
+      costs: {
+        cogs: costOfGoodsSold,
+        unitsSold: cogs.unitsSold || 0,
+        pharmacySalesValue: round2(cogs.salesValue || 0),
+        consumables: consumableExpense,
+        consumableUnits: consumables.quantity || 0,
+        note: 'No other operating expenses are recorded in the system.',
+      },
+      profit: {
+        grossProfit,
+        netProfit,
+        grossMarginPct:
+          totalRevenue > 0
+            ? round2((grossProfit / totalRevenue) * 100)
+            : 0,
+        netMarginPct:
+          totalRevenue > 0 ? round2((netProfit / totalRevenue) * 100) : 0,
       },
     };
   }

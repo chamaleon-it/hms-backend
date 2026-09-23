@@ -23,6 +23,15 @@ export class LabService {
           address: dto.address,
           'lab.general.owner': dto.owner,
           'lab.general.gstin': dto.gstin,
+          ...(dto.slogan !== undefined && {
+            'lab.general.slogan': dto.slogan,
+          }),
+          ...(dto.advertisement !== undefined && {
+            'lab.general.advertisement': dto.advertisement,
+          }),
+          ...(dto.services !== undefined && {
+            'lab.general.services': dto.services,
+          }),
         },
       },
       { new: true, runValidators: true }, // return updated document
@@ -82,6 +91,9 @@ export class LabService {
         $set: {
           'lab.billing.prefix': dto.prefix,
           'lab.billing.autoPrintAfterSave': dto.autoPrintAfterSave,
+          ...(dto.printDualCopies !== undefined && {
+            'lab.billing.printDualCopies': dto.printDualCopies,
+          }),
         },
       },
       { new: true, runValidators: true },

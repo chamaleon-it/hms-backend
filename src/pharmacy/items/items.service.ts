@@ -320,6 +320,135 @@ export class ItemsService {
     };
   }
 
+  async getInventoryValueBreakdown() {
+    const baseFilter = { status: { $ne: ItemStatus.Deleted } };
+
+    const [byCategory, totals, topItems] = await Promise.all([
+      this.itemModel.aggregate([
+        { $match: baseFilter },
+        {
+          $group: {
+            _id: { $ifNull: ['$category', 'Uncategorized'] },
+            itemCount: { $sum: 1 },
+            quantity: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $isNumber: '$quantity' }, { $gt: ['$quantity', 0] }] },
+                  '$quantity',
+                  0,
+                ],
+              },
+            },
+            sellingValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$unitPrice', 0] },
+                ],
+              },
+            },
+            purchaseValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$purchasePrice', 0] },
+                ],
+              },
+            },
+            mrpValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$mrp', 0] },
+                ],
+              },
+            },
+          },
+        },
+        { $sort: { sellingValue: -1 } },
+      ]),
+      this.itemModel.aggregate([
+        { $match: baseFilter },
+        {
+          $group: {
+            _id: null,
+            sellingValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$unitPrice', 0] },
+                ],
+              },
+            },
+            purchaseValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$purchasePrice', 0] },
+                ],
+              },
+            },
+            mrpValue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$quantity', 0] },
+                  { $ifNull: ['$mrp', 0] },
+                ],
+              },
+            },
+            totalQuantity: { $sum: { $ifNull: ['$quantity', 0] } },
+            totalItems: { $sum: 1 },
+          },
+        },
+      ]),
+      this.itemModel
+        .find(baseFilter)
+        .select('name category quantity unitPrice purchasePrice mrp sku')
+        .sort({ quantity: -1 })
+        .limit(25)
+        .lean(),
+    ]);
+
+    const round2 = (n: number) =>
+      Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+
+    const total = totals[0] || {
+      sellingValue: 0,
+      purchaseValue: 0,
+      mrpValue: 0,
+      totalQuantity: 0,
+      totalItems: 0,
+    };
+
+    return {
+      totals: {
+        sellingValue: round2(total.sellingValue),
+        purchaseValue: round2(total.purchaseValue),
+        mrpValue: round2(total.mrpValue),
+        totalQuantity: round2(total.totalQuantity),
+        totalItems: total.totalItems || 0,
+      },
+      byCategory: byCategory.map((row) => ({
+        category: row._id,
+        itemCount: row.itemCount,
+        quantity: round2(row.quantity),
+        sellingValue: round2(row.sellingValue),
+        purchaseValue: round2(row.purchaseValue),
+        mrpValue: round2(row.mrpValue),
+      })),
+      topItems: topItems.map((item: any) => ({
+        id: item._id,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        quantity: item.quantity || 0,
+        sellingValue: round2((item.quantity || 0) * (item.unitPrice || 0)),
+        purchaseValue: round2((item.quantity || 0) * (item.purchasePrice || 0)),
+        mrpValue: round2((item.quantity || 0) * (item.mrp || 0)),
+      })),
+    };
+  }
+
   async getItem(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');

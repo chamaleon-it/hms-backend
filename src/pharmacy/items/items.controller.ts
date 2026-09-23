@@ -12,6 +12,9 @@ import {
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { AddItemDto } from './dto/add-items.dto';
@@ -23,7 +26,8 @@ import type { Response } from 'express';
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post()
   async addItems(
     @GetUser() user: JWTUserInterface,
@@ -72,6 +76,17 @@ export class ItemsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('stats/breakdown')
+  async getInventoryValueBreakdown() {
+    const data = await this.itemsService.getInventoryValueBreakdown();
+    return {
+      data,
+      message: 'Inventory value breakdown retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Patch(':id')
   async updateItem(
     @Body() addItemDto: AddItemDto,
@@ -84,7 +99,8 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Delete(':id/batches/:batchId')
   async deleteBatch(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -99,7 +115,8 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Delete('delete_batch/:id/:batchId')
   async deleteBatchAlias(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -114,7 +131,8 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Delete(':id')
   async deleteItem(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.itemsService.deleteItem(id);
@@ -135,7 +153,8 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('add_batch/:id')
   async addBatchItems(
     @Param('id') id: mongoose.Types.ObjectId,
