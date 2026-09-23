@@ -36,6 +36,26 @@ export class OrderItemDto {
   @IsNumber()
   @IsNotEmpty({ message: 'Duration cannot be empty.' })
   quantity: number;
+
+  @IsString({ message: 'Batch number must be a string' })
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsNumber()
+  @IsOptional()
+  unitPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  mrp?: number;
+
+  @IsNumber()
+  @IsOptional()
+  gst?: number;
+
+  @IsNumber()
+  @IsOptional()
+  purchasePrice?: number;
 }
 
 export class CreateOrderDto {

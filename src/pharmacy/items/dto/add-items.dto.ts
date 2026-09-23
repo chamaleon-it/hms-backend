@@ -59,29 +59,32 @@ export class AddItemDto {
   @Transform(trim)
   manufacturer?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Unit price must be a number (max 2 decimals).' },
   )
   @Min(0, { message: 'Unit price cannot be negative.' })
-  unitPrice!: number;
+  unitPrice?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'MRP must be a number (max 2 decimals).' },
   )
   @Min(0, { message: 'MRP cannot be negative.' })
-  mrp!: number;
+  mrp?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
     { message: 'Unit price must be a number (max 2 decimals).' },
   )
   @Min(0, { message: 'Purchase price cannot be negative.' })
-  purchasePrice!: number;
+  purchasePrice?: number;
 
   @Type(() => Number)
   @IsInt({ message: 'Opening stock must be an integer.' })

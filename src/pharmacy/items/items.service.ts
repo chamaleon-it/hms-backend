@@ -97,10 +97,16 @@ export class ItemsService {
           expiryDate: addItemDto?.expiryDate
             ? new Date(addItemDto?.expiryDate)
             : new Date(),
-          purchasePrice: addItemDto.purchasePrice,
+          purchasePrice: addItemDto.purchasePrice || 0,
           quantity: openingQty,
           supplier: addItemDto.supplier || '-',
+          packing: addItemDto.packing || 0,
+          stripCount: (addItemDto as any).stripCount || (addItemDto as any).noOfpacking || 0,
+          mrp: addItemDto.mrp || 0,
+          unitPrice: addItemDto.unitPrice || 0,
+          gst: addItemDto.gst || 0,
         },
+        addItemDto.unitPrice,
         addItemDto.mrp,
       );
       return updatedItem; // ✅ return the DB-refreshed item with correct quantity
@@ -338,6 +344,7 @@ export class ItemsService {
     doctorName?: string,
     pharmacistName?: string,
     patientMrn?: string,
+    batchNumber?: string,
   ) {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
@@ -346,32 +353,50 @@ export class ItemsService {
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
-    const newQuantity = allowNegativeStock
-      ? item.quantity - quantity
-      : Math.max(item.quantity - quantity, 0);
 
-    if (newQuantity !== item.quantity) {
-      item.quantity = newQuantity;
-      await item.save();
+    // If batch specified, deduct from that batch
+    let effectiveUnitPrice = item.unitPrice || 0;
+    if (batchNumber && item.batches && item.batches.length > 0) {
+      const batch = item.batches.find(
+        (b) => b.batchNumber && b.batchNumber.toLowerCase() === batchNumber.trim().toLowerCase(),
+      );
+      if (batch) {
+        batch.quantity = allowNegativeStock
+          ? (batch.quantity || 0) - quantity
+          : Math.max((batch.quantity || 0) - quantity, 0);
+        if (batch.unitPrice) {
+          effectiveUnitPrice = batch.unitPrice;
+        }
+      }
     }
 
-    if (quantity > 0 && newQuantity >= 0) {
-      const newSoldQuantity = item.soldQuantity + quantity;
+    // Keep item total quantity synchronized
+    if (item.batches && item.batches.length > 0) {
+      item.quantity = item.batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+    } else {
+      const newQuantity = allowNegativeStock
+        ? item.quantity - quantity
+        : Math.max(item.quantity - quantity, 0);
+      item.quantity = newQuantity;
+    }
+
+    if (quantity > 0) {
+      const newSoldQuantity = (item.soldQuantity || 0) + quantity;
       item.soldQuantity = newSoldQuantity;
       item.soldHistory.push({
         date: new Date(),
         quantity,
-        unitPrice: item.unitPrice,
-        total: item.unitPrice * quantity,
+        unitPrice: effectiveUnitPrice,
+        total: effectiveUnitPrice * quantity,
         customerName,
         customerPhone,
         doctorName,
         pharmacistName,
         patientMrn,
       });
-      await item.save();
     }
 
+    await item.save();
     return item;
   }
 
@@ -395,36 +420,69 @@ export class ItemsService {
     batchData: {
       batchNumber: string;
       quantity: number;
-      expiryDate: Date;
-      purchasePrice: number;
-      supplier: string;
+      expiryDate: Date | string;
+      purchasePrice?: number;
+      supplier?: string;
+      packing?: number;
+      stripCount?: number;
+      mrp?: number;
+      unitPrice?: number;
+      gst?: number;
     },
-    unitPrice?: number,
-    mrp?: number,
+    legacyUnitPrice?: number,
+    legacyMrp?: number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
 
-    item.batches.push({ ...batchData, createdAt: new Date() });
-    item.quantity += batchData.quantity;
+    const unitPrice = Number(batchData.unitPrice ?? legacyUnitPrice ?? 0);
+    const mrp = Number(batchData.mrp ?? legacyMrp ?? 0);
+    const purchasePrice = Number(batchData.purchasePrice ?? 0);
+    const packing = Number(batchData.packing ?? 0);
+    const stripCount = Number(batchData.stripCount ?? 0);
+    const gst = Number(batchData.gst ?? 0);
+    const quantity = Number(batchData.quantity ?? 0);
+    const expiryDate = batchData.expiryDate ? new Date(batchData.expiryDate) : new Date();
 
-    // if (
-    //   !item.expiryDate ||
-    //   new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-    //   new Date() > new Date(item.expiryDate)
-    // ) {
-    item.expiryDate = batchData.expiryDate;
-    item.purchasePrice = batchData.purchasePrice;
-    item.supplier = batchData.supplier;
-    // }
-    if (unitPrice) {
-      item.unitPrice = unitPrice;
+    if (!item.batches) {
+      item.batches = [];
     }
-    if (mrp) {
-      item.mrp = mrp;
+
+    const existingBatchIndex = item.batches.findIndex(
+      (b) => b.batchNumber && b.batchNumber.toLowerCase() === batchData.batchNumber.trim().toLowerCase(),
+    );
+
+    if (existingBatchIndex >= 0) {
+      const b = item.batches[existingBatchIndex];
+      b.quantity = (Number(b.quantity) || 0) + quantity;
+      b.expiryDate = expiryDate;
+      if (purchasePrice > 0) b.purchasePrice = purchasePrice;
+      if (unitPrice > 0) b.unitPrice = unitPrice;
+      if (mrp > 0) b.mrp = mrp;
+      if (packing > 0) b.packing = packing;
+      if (stripCount > 0) b.stripCount = stripCount;
+      if (gst >= 0) b.gst = gst;
+      if (batchData.supplier && batchData.supplier !== '-') b.supplier = batchData.supplier;
+    } else {
+      item.batches.push({
+        batchNumber: batchData.batchNumber.trim(),
+        quantity,
+        expiryDate,
+        purchasePrice,
+        unitPrice,
+        mrp,
+        packing,
+        stripCount,
+        gst,
+        supplier: batchData.supplier || '-',
+        createdAt: new Date(),
+      } as any);
     }
+
+    // Keep item total quantity synchronized
+    item.quantity = item.batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
     await item.save();
 
     return item;

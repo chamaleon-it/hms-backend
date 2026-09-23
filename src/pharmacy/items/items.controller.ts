@@ -91,6 +91,15 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
+  @Get(':id')
+  async getItem(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.itemsService.getItem(id);
+    return {
+      data,
+      message: 'Item retrieved successfully',
+    };
+  }
+
   @Post('add_batch/:id')
   async addBatchItems(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -99,8 +108,13 @@ export class ItemsController {
       batchNumber: string;
       quantity: number;
       expiryDate: Date;
-      purchasePrice: number;
-      supplier: string;
+      purchasePrice?: number;
+      supplier?: string;
+      packing?: number;
+      stripCount?: number;
+      mrp?: number;
+      unitPrice?: number;
+      gst?: number;
     },
   ) {
     const data = await this.itemsService.addBatchItems(id, batchData);

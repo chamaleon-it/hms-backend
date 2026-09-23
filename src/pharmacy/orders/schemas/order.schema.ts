@@ -42,6 +42,21 @@ export class OrderItem {
 
   @Prop({ required: true })
   quantity: number;
+
+  @Prop({ default: null, trim: true })
+  batchNumber?: string;
+
+  @Prop({ default: 0 })
+  unitPrice?: number;
+
+  @Prop({ default: 0 })
+  mrp?: number;
+
+  @Prop({ default: 0 })
+  gst?: number;
+
+  @Prop({ default: 0 })
+  purchasePrice?: number;
 }
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 

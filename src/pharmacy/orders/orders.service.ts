@@ -70,16 +70,27 @@ export class OrdersService {
       const items = await Promise.all(
         order.items.map(async (item) => {
           const itemData = await this.itemsService.getItem(item.name);
+          const batch = item.batchNumber && itemData.batches
+            ? itemData.batches.find(
+                (b: any) =>
+                  b.batchNumber &&
+                  b.batchNumber.toLowerCase() ===
+                    item.batchNumber?.trim().toLowerCase(),
+              )
+            : itemData.batches?.[0];
 
-          const unitPrice = itemData.unitPrice;
+          const unitPrice =
+            item.unitPrice ?? batch?.unitPrice ?? itemData.unitPrice ?? 0;
           const quantity = item.quantity;
+          const gst = item.gst ?? batch?.gst ?? itemData.gst ?? 0;
 
           return {
             name: itemData.name,
+            batch: item.batchNumber || batch?.batchNumber,
             unitPrice,
             quantity,
             discount: 0,
-            gst: 0,
+            gst,
             total: unitPrice * quantity,
           };
         }),
@@ -779,6 +790,7 @@ export class OrdersService {
             (order as any).doctorName || (order as any).doctor,
             (order as any).pharmacistName || (order as any).pharmacist,
             patientObj?.mrn || (order as any).mrn,
+            (item as any).batchNumber,
           );
         }
       }
@@ -837,16 +849,26 @@ export class OrdersService {
     const items = await Promise.all(
       data.items.map(async (item) => {
         const itemData = await this.itemsService.getItem(item.name);
+        const batch = (item as any).batchNumber && itemData.batches
+          ? itemData.batches.find(
+              (b: any) =>
+                b.batchNumber &&
+                b.batchNumber.toLowerCase() ===
+                  (item as any).batchNumber?.trim().toLowerCase(),
+            )
+          : itemData.batches?.[0];
 
-        const unitPrice = itemData.unitPrice;
+        const unitPrice =
+          (item as any).unitPrice ?? batch?.unitPrice ?? itemData.unitPrice ?? 0;
         const quantity = item.quantity;
 
         return {
           name: itemData.name,
+          batch: (item as any).batchNumber || batch?.batchNumber,
           unitPrice,
           quantity,
           discount: 0,
-          gst: 0,
+          gst: batch?.gst ?? itemData.gst ?? 0,
           total: unitPrice * quantity,
         };
       }),

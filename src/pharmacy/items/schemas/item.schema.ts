@@ -9,6 +9,43 @@ export enum ItemStatus {
   Deleted = 'Deleted',
 }
 
+@Schema({ _id: true, timestamps: true, versionKey: false })
+export class Batch {
+  @Prop({ required: true, trim: true })
+  batchNumber: string;
+
+  @Prop({ type: Number, default: 0 })
+  packing: number;
+
+  @Prop({ type: Number, default: 0 })
+  stripCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  mrp: number;
+
+  @Prop({ type: Number, default: 0 })
+  unitPrice: number;
+
+  @Prop({ type: Number, default: 0 })
+  purchasePrice: number;
+
+  @Prop({ type: Number, default: 0 })
+  gst: number;
+
+  @Prop({ type: Number, default: 0 })
+  quantity: number;
+
+  @Prop({ trim: true, default: '-' })
+  supplier: string;
+
+  @Prop({ type: Date })
+  expiryDate: Date;
+
+  @Prop({ type: Date, default: Date.now })
+  createdAt: Date;
+}
+export const BatchSchema = SchemaFactory.createForClass(Batch);
+
 @Schema({ timestamps: true, versionKey: false })
 export class Item {
   @Prop({ required: true, trim: true })
@@ -44,32 +81,31 @@ export class Item {
   manufacturer?: string;
 
   @Prop({
-    required: true,
+    required: false,
     type: Number,
-    min: [0, 'Unit price cannot be negative'],
+    default: 0,
   })
-  unitPrice: number;
+  unitPrice?: number;
 
   @Prop({
-    required: true,
+    required: false,
     type: Number,
-    min: [0, 'MRP cannot be negative'],
+    default: 0,
   })
-  mrp: number;
+  mrp?: number;
 
   @Prop({
-    required: true,
+    required: false,
     type: Number,
-    min: [0, 'Unit price cannot be negative'],
+    default: 0,
   })
-  purchasePrice: number;
+  purchasePrice?: number;
 
   @Prop({
     default: 0,
     type: Number,
-    min: [0, 'Opening stock cannot be negative'],
   })
-  openingStockQuantity: number;
+  openingStockQuantity?: number;
 
   @Prop({
     type: Number,
@@ -120,13 +156,13 @@ export class Item {
   rackLocation: string;
 
   @Prop({ type: Number, default: 0 })
-  packing: number;
+  packing?: number;
 
   @Prop({ type: Number, default: 0 })
-  noOfPacking: number;
+  noOfPacking?: number;
 
   @Prop({ type: Number, default: 0 })
-  gst: number;
+  gst?: number;
 
   @Prop({
     enum: ItemStatus,
@@ -135,26 +171,10 @@ export class Item {
   status: ItemStatus;
 
   @Prop({
-    type: [
-      {
-        batchNumber: { type: String, required: true },
-        quantity: { type: Number, required: true },
-        expiryDate: { type: Date, required: true },
-        purchasePrice: { type: Number, required: true },
-        supplier: { type: String, required: true },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+    type: [BatchSchema],
     default: [],
   })
-  batches: {
-    batchNumber: string;
-    quantity: number;
-    expiryDate: Date;
-    purchasePrice: number;
-    supplier: string;
-    createdAt: Date;
-  }[];
+  batches: Batch[];
 }
 
 export const ItemSchema = SchemaFactory.createForClass(Item);
