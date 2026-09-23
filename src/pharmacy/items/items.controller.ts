@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UseGuards,
@@ -19,6 +20,11 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { AddItemDto } from './dto/add-items.dto';
 import { GetItemsDto } from './dto/get-items.dto';
+import {
+  CreateBatchDto,
+  PatchBatchStatusDto,
+  UpdateBatchDto,
+} from './dto/batch.dto';
 import mongoose from 'mongoose';
 import type { Response } from 'express';
 
@@ -91,15 +97,69 @@ export class ItemsController {
     @Param('id') id: mongoose.Types.ObjectId,
     @Query('sort') sort?: 'fefo' | 'fifo',
     @Query('includeExpired') includeExpired?: string,
+    @Query('includeInactive') includeInactive?: string,
   ) {
     const data = await this.itemsService.getItemBatches(
       id,
       sort === 'fifo' ? 'fifo' : 'fefo',
       includeExpired === 'true',
+      includeInactive === 'true',
     );
     return {
       data,
       message: 'Batches retrieved successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Post(':id/batches')
+  async createBatch(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: CreateBatchDto,
+  ) {
+    const data = await this.itemsService.createBatch(id, dto);
+    return {
+      data,
+      message: 'Batch created successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PHARMACY)
+  @Put(':id/batches/:batchNumber')
+  async updateBatch(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchNumber') batchNumber: string,
+    @Body() dto: UpdateBatchDto,
+  ) {
+    const data = await this.itemsService.updateBatchByNumber(
+      id,
+      decodeURIComponent(batchNumber),
+      dto,
+    );
+    return {
+      data,
+      message: 'Batch updated successfully',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PHARMACY)
+  @Patch(':id/batches/:batchNumber/status')
+  async patchBatchStatus(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Param('batchNumber') batchNumber: string,
+    @Body() dto: PatchBatchStatusDto,
+  ) {
+    const data = await this.itemsService.patchBatchStatus(
+      id,
+      decodeURIComponent(batchNumber),
+      dto,
+    );
+    return {
+      data,
+      message: `Batch ${dto.status === 'active' ? 'activated' : 'deactivated'} successfully`,
     };
   }
 
@@ -181,21 +241,15 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
+  /** Legacy alias — prefer POST :id/batches */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('add_batch/:id')
   async addBatchItems(
     @Param('id') id: mongoose.Types.ObjectId,
-    @Body()
-    batchData: {
-      batchNumber: string;
-      quantity: number;
-      expiryDate: Date;
-      purchasePrice: number;
-      supplier: string;
-    },
+    @Body() batchData: CreateBatchDto,
   ) {
-    const data = await this.itemsService.addBatchItems(id, batchData);
+    const data = await this.itemsService.createBatch(id, batchData);
     return {
       data,
       message: 'Batch items added successfully',

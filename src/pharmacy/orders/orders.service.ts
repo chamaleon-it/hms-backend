@@ -55,9 +55,14 @@ export class OrdersService {
         item.name,
         'fefo',
         true,
+        true, // include inactive so we can reject with a clear message
       );
       const availableBatches = (batchInfo.batches || []).filter(
-        (b) => !b.expired && b.available !== false && b.stock > 0,
+        (b) =>
+          !b.expired &&
+          b.available !== false &&
+          b.status !== 'inactive' &&
+          b.stock > 0,
       );
 
       // When stocked batches exist, force an explicit batch pick (no silent FEFO)
@@ -77,9 +82,19 @@ export class OrdersService {
             `Selected batch not found for item ${batchInfo.name}`,
           );
         }
+        if (batch.status === 'inactive') {
+          throw new BadRequestException(
+            `Cannot order from inactive batch ${batch.batchNumber}`,
+          );
+        }
         if (batch.expired) {
           throw new BadRequestException(
             `Cannot order from expired batch ${batch.batchNumber}`,
+          );
+        }
+        if ((batch.stock || 0) <= 0) {
+          throw new BadRequestException(
+            `Batch ${batch.batchNumber} has zero stock`,
           );
         }
         const allowNeg =
@@ -91,14 +106,18 @@ export class OrdersService {
             `Insufficient batch stock for ${batchInfo.name} (${batch.batchNumber}). Available: ${batch.stock}`,
           );
         }
-        // Freeze snapshot fields on the order line
+        // Freeze snapshot fields on the order line (prefer batch saleRate)
         item.batchNumber = item.batchNumber || batch.batchNumber;
         item.batchExpiryDate = item.batchExpiryDate || batch.expiryDate;
         item.batchMrp = item.batchMrp ?? batch.mrp;
         item.batchPurchasePrice =
-          item.batchPurchasePrice ?? batch.purchasePrice;
+          item.batchPurchasePrice ??
+          batch.purchaseRate ??
+          batch.purchasePrice;
         item.batchSellingPrice =
-          item.batchSellingPrice ?? batch.sellingPrice;
+          item.batchSellingPrice ??
+          batch.saleRate ??
+          batch.sellingPrice;
         item.batchGst = item.batchGst ?? batch.gst;
         item.batchStock = item.batchStock ?? batch.stock;
         item.batchSupplier = item.batchSupplier || batch.supplier;
