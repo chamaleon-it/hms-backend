@@ -6,11 +6,18 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { RegisterTechnicianDto } from './dto/register-technician.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('technician')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.LAB, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class TechnicianController {
   constructor(private readonly technicianService: TechnicianService) {}
 

@@ -52,4 +52,28 @@ export class GetBillisDto {
   @IsOptional()
   @IsString()
   activeDate?: string;
+
+  /**
+   * Soft billing categories (heuristic). Include-if-any line matches.
+   * Values: Consultation | Clinical | Pharmacy | Lab | Dressing | Sale | Return
+   */
+  @IsOptional()
+  @Transform(({ value }) => (value === '' || value === 'all' ? undefined : value))
+  @IsEnum([
+    'Consultation',
+    'Clinical',
+    'Pharmacy',
+    'Lab',
+    'Dressing',
+    'Sale',
+    'Return',
+  ])
+  billingType?:
+    | 'Consultation'
+    | 'Clinical'
+    | 'Pharmacy'
+    | 'Lab'
+    | 'Dressing'
+    | 'Sale'
+    | 'Return';
 }

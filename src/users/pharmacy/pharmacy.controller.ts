@@ -6,7 +6,6 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Controller('users/pharmacy')
 export class PharmacyController {
@@ -51,19 +50,6 @@ export class PharmacyController {
     return {
       data,
       message: 'Pharmacy inventory settings updated successfully',
-    };
-  }
-
-  @Patch('notifications')
-  @UseGuards(JwtAuthGuard)
-  async updateNotifications(
-    @GetUser() user: JWTUserInterface,
-    @Body() dto: UpdateNotificationsDto,
-  ) {
-    const data = await this.pharmacyService.updateNotifications(user.id, dto);
-    return {
-      data,
-      message: 'Pharmacy notifications settings updated successfully',
     };
   }
 }

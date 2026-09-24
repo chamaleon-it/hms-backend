@@ -11,27 +11,41 @@ import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    private readonly countersService: CountersService,
   ) { }
 
   private async generateUniqueMRN(): Promise<string> {
-    let mrn: string;
-    let exists = true;
-
-    do {
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      mrn = `${randomNum}`;
-
-      // Check if MRN already exists
-      const existing = await this.patientModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+    // Sequential patient PID. Seed from max numeric mrn already in DB.
+    return this.countersService.nextFormatted(COUNTER_KEYS.PATIENT_PID, {
+      getInitialMax: async () => {
+        const result = await this.patientModel.aggregate<{ max: number }>([
+          { $match: { mrn: { $regex: /^\d+$/ } } },
+          {
+            $project: {
+              n: {
+                $convert: {
+                  input: '$mrn',
+                  to: 'int',
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+          },
+          { $group: { _id: null, max: { $max: '$n' } } },
+        ]);
+        return result[0]?.max ?? 0;
+      },
+    });
   }
 
   async register(

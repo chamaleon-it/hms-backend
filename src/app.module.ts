@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import configuration from './config/configuration';
+import { InHouseConfigValidator } from './config/in-house';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
@@ -24,6 +25,8 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
 import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
+import { ConsumablesModule } from './pharmacy/consumables/consumables.module';
+import { CountersModule } from './counters/counters.module';
 
 @Module({
   imports: [
@@ -35,6 +38,7 @@ import { AdminModule } from './admin/admin.module';
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    CountersModule,
     UsersModule,
     AuthModule,
     AppointmentsModule,
@@ -53,8 +57,9 @@ import { AdminModule } from './admin/admin.module';
     PharmacistModule,
     TechnicianModule,
     AdminModule,
+    ConsumablesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, InHouseConfigValidator],
 })
 export class AppModule {}

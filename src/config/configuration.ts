@@ -5,18 +5,11 @@ export default () => ({
     refreshToken: 'refreshTokenrefreshToken',
     forgotPassword: 'forgotPasswordforgotPassword',
   },
-  in_house_lab_id: process.env.IN_HOUSE_LAB_ID,
-  in_house_pharmacy_id: process.env.IN_HOUSE_PHARMACY_ID as string,
-  in_doctor_id: process.env.IN_DOCTOR_ID as string,
+  /** Env-specific user ObjectIds — never hard-code per-database values here. */
+  in_house_lab_id: (process.env.IN_HOUSE_LAB_ID || '').trim(),
+  in_house_pharmacy_id: (process.env.IN_HOUSE_PHARMACY_ID || '').trim(),
+  in_house_reception_id: (process.env.IN_HOUSE_RECEPTION || '').trim(),
+  in_doctor_id: (process.env.IN_DOCTOR_ID || '').trim(),
+  /** Shared secret for LIS machine ingest (`POST /lab/report/lis-result`). */
+  lisApiKey: (process.env.LIS_API_KEY || '').trim(),
 });
-
-// export default () => ({
-//   databaseUrl: "mongodb+srv://root:hms321@hms.rtnjqlm.mongodb.net/development?retryWrites=true&w=majority&appName=HMS", // "mongodb://localhost:27017/dev", //process.env.DATABASE_URL as string,
-//   secret: {
-//     accessToken: 'accessTokenaccessToken',
-//     refreshToken: 'refreshTokenrefreshToken',
-//     forgotPassword: 'forgotPasswordforgotPassword',
-//   },
-//   in_house_lab_id: "68e4e8c7534364541c8deeb2",// "696491f1d123c2740e924a7a", //process.env.IN_HOUSE_LAB_ID,
-//   in_house_pharmacy_id: "68e4e8c7534364541c8deeb2"//"696491f1d123c2740e924a7a", //process.env.IN_HOUSE_PHARMACY_ID as string,
-// });

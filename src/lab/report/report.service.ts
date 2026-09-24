@@ -11,10 +11,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Report, ReportStatus } from './schemas/report.schema';
 // import { GetReportDto } from './dto/get-report.dto';
-import configuration from 'src/config/configuration';
+import { getInHouseObjectId } from 'src/config/in-house';
 import { ResultDto } from './dto/result.dto';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { GetLabPatientsDto } from './dto/get-lab-patients.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 import { Test } from '../panels/schemas/test.schema';
 import { Patient } from '../../patients/schemas/patient.schema';
@@ -22,6 +23,10 @@ import { Panel } from '../panels/schemas/panel.schema';
 import { Group } from '../panels/schemas/group.schema';
 import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class ReportService implements OnModuleInit {
@@ -32,6 +37,7 @@ export class ReportService implements OnModuleInit {
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Group.name) private groupModel: Model<Group>,
     private billingService: BillingService,
+    private readonly countersService: CountersService,
   ) {}
 
   async onModuleInit() {
@@ -47,9 +53,22 @@ export class ReportService implements OnModuleInit {
       console.error('[Migration] Error migrating reports:', e);
     }
   }
+
+  private async nextLabReportMrn(): Promise<number> {
+    return this.countersService.next(COUNTER_KEYS.LAB_REPORT, async () => {
+      const last = await this.reportModel
+        .findOne()
+        .sort({ mrn: -1 })
+        .select('mrn')
+        .lean()
+        .exec();
+      return last?.mrn ? Number(last.mrn) : 0;
+    });
+  }
+
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
-      dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
+      dto.lab = getInHouseObjectId('lab');
     }
     const startOfDay = new Date(dto.date);
     startOfDay.setUTCHours(0, 0, 0, 0);
@@ -65,7 +84,8 @@ export class ReportService implements OnModuleInit {
     });
 
     if (!userReport) {
-      const data = await this.reportModel.create(dto);
+      const mrn = await this.nextLabReportMrn();
+      const data = await this.reportModel.create({ ...dto, mrn });
       await this.createOrUpdateDraftBill(data);
       return data;
     } else {
@@ -209,9 +229,7 @@ export class ReportService implements OnModuleInit {
     match.isDeleted = false;
 
     if (dto.status) {
-      if (dto.status === 'Flagged') {
-        match.isFlagged = true;
-      } else if (dto.status === 'Deleted') {
+      if (dto.status === 'Deleted') {
         match.isDeleted = true;
       } else {
         match.status = dto.status;
@@ -476,7 +494,20 @@ export class ReportService implements OnModuleInit {
     return report;
   }
 
-  async getPatients() {
+  async getPatients(query: GetLabPatientsDto = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      q,
+      gender,
+      doctor,
+      lastVisit,
+      from,
+      to,
+      age,
+    } = query;
+    const skip = (page - 1) * limit;
+
     type PatientOut = {
       _id: mongoose.Types.ObjectId;
       name?: string;
@@ -485,68 +516,142 @@ export class ReportService implements OnModuleInit {
       dateOfBirth?: Date;
       address?: string;
       mrn?: string;
+      doctor?: mongoose.Types.ObjectId;
       createdAt?: Date;
       visits: number;
       lastVisit?: Date;
     };
 
+    const pipeline: any[] = [
+      {
+        $match: {
+          patient: { $exists: true, $ne: null },
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$patient',
+          visits: { $sum: 1 },
+          lastVisit: { $max: '$createdAt' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'patients',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'patient',
+        },
+      },
+      { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: [
+              '$patient',
+              { visits: '$visits', lastVisit: '$lastVisit' },
+            ],
+          },
+        },
+      },
+    ];
+
+    const postMatch: any = {};
+
+    if (q) {
+      const searchRegex = { $regex: q, $options: 'i' };
+      const orConditions: any[] = [
+        { name: searchRegex },
+        { phoneNumber: searchRegex },
+        { address: searchRegex },
+        { mrn: searchRegex },
+      ];
+      if (mongoose.isValidObjectId(q)) {
+        orConditions.push({ _id: new mongoose.Types.ObjectId(q) });
+      }
+      postMatch.$or = orConditions;
+    }
+
+    if (gender) {
+      postMatch.gender = gender;
+    }
+
+    if (doctor && mongoose.isValidObjectId(doctor)) {
+      postMatch.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
+    if (age) {
+      const [minAge, maxAge] = age.split('-').map(Number);
+      if (!isNaN(minAge) && !isNaN(maxAge)) {
+        const now = new Date();
+        const minDate = new Date(
+          now.getFullYear() - maxAge - 1,
+          now.getMonth(),
+          now.getDate(),
+        );
+        const maxDate = new Date(
+          now.getFullYear() - minAge,
+          now.getMonth(),
+          now.getDate(),
+        );
+        postMatch.dateOfBirth = { $gte: minDate, $lte: maxDate };
+      }
+    }
+
+    if (lastVisit) {
+      const now = new Date();
+      if (lastVisit === '7') {
+        const dateLimit = new Date(now);
+        dateLimit.setDate(dateLimit.getDate() - 7);
+        postMatch.lastVisit = { $gte: dateLimit };
+      } else if (lastVisit === '30') {
+        const dateLimit = new Date(now);
+        dateLimit.setDate(dateLimit.getDate() - 30);
+        postMatch.lastVisit = { $gte: dateLimit };
+      } else if (lastVisit === 'Custom' && from && to) {
+        postMatch.lastVisit = {
+          $gte: new Date(from),
+          $lte: new Date(to),
+        };
+      }
+    }
+
+    if (Object.keys(postMatch).length > 0) {
+      pipeline.push({ $match: postMatch });
+    }
+
+    pipeline.push({
+      $project: {
+        name: 1,
+        address: 1,
+        mrn: 1,
+        dateOfBirth: 1,
+        gender: 1,
+        phoneNumber: 1,
+        doctor: 1,
+        createdAt: 1,
+        visits: 1,
+        lastVisit: 1,
+      },
+    });
+
+    const countResult = await this.reportModel.aggregate([
+      ...pipeline,
+      { $count: 'total' },
+    ]);
+    const total = countResult[0]?.total ?? 0;
+
     const patients: PatientOut[] = await this.reportModel
       .aggregate([
-        {
-          $match: {
-            patient: { $exists: true, $ne: null },
-            isDeleted: false,
-          },
-        },
-
-        {
-          $group: {
-            _id: '$patient',
-            visits: { $sum: 1 },
-            lastVisit: { $max: '$createdAt' },
-          },
-        },
-
-        {
-          $lookup: {
-            from: 'patients',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'patient',
-          },
-        },
-
-        { $unwind: { path: '$patient', preserveNullAndEmptyArrays: false } },
-
-        {
-          $replaceRoot: {
-            newRoot: {
-              $mergeObjects: [
-                '$patient',
-                { visits: '$visits', lastVisit: '$lastVisit' },
-              ],
-            },
-          },
-        },
-
-        {
-          $project: {
-            name: 1,
-            address: 1,
-            mrn: 1,
-            dateOfBirth: 1,
-            gender: 1,
-            phoneNumber: 1,
-            createdAt: 1,
-            visits: 1,
-            lastVisit: 1,
-          },
-        },
-        { $sort: { createdAt: -1 } },
+        ...pipeline,
+        { $sort: { lastVisit: -1 } },
+        { $skip: skip },
+        { $limit: limit },
       ])
       .exec();
 
-    return patients;
+    return { data: patients, total };
   }
 
   async sampleCollected(id: mongoose.Types.ObjectId, dto: SampleCollectedDto) {
@@ -606,26 +711,6 @@ export class ReportService implements OnModuleInit {
     return data;
   }
 
-  async markAsFlagged(id: mongoose.Types.ObjectId) {
-    const data = await this.reportModel.findById(id);
-    if (!data) {
-      throw new NotFoundException('Records not found');
-    }
-    data.isFlagged = true;
-    await data.save();
-    return data;
-  }
-
-  async markAsUnflagged(id: mongoose.Types.ObjectId) {
-    const data = await this.reportModel.findById(id);
-    if (!data) {
-      throw new NotFoundException('Records not found');
-    }
-    data.isFlagged = false;
-    await data.save();
-    return data;
-  }
-
   async getStatistics() {
     const data: any[] = await this.reportModel.aggregate([
       {
@@ -668,15 +753,6 @@ export class ReportService implements OnModuleInit {
             $sum: {
               $cond: {
                 if: { $eq: ['$status', ReportStatus.COMPLETED] },
-                then: 1,
-                else: 0,
-              },
-            },
-          },
-          flagged: {
-            $sum: {
-              $cond: {
-                if: { $eq: ['$isFlagged', true] },
                 then: 1,
                 else: 0,
               },
