@@ -9,8 +9,8 @@ import { Return, ReturnReason } from './schemas/return.schema';
 import mongoose, { Model } from 'mongoose';
 import { ItemsService } from '../items/items.service';
 import { Billing } from 'src/billing/schemas/billing.schema';
-import configuration from 'src/config/configuration';
 import { UsersService } from 'src/users/users.service';
+import { requireInHouseId } from 'src/config/in-house';
 
 @Injectable()
 export class ReturnService {
@@ -35,7 +35,7 @@ export class ReturnService {
 
     await this.billingModel.create({
       patient: createReturnDto.patient,
-      user: configuration().in_house_pharmacy_id,
+      user: requireInHouseId('pharmacy'),
       items: await Promise.all(
         createReturnDto.items.map(async (e) => {
           const item = await this.itemsService.getItem(e.name);

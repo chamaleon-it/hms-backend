@@ -11,7 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Report, ReportStatus } from './schemas/report.schema';
 // import { GetReportDto } from './dto/get-report.dto';
-import configuration from 'src/config/configuration';
+import { getInHouseObjectId } from 'src/config/in-house';
 import { ResultDto } from './dto/result.dto';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
@@ -49,7 +49,7 @@ export class ReportService implements OnModuleInit {
   }
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
-      dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
+      dto.lab = getInHouseObjectId('lab');
     }
     const startOfDay = new Date(dto.date);
     startOfDay.setUTCHours(0, 0, 0, 0);

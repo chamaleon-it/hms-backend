@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/createUser.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -14,13 +16,61 @@ import { JwtService } from '@nestjs/jwt';
 import configuration from 'src/config/configuration';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
+import { sanitizeUser } from 'src/auth/sanitize-user';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
   ) {}
+
+  /**
+   * H2: replace legacy non-sparse unique `username_1` with a partial unique
+   * index so multiple users may omit username / store null without E11000.
+   */
+  async onModuleInit() {
+    try {
+      const collection = this.userModel.collection;
+      const indexes = await collection.indexes();
+      const usernameIdx = indexes.find((idx) => idx.name === 'username_1');
+      const isPartialUnique =
+        !!usernameIdx?.unique &&
+        !!usernameIdx?.partialFilterExpression &&
+        JSON.stringify(usernameIdx.partialFilterExpression) ===
+          JSON.stringify({ username: { $type: 'string', $gt: '' } });
+
+      if (usernameIdx && !isPartialUnique) {
+        await collection.dropIndex('username_1');
+        this.logger.log(
+          'Dropped legacy non-partial username_1 index (allows multiple null usernames)',
+        );
+      }
+
+      if (!isPartialUnique) {
+        await collection.createIndex(
+          { username: 1 },
+          {
+            unique: true,
+            name: 'username_1',
+            partialFilterExpression: {
+              username: { $type: 'string', $gt: '' },
+            },
+          },
+        );
+        this.logger.log(
+          'Ensured partial unique username_1 index (unique when set)',
+        );
+      }
+    } catch (err: any) {
+      // Index ops can fail briefly during deploy; do not crash boot.
+      this.logger.warn(
+        `Username index migration skipped/failed: ${err?.message || err}`,
+      );
+    }
+  }
 
   async createUser(createUserDto: CreateUserDto) {
     const isUserExist = await this.userModel.findOne({
@@ -33,7 +83,7 @@ export class UsersService {
     }
     createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
     const user = await this.userModel.create(createUserDto);
-    return user;
+    return sanitizeUser(user);
   }
 
   async getProfile(user: JWTUserInterface) {

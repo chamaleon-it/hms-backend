@@ -15,6 +15,9 @@ import mongoose from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -22,9 +25,15 @@ import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
-import configuration from 'src/config/configuration';
 
 @Controller('pharmacy/orders')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(
+  UserRole.PHARMACY,
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+  UserRole.DOCTOR,
+)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
@@ -68,7 +77,6 @@ export class OrdersController {
   }
 
   @Post('packed')
-  @UseGuards(JwtAuthGuard)
   async itemPacked(
     @Body() packedDto: PackedDto,
     @GetUser() user: JWTUserInterface,
@@ -81,7 +89,6 @@ export class OrdersController {
   }
 
   @Post('mark_all_as_packed')
-  @UseGuards(JwtAuthGuard)
   async markAllAsPacked(
     @Body() markAllAsPackedDto: MarkAllAsPackedDto,
     @GetUser() user: JWTUserInterface,
@@ -130,7 +137,6 @@ export class OrdersController {
     };
   }
   @Patch('complete/:id')
-  @UseGuards(JwtAuthGuard)
   async completeOrder(
     @Param('id') id: mongoose.Types.ObjectId,
     @GetUser() user: JWTUserInterface,
