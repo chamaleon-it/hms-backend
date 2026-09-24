@@ -11,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import configuration from 'src/config/configuration';
 import { GetRefreshTokenDto } from './dto/get-refresh-token.dto';
+import { sanitizeUser } from './sanitize-user';
 
 @Injectable()
 export class AuthService {
@@ -71,7 +72,7 @@ export class AuthService {
     await user.save();
 
     return {
-      user,
+      user: sanitizeUser(user),
       accessToken,
       refreshToken,
     };
@@ -116,7 +117,11 @@ export class AuthService {
       user.refreshToken = refreshToken;
       await user.save();
 
-      return { user, accessToken, refreshToken };
+      return {
+        user: sanitizeUser(user),
+        accessToken,
+        refreshToken,
+      };
     } catch (error) {
       throw error;
     }

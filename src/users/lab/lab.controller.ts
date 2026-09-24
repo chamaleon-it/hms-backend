@@ -52,7 +52,7 @@ export class LabController {
   }
 
   @Get('')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getLab() {
     const data = await this.labService.getLab();
     return {

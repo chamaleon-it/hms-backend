@@ -13,7 +13,7 @@ import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
 import { UsersService } from 'src/users/users.service';
-import configuration from 'src/config/configuration';
+import { getInHouseObjectId, requireInHouseId } from 'src/config/in-house';
 import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
@@ -55,9 +55,14 @@ export class OrdersService {
         item.name,
         'fefo',
         true,
+        true, // include inactive so we can reject with a clear message
       );
       const availableBatches = (batchInfo.batches || []).filter(
-        (b) => !b.expired && b.available !== false && b.stock > 0,
+        (b) =>
+          !b.expired &&
+          b.available !== false &&
+          b.status !== 'inactive' &&
+          b.stock > 0,
       );
 
       // When stocked batches exist, force an explicit batch pick (no silent FEFO)
@@ -77,28 +82,42 @@ export class OrdersService {
             `Selected batch not found for item ${batchInfo.name}`,
           );
         }
+        if (batch.status === 'inactive') {
+          throw new BadRequestException(
+            `Cannot order from inactive batch ${batch.batchNumber}`,
+          );
+        }
         if (batch.expired) {
           throw new BadRequestException(
             `Cannot order from expired batch ${batch.batchNumber}`,
           );
         }
+        if ((batch.stock || 0) <= 0) {
+          throw new BadRequestException(
+            `Batch ${batch.batchNumber} has zero stock`,
+          );
+        }
         const allowNeg =
           await this.usersService.getPharmacyInventoryAllowNegativeStock(
-            new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+            getInHouseObjectId('pharmacy'),
           );
         if (!allowNeg && batch.stock < item.quantity) {
           throw new BadRequestException(
             `Insufficient batch stock for ${batchInfo.name} (${batch.batchNumber}). Available: ${batch.stock}`,
           );
         }
-        // Freeze snapshot fields on the order line
+        // Freeze snapshot fields on the order line (prefer batch saleRate)
         item.batchNumber = item.batchNumber || batch.batchNumber;
         item.batchExpiryDate = item.batchExpiryDate || batch.expiryDate;
         item.batchMrp = item.batchMrp ?? batch.mrp;
         item.batchPurchasePrice =
-          item.batchPurchasePrice ?? batch.purchasePrice;
+          item.batchPurchasePrice ??
+          batch.purchaseRate ??
+          batch.purchasePrice;
         item.batchSellingPrice =
-          item.batchSellingPrice ?? batch.sellingPrice;
+          item.batchSellingPrice ??
+          batch.saleRate ??
+          batch.sellingPrice;
         item.batchGst = item.batchGst ?? batch.gst;
         item.batchStock = item.batchStock ?? batch.stock;
         item.batchSupplier = item.batchSupplier || batch.supplier;
@@ -108,7 +127,7 @@ export class OrdersService {
 
     const data = await this.orderModel.create(order);
     const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      configuration().in_house_pharmacy_id,
+      requireInHouseId('pharmacy'),
     );
     if (autoGenerateBill) {
       const items = await Promise.all(
@@ -142,7 +161,7 @@ export class OrdersService {
       const bill = await this.billingService.generateBill({
         patient: order.patient,
         items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        user: getInHouseObjectId('pharmacy'),
         discount: order.discount ?? 0,
         doctor: order.doctorName || "Self",
       });
@@ -714,7 +733,7 @@ export class OrdersService {
       await this.billingService.generateBill({
         patient: data.patient,
         items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        user: getInHouseObjectId('pharmacy'),
         discount: data.discount ?? 0,
         doctor: existOrder.doctorName || "Self",
       });

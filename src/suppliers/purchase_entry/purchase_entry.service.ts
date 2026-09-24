@@ -54,16 +54,22 @@ export class PurchaseEntryService {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
+      const saleRate =
+        item.pack > 0 ? item.unitPrice / item.pack : item.unitPrice;
       await this.itemsService.addBatchItems(
         item.item,
         {
           batchNumber: item.batch,
           quantity: item.quantity,
           expiryDate: item.expiryDate,
+          purchaseRate: item.purchasePrice,
           purchasePrice: item.purchasePrice,
+          saleRate,
+          mrp: item.unitPrice,
+          startingQuantity: item.quantity,
           supplier: supplier?.name || '-',
         },
-        item.unitPrice / item.pack,
+        saleRate,
         item.unitPrice,
       );
     }
