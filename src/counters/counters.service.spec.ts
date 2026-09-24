@@ -61,6 +61,7 @@ describe('CountersService', () => {
           { key }: { key: string },
           update: {
             $inc?: { seq: number };
+            $max?: { seq: number };
             $setOnInsert?: { key?: string; name?: string };
           },
           opts: { new?: boolean; upsert?: boolean },
@@ -76,11 +77,17 @@ describe('CountersService', () => {
                     seq: 0,
                   };
                   assertLegacyName(insertDoc);
+                  if (update.$max?.seq != null) {
+                    insertDoc.seq = Math.max(insertDoc.seq, update.$max.seq);
+                  }
                   insertDoc.seq = (insertDoc.seq ?? 0) + (update.$inc?.seq ?? 0);
                   store.set(key, insertDoc);
                   return { ...insertDoc };
                 }
                 return null;
+              }
+              if (update.$max?.seq != null) {
+                cur.seq = Math.max(cur.seq, update.$max.seq);
               }
               cur.seq += update.$inc?.seq ?? 0;
               store.set(key, cur);
@@ -114,6 +121,45 @@ describe('CountersService', () => {
       getInitialMax: async () => 0,
     });
     expect(id).toBe('RX0001');
+  });
+
+  it('peek returns next without consuming', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    store.set(COUNTER_KEYS.PATIENT_PID, {
+      key: COUNTER_KEYS.PATIENT_PID,
+      name: COUNTER_KEYS.PATIENT_PID,
+      seq: 10,
+    });
+    expect(await service.peek(COUNTER_KEYS.PATIENT_PID)).toBe(11);
+    expect(await service.peek(COUNTER_KEYS.PATIENT_PID)).toBe(11);
+    expect(store.get(COUNTER_KEYS.PATIENT_PID)?.seq).toBe(10);
+    expect(
+      await service.peekFormatted(COUNTER_KEYS.PATIENT_PID, { prefix: '' }),
+    ).toBe('11');
+  });
+
+  it('peek seeds from initial max when counter missing', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    expect(await service.peek(COUNTER_KEYS.PATIENT_PID, async () => 42)).toBe(
+      43,
+    );
+    expect(store.has(COUNTER_KEYS.PATIENT_PID)).toBe(false);
+  });
+
+  it('ensureAtLeast raises floor without skipping further next', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    store.set(COUNTER_KEYS.PATIENT_PID, {
+      key: COUNTER_KEYS.PATIENT_PID,
+      name: COUNTER_KEYS.PATIENT_PID,
+      seq: 5,
+    });
+    await service.ensureAtLeast(COUNTER_KEYS.PATIENT_PID, 12);
+    expect(store.get(COUNTER_KEYS.PATIENT_PID)?.seq).toBe(12);
+    const next = await service.next(COUNTER_KEYS.PATIENT_PID);
+    expect(next).toBe(13);
   });
 
   it('builds invoice keys per prefix', () => {

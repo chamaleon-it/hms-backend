@@ -61,6 +61,16 @@ export class PatientsController {
     };
   }
 
+  /** Peek next Customer ID (PID) — does not consume; allocate on create. */
+  @Get('next-pid')
+  async peekNextPid() {
+    const pid = await this.patientsService.peekNextPid();
+    return {
+      data: { pid },
+      message: 'Next patient PID peeked successfully',
+    };
+  }
+
   @Get('single/:id')
   async getSinglePatient(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.patientsService.getSinglePatient(id);

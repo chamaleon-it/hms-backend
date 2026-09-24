@@ -153,6 +153,72 @@ export class CountersService implements OnModuleInit {
     }
   }
 
+  /**
+   * Read the next sequence without consuming it.
+   * Use for UI previews; allocate with `next` / `nextFormatted` on create.
+   */
+  async peek(
+    key: string,
+    getInitialMax: () => Promise<number> = async () => 0,
+  ): Promise<number> {
+    const existing = await this.counterModel.findOne({ key }).lean().exec();
+    if (!existing) {
+      const max = Math.max(0, Math.floor(Number(await getInitialMax()) || 0));
+      return max + 1;
+    }
+    return Math.max(0, Math.floor(Number(existing.seq) || 0)) + 1;
+  }
+
+  /**
+   * Raise the counter floor so `seq >= minSeq` without issuing a new id.
+   * Used when a client-supplied numeric id was accepted on create.
+   */
+  async ensureAtLeast(key: string, minSeq: number): Promise<void> {
+    const floor = Math.max(0, Math.floor(Number(minSeq) || 0));
+    if (floor <= 0) return;
+
+    try {
+      await this.counterModel
+        .findOneAndUpdate(
+          { key },
+          {
+            $max: { seq: floor },
+            $setOnInsert: { key, name: key },
+          },
+          { upsert: true, setDefaultsOnInsert: true },
+        )
+        .lean()
+        .exec();
+    } catch (err) {
+      if (!isDuplicateKeyError(err)) {
+        throw err;
+      }
+      // Race / legacy name_1 — seed then $max without upsert.
+      try {
+        await this.counterModel.create({ key, name: key, seq: floor });
+      } catch (createErr) {
+        if (!isDuplicateKeyError(createErr)) {
+          throw createErr;
+        }
+        await this.counterModel
+          .findOneAndUpdate({ key }, { $max: { seq: floor } })
+          .lean()
+          .exec();
+      }
+    }
+  }
+
+  private formatSeq(
+    seq: number,
+    opts: { prefix?: string; pad?: number } = {},
+  ): string {
+    const body =
+      opts.pad && opts.pad > 0
+        ? String(seq).padStart(opts.pad, '0')
+        : String(seq);
+    return `${opts.prefix ?? ''}${body}`;
+  }
+
   /** Format helpers for call sites that need prefixed / padded IDs. */
   async nextFormatted(
     key: string,
@@ -163,10 +229,19 @@ export class CountersService implements OnModuleInit {
     } = {},
   ): Promise<string> {
     const seq = await this.next(key, opts.getInitialMax);
-    const body =
-      opts.pad && opts.pad > 0
-        ? String(seq).padStart(opts.pad, '0')
-        : String(seq);
-    return `${opts.prefix ?? ''}${body}`;
+    return this.formatSeq(seq, opts);
+  }
+
+  /** Peek next formatted id without consuming the counter. */
+  async peekFormatted(
+    key: string,
+    opts: {
+      prefix?: string;
+      pad?: number;
+      getInitialMax?: () => Promise<number>;
+    } = {},
+  ): Promise<string> {
+    const seq = await this.peek(key, opts.getInitialMax);
+    return this.formatSeq(seq, opts);
   }
 }
