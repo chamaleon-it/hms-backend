@@ -19,6 +19,7 @@ import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { GetLabPatientsDto } from './dto/get-lab-patients.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
@@ -116,10 +117,11 @@ export class ReportController {
 
   @Get('patients')
   @UseGuards(JwtAuthGuard)
-  async getPatients() {
-    const data = await this.reportService.getPatients();
+  async getPatients(@Query() query: GetLabPatientsDto) {
+    const { data, total } = await this.reportService.getPatients(query);
     return {
       data,
+      total,
       message: 'All patient data retrived',
     };
   }
@@ -131,25 +133,6 @@ export class ReportController {
     return {
       data,
       message: 'All statistics retrived',
-    };
-  }
-
-  @Post('mark_as_flagged/:id')
-  @UseGuards(JwtAuthGuard)
-  async markAsFlagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsFlagged(id);
-    return {
-      message: 'Report is marked as flagged',
-      data,
-    };
-  }
-  @Post('mark_as_unflagged/:id')
-  @UseGuards(JwtAuthGuard)
-  async markAsUnflagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsUnflagged(id);
-    return {
-      message: 'Report is marked as unflagged',
-      data,
     };
   }
 
