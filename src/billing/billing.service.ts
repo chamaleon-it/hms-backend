@@ -122,15 +122,45 @@ export class BillingService {
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
-    const qEndFound = await this.billingModel.exists({
-      mrn: qEnd?.toUpperCase(),
-    });
+
+    // Legacy invoice-range: From/To MRN when both q and qEnd are set and qEnd exists
+    const qEndFound =
+      qEnd &&
+      (await this.billingModel.exists({
+        mrn: qEnd?.toUpperCase(),
+      }));
 
     if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
+    } else if (q?.trim()) {
+      // Single search: invoice (bill mrn / salesMRN), patient PID, name, phone
+      const escaped = q
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+      const patientDocs = await this.billingModel.db
+        .collection('patients')
+        .find({
+          $or: [
+            { name: searchRegex },
+            { phoneNumber: searchRegex },
+            { mrn: searchRegex },
+          ],
+        })
+        .project({ _id: 1 })
+        .toArray();
+      const patientIds = patientDocs.map((p) => p._id);
+      match.$or = [
+        { mrn: searchRegex },
+        { salesMRN: searchRegex },
+        ...(patientIds.length
+          ? [{ patient: { $in: patientIds } }]
+          : []),
+      ];
     }
 
-    if (!q && startDate && endDate) {
+    // Date filter always applies alongside search (and when no search)
+    if (startDate && endDate) {
       match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
