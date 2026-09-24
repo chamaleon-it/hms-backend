@@ -25,6 +25,10 @@ export enum AppointmentStatus {
   timestamps: true,
 })
 export class Appointment {
+  /** Sequential appointment id (CountersService key: appointment). */
+  @Prop({ required: false, unique: true, sparse: true })
+  mrn?: number;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' })
   patient: mongoose.Types.ObjectId;
 

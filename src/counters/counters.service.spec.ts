@@ -1,4 +1,4 @@
-import { COUNTER_KEYS, CountersService } from './counters.service';
+import { BOOT_SEED_COUNTER_KEYS, COUNTER_KEYS, CountersService } from './counters.service';
 
 describe('CountersService', () => {
   type CounterDoc = { key: string; name?: string; seq: number };
@@ -167,6 +167,11 @@ describe('CountersService', () => {
   it('builds invoice keys per prefix', () => {
     expect(COUNTER_KEYS.invoice('inv')).toBe('invoice:INV');
     expect(COUNTER_KEYS.invoice('LAB')).toBe('invoice:LAB');
+  });
+
+  it('includes appointment in fixed boot-seed keys', () => {
+    expect(COUNTER_KEYS.APPOINTMENT).toBe('appointment');
+    expect(BOOT_SEED_COUNTER_KEYS).toContain(COUNTER_KEYS.APPOINTMENT);
   });
 
   it('creates distinct counters under legacy name_1 by setting name=key', async () => {

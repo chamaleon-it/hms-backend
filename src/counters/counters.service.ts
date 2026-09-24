@@ -14,6 +14,7 @@ export const COUNTER_KEYS = {
   PHARMACY_ORDER: 'pharmacy_order',
   PHARMACY_PURCHASE: 'pharmacy_purchase',
   LAB_REPORT: 'lab_report',
+  APPOINTMENT: 'appointment',
   /** Per-prefix invoice/bill: invoice:INV, invoice:LAB, … */
   invoice: (prefix: string) =>
     `invoice:${String(prefix || 'INV').trim().toUpperCase()}`,
@@ -25,6 +26,7 @@ export const BOOT_SEED_COUNTER_KEYS = [
   COUNTER_KEYS.PHARMACY_ORDER,
   COUNTER_KEYS.PHARMACY_PURCHASE,
   COUNTER_KEYS.LAB_REPORT,
+  COUNTER_KEYS.APPOINTMENT,
 ] as const;
 
 function isDuplicateKeyError(err: unknown): boolean {
