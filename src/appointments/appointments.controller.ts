@@ -73,7 +73,7 @@ export class AppointmentsController {
     };
   }
 
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
   async calenderMonthly() {
     const data = await this.appointmentsService.calenderMonthly(
@@ -85,6 +85,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/calender/weekly')
   async calenderWeekly(@Query('date') date?: string) {
     const data = await this.appointmentsService.calenderWeekly(

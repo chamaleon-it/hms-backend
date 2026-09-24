@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ReturnService } from './return.service';
 import { CreateReturnDto } from './dto/create-return.dto';
 import mongoose from 'mongoose';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('pharmacy/return')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class ReturnController {
   constructor(private readonly returnService: ReturnService) {}
 

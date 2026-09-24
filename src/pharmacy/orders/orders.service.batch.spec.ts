@@ -1,4 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
+import mongoose from 'mongoose';
+
+const pharmacyId = new mongoose.Types.ObjectId().toHexString();
+
+jest.mock('src/config/in-house', () => ({
+  requireInHouseId: jest.fn(() => pharmacyId),
+  getInHouseObjectId: jest.fn(
+    () => new mongoose.Types.ObjectId(pharmacyId),
+  ),
+}));
+
 import { OrdersService } from './orders.service';
 
 describe('OrdersService.createOrder batch requirement', () => {

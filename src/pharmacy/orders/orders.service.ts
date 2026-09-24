@@ -13,7 +13,7 @@ import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
 import { UsersService } from 'src/users/users.service';
-import configuration from 'src/config/configuration';
+import { getInHouseObjectId, requireInHouseId } from 'src/config/in-house';
 import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
@@ -99,7 +99,7 @@ export class OrdersService {
         }
         const allowNeg =
           await this.usersService.getPharmacyInventoryAllowNegativeStock(
-            new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+            getInHouseObjectId('pharmacy'),
           );
         if (!allowNeg && batch.stock < item.quantity) {
           throw new BadRequestException(
@@ -127,7 +127,7 @@ export class OrdersService {
 
     const data = await this.orderModel.create(order);
     const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      configuration().in_house_pharmacy_id,
+      requireInHouseId('pharmacy'),
     );
     if (autoGenerateBill) {
       const items = await Promise.all(
@@ -161,7 +161,7 @@ export class OrdersService {
       const bill = await this.billingService.generateBill({
         patient: order.patient,
         items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        user: getInHouseObjectId('pharmacy'),
         discount: order.discount ?? 0,
         doctor: order.doctorName || "Self",
       });
@@ -733,7 +733,7 @@ export class OrdersService {
       await this.billingService.generateBill({
         patient: data.patient,
         items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        user: getInHouseObjectId('pharmacy'),
         discount: data.discount ?? 0,
         doctor: existOrder.doctorName || "Self",
       });

@@ -6,11 +6,18 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { PharmacistService } from './pharmacist.service';
 import { RegisterPharmacistDto } from './dto/register-pharmacist.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('pharmacist')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class PharmacistController {
   constructor(private readonly pharmacistService: PharmacistService) {}
 

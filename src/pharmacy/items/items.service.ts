@@ -56,6 +56,17 @@ export class ItemsService {
   }
 
   /**
+   * Legacy rows may have packing: 0 which fails schema min:1 on save (500).
+   * Normalize before any persist path.
+   */
+  ensureValidPacking(item: any): void {
+    const packing = Number(item?.packing);
+    if (!Number.isFinite(packing) || packing < 1) {
+      item.packing = 1;
+    }
+  }
+
+  /**
    * Recalculate denormalized item.quantity / expiry / rates from active batches.
    * When there are no batches, leave flat historical values untouched (dual-read).
    */
@@ -721,6 +732,7 @@ export class ItemsService {
       });
     }
 
+    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -779,7 +791,10 @@ export class ItemsService {
 
     // Dual-read: seed a legacy batch in-memory for pickers (persist only when mutated)
     const seeded = this.ensureLegacyBatchFromFlatItem(item);
-    if (seeded) {
+    const packingWasInvalid =
+      !Number.isFinite(Number(item.packing)) || Number(item.packing) < 1;
+    this.ensureValidPacking(item);
+    if (seeded || packingWasInvalid) {
       await item.save();
     }
 
@@ -924,6 +939,7 @@ export class ItemsService {
       total: saleRate * quantity,
     });
 
+    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -937,6 +953,7 @@ export class ItemsService {
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
+      this.ensureValidPacking(item);
       await item.save();
     }
 
@@ -1006,6 +1023,7 @@ export class ItemsService {
 
     item.markModified('batches');
     this.recalculateItemStockFromBatches(item);
+    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -1080,6 +1098,7 @@ export class ItemsService {
 
     item.markModified('batches');
     this.recalculateItemStockFromBatches(item);
+    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -1119,6 +1138,7 @@ export class ItemsService {
       this.recalculateItemStockFromBatches(item);
     }
 
+    this.ensureValidPacking(item);
     await item.save();
     return item;
   }

@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
-import configuration from 'src/config/configuration';
 
 export type ConsultingDocument = HydratedDocument<Consulting>;
 
@@ -89,7 +88,6 @@ export class Consulting {
       lab: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        default: configuration().in_house_lab_id,
         ref: 'User',
       },
       priority: { type: String, required: true },
