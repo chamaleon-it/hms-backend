@@ -4,7 +4,6 @@ import { User, UserRole } from '../schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
-import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 
@@ -101,32 +100,6 @@ export class LabService {
 
     if (!updated) {
       throw new NotFoundException('Lab Not Found');
-    }
-
-    return updated;
-  }
-
-  async updateNotifications(
-    user: mongoose.Types.ObjectId,
-    dto: UpdateNotificationsDto,
-  ) {
-    const updated = await this.userModel.findByIdAndUpdate(
-      user,
-      {
-        $set: {
-          'lab.notifications.whatsapp': dto.whatsapp,
-          'lab.notifications.sms': dto.sms,
-          'lab.notifications.inApp': dto.inApp,
-          ...(dto.note && {
-            'lab.notifications.note': dto.note,
-          }),
-        },
-      },
-      { new: true, runValidators: true, context: 'query' },
-    );
-
-    if (!updated) {
-      throw new NotFoundException('Lab Not found');
     }
 
     return updated;
