@@ -73,6 +73,24 @@ export class CreateBatchDto {
   @Transform(trim)
   supplier?: string;
 
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  packing?: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  stripCount?: number;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  gst?: number;
+
   @IsOptional()
   @IsEnum(BatchStatus)
   status?: BatchStatus;
@@ -129,6 +147,24 @@ export class UpdateBatchDto {
   @IsString()
   @Transform(trim)
   supplier?: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  packing?: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  stripCount?: number;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  gst?: number;
 
   @IsOptional()
   @IsEnum(BatchStatus)

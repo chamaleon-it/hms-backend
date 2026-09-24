@@ -155,6 +155,9 @@ export class ItemsService {
     unitPrice?: number;
     supplier?: string;
     status?: BatchStatus;
+    packing?: number;
+    stripCount?: number;
+    gst?: number;
   }) {
     const purchaseRate =
       input.purchaseRate ?? input.purchasePrice ?? 0;
@@ -180,6 +183,9 @@ export class ItemsService {
       quantity,
       status: input.status || BatchStatus.Active,
       supplier: (input.supplier || '-').trim() || '-',
+      packing: Number(input.packing) || 0,
+      stripCount: Number(input.stripCount) || 0,
+      gst: Number(input.gst) || 0,
       createdAt: new Date(),
     };
   }
@@ -838,13 +844,14 @@ export class ItemsService {
           saleRate,
           sellingPrice: saleRate,
           mrp,
-          gst: 0,
+          gst: Number(b.gst) || 0,
           stock,
           quantity: stock,
           startingQuantity: Number(b.startingQuantity) || stock,
           status,
           supplier: b.supplier,
-          packing: lean.packing ?? 1,
+          packing: Number(b.packing) || lean.packing || 1,
+          stripCount: Number(b.stripCount) || 0,
           createdAt: b.createdAt,
           expired,
           available:
@@ -978,6 +985,9 @@ export class ItemsService {
       startingQuantity?: number;
       supplier?: string;
       status?: BatchStatus;
+      packing?: number;
+      stripCount?: number;
+      gst?: number;
     },
     unitPrice?: number,
     mrp?: number,
@@ -1012,6 +1022,11 @@ export class ItemsService {
       existing.purchasePrice = normalized.purchaseRate;
       existing.saleRate = normalized.saleRate;
       existing.supplier = normalized.supplier || existing.supplier;
+      if (normalized.packing != null) existing.packing = normalized.packing;
+      if (normalized.stripCount != null) {
+        existing.stripCount = normalized.stripCount;
+      }
+      if (normalized.gst != null) existing.gst = normalized.gst;
       if (normalized.status) {
         existing.status = normalized.status;
       } else if (!existing.status) {
@@ -1041,6 +1056,9 @@ export class ItemsService {
       startingQuantity: dto.startingQuantity,
       supplier: dto.supplier,
       status: dto.status,
+      packing: dto.packing,
+      stripCount: dto.stripCount,
+      gst: dto.gst,
     });
   }
 
@@ -1079,6 +1097,9 @@ export class ItemsService {
       batch.startingQuantity = Number(dto.startingQuantity);
     }
     if (dto.supplier != null) batch.supplier = dto.supplier;
+    if (dto.packing != null) batch.packing = Number(dto.packing);
+    if (dto.stripCount != null) batch.stripCount = Number(dto.stripCount);
+    if (dto.gst != null) batch.gst = Number(dto.gst);
     if (dto.status != null) batch.status = dto.status;
 
     // Backfill missing new fields on live edit of legacy batches

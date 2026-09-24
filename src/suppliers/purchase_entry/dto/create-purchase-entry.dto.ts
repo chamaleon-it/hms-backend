@@ -32,6 +32,11 @@ export class PurchaseItemDto {
   @IsNotEmpty()
   pack: number;
 
+  /** Strip / bottle count on the purchase line (maps to batch.stripCount). */
+  @IsNumber()
+  @IsOptional()
+  noOfPack?: number;
+
   @IsNumber()
   @IsNotEmpty()
   unitPrice: number;
@@ -44,9 +49,15 @@ export class PurchaseItemDto {
   @IsNotEmpty()
   purchasePrice: number;
 
+  /** GST amount (₹) for the purchase-entry line. */
   @IsNumber()
   @IsNotEmpty()
   gst: number;
+
+  /** GST rate % for the batch (5/12/18/…). */
+  @IsNumber()
+  @IsOptional()
+  gstPercent?: number;
 
   @IsNumber()
   @IsNotEmpty()

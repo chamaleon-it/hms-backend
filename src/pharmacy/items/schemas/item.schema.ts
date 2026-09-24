@@ -62,6 +62,18 @@ export class ItemBatch {
   @Prop({ type: String, required: true, trim: true, default: '-' })
   supplier: string;
 
+  /** Units per strip/bottle for this batch (batch-level packing). */
+  @Prop({ type: Number, min: 0, default: 0 })
+  packing?: number;
+
+  /** Number of strips/bottles for this batch. */
+  @Prop({ type: Number, min: 0, default: 0 })
+  stripCount?: number;
+
+  /** GST % applicable to this batch. */
+  @Prop({ type: Number, min: 0, max: 100, default: 0 })
+  gst?: number;
+
   @Prop({ type: Date, default: Date.now })
   createdAt: Date;
 }
@@ -214,6 +226,9 @@ export class Item {
           default: BatchStatus.Active,
         },
         supplier: { type: String, required: true, default: '-' },
+        packing: { type: Number, min: 0, default: 0 },
+        stripCount: { type: Number, min: 0, default: 0 },
+        gst: { type: Number, min: 0, max: 100, default: 0 },
         createdAt: { type: Date, default: Date.now },
       },
     ],
