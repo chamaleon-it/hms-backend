@@ -107,7 +107,11 @@ export class ReportService implements OnModuleInit {
 
     if (!userReport) {
       const mrn = await this.nextLabReportMrn();
-      const data = await this.reportModel.create({ ...dto, mrn });
+      const data = await this.reportModel.create({
+        ...dto,
+        mrn,
+        testStartedAt: new Date(),
+      });
       await this.createOrUpdateDraftBill(data);
       return data;
     } else {
