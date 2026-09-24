@@ -21,7 +21,7 @@ async function bootstrap() {
       // // 'http://192.168.220.10:3000',
     
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-lis-api-key', 'x-api-key'],
     credentials: true,
   });
   await app.listen(3001, '0.0.0.0');

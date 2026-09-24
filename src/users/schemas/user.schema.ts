@@ -77,6 +77,20 @@ export class User {
   @Prop({ required: true, select: false })
   password: string;
 
+  /**
+   * Optional login alias. Legacy DBs may have a non-sparse unique `username_1`
+   * index that blocks multiple null usernames — UsersService migrates it to a
+   * partial unique index on startup. Sparse unique here allows many missing values.
+   */
+  @Prop({
+    type: String,
+    trim: true,
+    sparse: true,
+    unique: true,
+    default: undefined,
+  })
+  username?: string | null;
+
   @Prop({ type: Date, default: Date.now })
   lastLogin: Date;
 

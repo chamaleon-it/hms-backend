@@ -12,6 +12,9 @@ import {
 import { PatientsService } from './patients.service';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { GetPatientsDto } from './dto/get-patients.dto';
@@ -20,11 +23,20 @@ import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
 
+const PATIENT_ROLES = [
+  UserRole.PHARMACY,
+  UserRole.LAB,
+  UserRole.DOCTOR,
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+] as const;
+
 @Controller('patients')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...PATIENT_ROLES)
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async register(
     @Body() patientRegisterDto: PatientRegisterDto,

@@ -140,6 +140,20 @@ describe('ItemsService batch helpers', () => {
     expect(svc.sanitizeSearchRegex('a(b)')).toBe('a\\(b\\)');
   });
 
+  it('H4: ensureValidPacking normalizes packing < 1 to 1 (avoids schema 500)', () => {
+    const item: any = { packing: 0 };
+    service.ensureValidPacking(item);
+    expect(item.packing).toBe(1);
+
+    const missing: any = {};
+    service.ensureValidPacking(missing);
+    expect(missing.packing).toBe(1);
+
+    const ok: any = { packing: 10 };
+    service.ensureValidPacking(ok);
+    expect(ok.packing).toBe(10);
+  });
+
   it('deductFromBatch blocks expired, inactive, zero, and oversell', async () => {
     const item: any = {
       name: 'Para',

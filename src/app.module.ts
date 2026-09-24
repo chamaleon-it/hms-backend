@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import configuration from './config/configuration';
+import { InHouseConfigValidator } from './config/in-house';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
@@ -57,6 +58,6 @@ import { ConsumablesModule } from './pharmacy/consumables/consumables.module';
     ConsumablesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, InHouseConfigValidator],
 })
 export class AppModule {}

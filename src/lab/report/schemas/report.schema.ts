@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Model, Types } from 'mongoose';
-import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
@@ -27,7 +26,6 @@ export class Report {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    default: configuration().in_house_lab_id,
   })
   lab: Types.ObjectId;
 
