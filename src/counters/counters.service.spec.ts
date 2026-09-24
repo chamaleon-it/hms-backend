@@ -13,6 +13,7 @@ describe('CountersService', () => {
     const service = Object.create(CountersService.prototype) as CountersService;
     (service as any).logger = { warn: jest.fn(), log: jest.fn() };
     (service as any).bootSeeders = [];
+    (service as any).bootSeedJobs = [];
 
     const assertLegacyName = (doc: Partial<CounterDoc>) => {
       if (!opts.legacyNameUnique) return;
@@ -299,5 +300,37 @@ describe('CountersService', () => {
     await service.seedRegisteredCounters();
     expect(store.get(COUNTER_KEYS.LAB_REPORT)?.seq).toBe(70);
     expect(store.get(COUNTER_KEYS.PATIENT_PID)?.seq).toBe(3);
+  });
+
+  it('seedRegisteredCounters runs boot seed jobs (e.g. invoices)', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    (service as any).bootSeeders = [];
+    (service as any).bootSeedJobs = [];
+
+    service.registerBootSeed(COUNTER_KEYS.PHARMACY_ORDER, async () => 10);
+    service.registerBootSeedJob(async () => {
+      await service.seedIfMissing(COUNTER_KEYS.invoice('INV'), async () => 25);
+      await service.seedIfMissing(COUNTER_KEYS.invoice('LAB'), async () => 8);
+    });
+
+    await service.seedRegisteredCounters();
+
+    expect(store.get(COUNTER_KEYS.PHARMACY_ORDER)?.seq).toBe(10);
+    expect(store.get(COUNTER_KEYS.invoice('INV'))?.seq).toBe(25);
+    expect(store.get(COUNTER_KEYS.invoice('LAB'))?.seq).toBe(8);
+    expect(store.get(COUNTER_KEYS.invoice('LAB'))?.name).toBe(
+      COUNTER_KEYS.invoice('LAB'),
+    );
+
+    // Existing invoice counter untouched on re-boot.
+    store.set(COUNTER_KEYS.invoice('INV'), {
+      key: COUNTER_KEYS.invoice('INV'),
+      name: COUNTER_KEYS.invoice('INV'),
+      seq: 999,
+    });
+    await service.seedRegisteredCounters();
+    expect(store.get(COUNTER_KEYS.invoice('INV'))?.seq).toBe(999);
+    expect(store.get(COUNTER_KEYS.PHARMACY_ORDER)?.seq).toBe(10);
   });
 });

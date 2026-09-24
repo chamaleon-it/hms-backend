@@ -35,30 +35,88 @@ export class BillingService {
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly usersService: UsersService,
     private readonly countersService: CountersService,
-  ) { }
+  ) {
+    // Discover pharmacy/lab invoice prefixes and seed each missing counter once.
+    this.countersService.registerBootSeedJob(() => this.seedInvoiceCounters());
+  }
+
+  /** Leading letter prefix from bill MRNs like INV0042 → INV. */
+  private normalizeInvoicePrefix(prefix: string): string {
+    return String(prefix || 'INV').trim().toUpperCase() || 'INV';
+  }
+
+  private async maxInvoiceSeq(prefix: string): Promise<number> {
+    const safePrefix = this.normalizeInvoicePrefix(prefix);
+    const lastRecord = await this.billingModel
+      .findOne({ mrn: { $regex: `^${safePrefix}\\d+$` } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
+
+    if (lastRecord?.mrn) {
+      const match = String(lastRecord.mrn).match(
+        new RegExp(`^${safePrefix}(\\d+)$`),
+      );
+      if (match?.[1]) return parseInt(match[1], 10);
+    }
+    return 0;
+  }
+
+  /**
+   * Collect invoice prefixes from configured pharmacy/lab billing settings and
+   * existing bill MRNs. Always includes INV. Never invents unsafe keys.
+   */
+  private async discoverInvoicePrefixes(): Promise<string[]> {
+    const prefixes = new Set<string>(['INV']);
+
+    const users = await this.userModel
+      .find({})
+      .select('pharmacy.billing.prefix lab.billing.prefix')
+      .lean()
+      .exec();
+    for (const u of users) {
+      const pharmacyPrefix = (u as any)?.pharmacy?.billing?.prefix;
+      const labPrefix = (u as any)?.lab?.billing?.prefix;
+      if (pharmacyPrefix) {
+        prefixes.add(this.normalizeInvoicePrefix(pharmacyPrefix));
+      }
+      if (labPrefix) {
+        prefixes.add(this.normalizeInvoicePrefix(labPrefix));
+      }
+    }
+
+    const mrns = await this.billingModel
+      .distinct('mrn', { mrn: { $regex: /^[A-Za-z]+\d+$/ } })
+      .exec();
+    for (const mrn of mrns) {
+      const match = String(mrn).match(/^([A-Za-z]+)\d+$/);
+      if (match?.[1]) {
+        prefixes.add(this.normalizeInvoicePrefix(match[1]));
+      }
+    }
+
+    return [...prefixes];
+  }
+
+  /** First-time seed for each discovered invoice:<PREFIX> counter. */
+  async seedInvoiceCounters(): Promise<void> {
+    const prefixes = await this.discoverInvoicePrefixes();
+    for (const prefix of prefixes) {
+      await this.countersService.seedIfMissing(
+        COUNTER_KEYS.invoice(prefix),
+        () => this.maxInvoiceSeq(prefix),
+      );
+    }
+  }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
-    const safePrefix = String(prefix || 'INV').trim().toUpperCase() || 'INV';
+    const safePrefix = this.normalizeInvoicePrefix(prefix);
     return this.countersService.nextFormatted(COUNTER_KEYS.invoice(safePrefix), {
       prefix: safePrefix,
       pad: 4,
-      getInitialMax: async () => {
-        const lastRecord = await this.billingModel
-          .findOne({ mrn: { $regex: `^${safePrefix}\\d+$` } })
-          .collation({ locale: 'en_US', numericOrdering: true })
-          .sort({ mrn: -1 })
-          .select('mrn')
-          .lean()
-          .exec();
-
-        if (lastRecord?.mrn) {
-          const match = lastRecord.mrn.match(
-            new RegExp(`^${safePrefix}(\\d+)$`),
-          );
-          if (match?.[1]) return parseInt(match[1], 10);
-        }
-        return 0;
-      },
+      getInitialMax: () => this.maxInvoiceSeq(safePrefix),
     });
   }
 

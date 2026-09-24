@@ -41,6 +41,8 @@ export class CountersService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(CountersService.name);
   /** Domain services register getInitialMax during construction; run once at boot. */
   private readonly bootSeeders: BootSeeder[] = [];
+  /** Multi-key / dynamic seed jobs (e.g. invoice prefixes discovered from users + bills). */
+  private readonly bootSeedJobs: Array<() => Promise<void>> = [];
 
   constructor(
     @InjectModel(Counter.name) private readonly counterModel: Model<Counter>,
@@ -49,10 +51,17 @@ export class CountersService implements OnModuleInit, OnApplicationBootstrap {
   /**
    * Register a first-time seed callback for a fixed counter key.
    * Called from domain service constructors; executed in onApplicationBootstrap.
-   * Invoice prefixes are intentionally not registered — seeded on first use via next().
    */
   registerBootSeed(key: string, getInitialMax: () => Promise<number>): void {
     this.bootSeeders.push({ key, getInitialMax });
+  }
+
+  /**
+   * Register a boot-time seed job that may seed multiple keys (e.g. invoices).
+   * Job should call `seedIfMissing` per key; existing keys must not be overwritten.
+   */
+  registerBootSeedJob(job: () => Promise<void>): void {
+    this.bootSeedJobs.push(job);
   }
 
   /**
@@ -144,6 +153,15 @@ export class CountersService implements OnModuleInit, OnApplicationBootstrap {
         // Do not crash boot on seed failure — next()/peek() still fall back.
         this.logger.warn(
           `Boot seed for ${key} skipped/failed: ${err?.message || err}`,
+        );
+      }
+    }
+    for (const job of this.bootSeedJobs) {
+      try {
+        await job();
+      } catch (err: any) {
+        this.logger.warn(
+          `Boot seed job skipped/failed: ${err?.message || err}`,
         );
       }
     }
