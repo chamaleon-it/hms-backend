@@ -46,12 +46,23 @@ export class ReportService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      const result = await this.reportModel.updateMany(
+      const sampleCollected = await this.reportModel.updateMany(
         { status: 'Sample Collected' },
-        { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } },
       );
-      if (result.modifiedCount > 0) {
-        console.log(`[Migration] Migrated ${result.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`);
+      if (sampleCollected.modifiedCount > 0) {
+        console.log(
+          `[Migration] Migrated ${sampleCollected.modifiedCount} reports from 'Sample Collected' to 'Waiting For Result'`,
+        );
+      }
+      const upcoming = await this.reportModel.updateMany(
+        { status: 'Upcoming' },
+        { $set: { status: ReportStatus.WAITING_FOR_RESULT } },
+      );
+      if (upcoming.modifiedCount > 0) {
+        console.log(
+          `[Migration] Migrated ${upcoming.modifiedCount} reports from 'Upcoming' to 'Waiting For Result'`,
+        );
       }
     } catch (e) {
       console.error('[Migration] Error migrating reports:', e);
@@ -78,6 +89,9 @@ export class ReportService implements OnModuleInit {
     if (!dto.lab) {
       dto.lab = getInHouseObjectId('lab');
     }
+    // New tests go straight to Waiting For Result (no Upcoming / sample-collection step)
+    dto.status = ReportStatus.WAITING_FOR_RESULT;
+
     const startOfDay = new Date(dto.date);
     startOfDay.setUTCHours(0, 0, 0, 0);
     const endOfDay = new Date(dto.date);
@@ -85,7 +99,7 @@ export class ReportService implements OnModuleInit {
 
     const userReport = await this.reportModel.findOne({
       patient: dto.patient,
-      status: ReportStatus.UPCOMING,
+      status: ReportStatus.WAITING_FOR_RESULT,
       lab: dto.lab,
       date: { $gte: startOfDay, $lte: endOfDay },
       isDeleted: false,
@@ -832,7 +846,7 @@ export class ReportService implements OnModuleInit {
       patient: data.patient,
       priority: data.priority,
       sampleType: data.sampleType || '',
-      status: ReportStatus.UPCOMING,
+      status: ReportStatus.WAITING_FOR_RESULT,
       lab: data.lab,
     });
     return newReport;

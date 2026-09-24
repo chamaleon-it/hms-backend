@@ -85,7 +85,7 @@ export class Report {
   @Prop({
     type: String,
     enum: Object.values(ReportStatus),
-    default: ReportStatus.UPCOMING,
+    default: ReportStatus.WAITING_FOR_RESULT,
   })
   status: ReportStatus;
 
