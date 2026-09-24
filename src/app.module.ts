@@ -26,6 +26,7 @@ import { PharmacistModule } from './pharmacy/pharmacist/pharmacist.module';
 import { TechnicianModule } from './lab/technician/technician.module';
 import { AdminModule } from './admin/admin.module';
 import { ConsumablesModule } from './pharmacy/consumables/consumables.module';
+import { CountersModule } from './counters/counters.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ConsumablesModule } from './pharmacy/consumables/consumables.module';
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    CountersModule,
     UsersModule,
     AuthModule,
     AppointmentsModule,

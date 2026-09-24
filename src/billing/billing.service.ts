@@ -20,6 +20,10 @@ import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { Consulting } from 'src/consultings/schemas/consulting.schema';
 import { User } from 'src/users/schemas/user.schema';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class BillingService {
@@ -30,26 +34,32 @@ export class BillingService {
     @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly usersService: UsersService,
+    private readonly countersService: CountersService,
   ) { }
 
   private async generateUniqueMRN(prefix: string): Promise<string> {
-    const lastRecord = await this.billingModel
-      .findOne({ mrn: { $regex: `^${prefix}` } })
-      .collation({ locale: 'en_US', numericOrdering: true })
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean()
-      .exec();
+    const safePrefix = String(prefix || 'INV').trim().toUpperCase() || 'INV';
+    return this.countersService.nextFormatted(COUNTER_KEYS.invoice(safePrefix), {
+      prefix: safePrefix,
+      pad: 4,
+      getInitialMax: async () => {
+        const lastRecord = await this.billingModel
+          .findOne({ mrn: { $regex: `^${safePrefix}\\d+$` } })
+          .collation({ locale: 'en_US', numericOrdering: true })
+          .sort({ mrn: -1 })
+          .select('mrn')
+          .lean()
+          .exec();
 
-    if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
-      if (match && match[1]) {
-        const nextNumber = parseInt(match[1], 10) + 1;
-        return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
-      }
-    }
-
-    return `${prefix}0001`;
+        if (lastRecord?.mrn) {
+          const match = lastRecord.mrn.match(
+            new RegExp(`^${safePrefix}(\\d+)$`),
+          );
+          if (match?.[1]) return parseInt(match[1], 10);
+        }
+        return 0;
+      },
+    });
   }
 
   async generateBill(createBill: CreateBillingDto) {

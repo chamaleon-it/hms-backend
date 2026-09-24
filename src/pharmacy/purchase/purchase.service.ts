@@ -4,11 +4,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Purchase } from './schemas/purchase.schema';
 import { Model } from 'mongoose';
 import { FindAllPurchaseDto } from './dto/find-all-purchase.dto';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class PurchaseService {
   constructor(
     @InjectModel(Purchase.name) private purchaseModel: Model<Purchase>,
+    private readonly countersService: CountersService,
   ) {}
 
   async createPurchase(createPurchaseDto: CreatePurchaseDto) {
@@ -52,18 +57,21 @@ export class PurchaseService {
   }
 
   private async generateUniqueMRN(): Promise<string> {
-    let mrn: string;
-    let exists = true;
-
-    do {
-      const randomNum = Math.floor(1000000 + Math.random() * 9000000);
-      mrn = `RXW${randomNum}`;
-
-      // Check if MRN already exists
-      const existing = await this.purchaseModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+    return this.countersService.nextFormatted(COUNTER_KEYS.PHARMACY_PURCHASE, {
+      prefix: 'RXW',
+      pad: 7,
+      getInitialMax: async () => {
+        const last = await this.purchaseModel
+          .findOne({ mrn: { $regex: /^RXW\d+$/ } })
+          .collation({ locale: 'en_US', numericOrdering: true })
+          .sort({ mrn: -1 })
+          .select('mrn')
+          .lean()
+          .exec();
+        if (!last?.mrn) return 0;
+        const match = String(last.mrn).match(/^RXW(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      },
+    });
   }
 }

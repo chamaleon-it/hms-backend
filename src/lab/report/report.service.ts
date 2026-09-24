@@ -23,6 +23,10 @@ import { Panel } from '../panels/schemas/panel.schema';
 import { Group } from '../panels/schemas/group.schema';
 import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class ReportService implements OnModuleInit {
@@ -33,6 +37,7 @@ export class ReportService implements OnModuleInit {
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Group.name) private groupModel: Model<Group>,
     private billingService: BillingService,
+    private readonly countersService: CountersService,
   ) {}
 
   async onModuleInit() {
@@ -48,6 +53,19 @@ export class ReportService implements OnModuleInit {
       console.error('[Migration] Error migrating reports:', e);
     }
   }
+
+  private async nextLabReportMrn(): Promise<number> {
+    return this.countersService.next(COUNTER_KEYS.LAB_REPORT, async () => {
+      const last = await this.reportModel
+        .findOne()
+        .sort({ mrn: -1 })
+        .select('mrn')
+        .lean()
+        .exec();
+      return last?.mrn ? Number(last.mrn) : 0;
+    });
+  }
+
   async createReport(@Body() dto: CreateReportDto) {
     if (!dto.lab) {
       dto.lab = getInHouseObjectId('lab');
@@ -66,7 +84,8 @@ export class ReportService implements OnModuleInit {
     });
 
     if (!userReport) {
-      const data = await this.reportModel.create(dto);
+      const mrn = await this.nextLabReportMrn();
+      const data = await this.reportModel.create({ ...dto, mrn });
       await this.createOrUpdateDraftBill(data);
       return data;
     } else {
