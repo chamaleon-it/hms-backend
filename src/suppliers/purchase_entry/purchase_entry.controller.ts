@@ -1,10 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { PurchaseEntryService } from './purchase_entry.service';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { SupplierBulkPaymentDto } from './dto/supplier-bulk-payment.dto';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('purchase_entry')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class PurchaseEntryController {
   constructor(private readonly purchaseEntryService: PurchaseEntryService) {}
 

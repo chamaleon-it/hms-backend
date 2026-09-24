@@ -63,7 +63,7 @@ export class BillingController {
   }
 
   @Get('drop-down')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
     const data = await this.billingService.getBillDropDown(getBillDropDownDto);
     return {
@@ -73,6 +73,7 @@ export class BillingController {
   }
 
   @Get('single')
+  @UseGuards(JwtAuthGuard)
   async getSingleCustomerBill(@Query('q') q: string) {
     const data = await this.billingService.getSingleCustomerBill(q);
     return {

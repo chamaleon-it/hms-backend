@@ -30,6 +30,20 @@ export class PurchaseEntryService {
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {
       throw new BadRequestException('Paid Amount is greater than Total Amount');
     }
+
+    const supplierCheck = await this.supplierModel
+      .findById(createPurchaseEntryDto.supplier)
+      .exec();
+    if (
+      !supplierCheck ||
+      supplierCheck.isDeleted ||
+      supplierCheck.status === 'Inactive'
+    ) {
+      throw new BadRequestException(
+        'Supplier is inactive or deleted and cannot receive new purchase entries',
+      );
+    }
+
     createPurchaseEntryDto.paymentStatus = this.resolvePaymentStatus(
       createPurchaseEntryDto.paidAmount ?? 0,
       createPurchaseEntryDto.total,
@@ -40,16 +54,22 @@ export class PurchaseEntryService {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
         .exec();
+      const saleRate =
+        item.pack > 0 ? item.unitPrice / item.pack : item.unitPrice;
       await this.itemsService.addBatchItems(
         item.item,
         {
           batchNumber: item.batch,
           quantity: item.quantity,
           expiryDate: item.expiryDate,
+          purchaseRate: item.purchasePrice,
           purchasePrice: item.purchasePrice,
+          saleRate,
+          mrp: item.unitPrice,
+          startingQuantity: item.quantity,
           supplier: supplier?.name || '-',
         },
-        item.unitPrice / item.pack,
+        saleRate,
         item.unitPrice,
       );
     }

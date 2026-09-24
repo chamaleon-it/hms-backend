@@ -45,6 +45,37 @@ export class OrderItem {
 
   @Prop({ required: true, default: false })
   isPacked: boolean;
+
+  /** Selected inventory batch subdocument id (manual pick; FEFO/FIFO is only a default). */
+  @Prop({ type: String, default: null })
+  batchId?: string | null;
+
+  @Prop({ type: String, default: null })
+  batchNumber?: string | null;
+
+  @Prop({ type: Date, default: null })
+  batchExpiryDate?: Date | null;
+
+  @Prop({ type: Number, default: null })
+  batchMrp?: number | null;
+
+  @Prop({ type: Number, default: null })
+  batchPurchasePrice?: number | null;
+
+  @Prop({ type: Number, default: null })
+  batchSellingPrice?: number | null;
+
+  @Prop({ type: Number, default: null })
+  batchGst?: number | null;
+
+  @Prop({ type: Number, default: null })
+  batchStock?: number | null;
+
+  @Prop({ type: String, default: null })
+  batchSupplier?: string | null;
+
+  @Prop({ type: Number, default: null })
+  batchPacking?: number | null;
 }
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 

@@ -39,6 +39,45 @@ export class CreateBillingItemDto {
   @Min(0)
   @IsOptional()
   total?: number;
+
+  @IsMongoId()
+  @IsOptional()
+  itemId?: mongoose.Types.ObjectId;
+
+  @IsString()
+  @IsOptional()
+  batchId?: string;
+
+  @IsString()
+  @IsOptional()
+  batchNumber?: string;
+
+  @IsOptional()
+  expiryDate?: Date | string;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  mrp?: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  purchasePrice?: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  gst?: number;
+
+  @IsString()
+  @IsOptional()
+  supplier?: string;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  packing?: number;
 }
 
 export class CreateBillingDto {

@@ -17,6 +17,9 @@ import {
   ConsumableIssue,
   ConsumableIssueDocument,
 } from '../pharmacy/consumables/schemas/consumable-issue.schema';
+import {
+  PurchaseEntry,
+} from '../suppliers/purchase_entry/schemas/purchase-entry.schema';
 
 @Injectable()
 export class AdminService {
@@ -30,6 +33,8 @@ export class AdminService {
     @InjectModel(Item.name) private itemModel: Model<ItemDocument>,
     @InjectModel(ConsumableIssue.name)
     private consumableIssueModel: Model<ConsumableIssueDocument>,
+    @InjectModel(PurchaseEntry.name)
+    private purchaseEntryModel: Model<PurchaseEntry>,
   ) {}
 
   async getDashboardStats() {
@@ -223,11 +228,14 @@ export class AdminService {
       hospital: body.hospital || null,
       specialization: body.specialization || null,
       qualification: body.qualification || null,
+      designation: body.designation || null,
       signature: body.signature || null,
       profilePic: body.profilePic || null,
       role: UserRole.DOCTOR,
       status: body.status || UserStatus.ACTIVE,
-      availability: body.availability || null,
+      availability: body.availability
+        ? this.validateAvailability(body.availability)
+        : null,
       emailVerified: true,
     });
 
@@ -246,10 +254,13 @@ export class AdminService {
       ...(body.hospital !== undefined && { hospital: body.hospital }),
       ...(body.specialization !== undefined && { specialization: body.specialization }),
       ...(body.qualification !== undefined && { qualification: body.qualification }),
+      ...(body.designation !== undefined && { designation: body.designation }),
       ...(body.signature !== undefined && { signature: body.signature }),
       ...(body.profilePic !== undefined && { profilePic: body.profilePic }),
       ...(body.status !== undefined && { status: body.status }),
-      ...(body.availability !== undefined && { availability: body.availability }),
+      ...(body.availability !== undefined && {
+        availability: this.validateAvailability(body.availability),
+      }),
     };
 
     if (body.password && body.password.trim().length >= 6) {
@@ -612,6 +623,386 @@ export class AdminService {
         netMarginPct:
           totalRevenue > 0 ? round2((netProfit / totalRevenue) * 100) : 0,
       },
+    };
+  }
+
+  /**
+   * Validate doctor consultation availability (end ≥ start, rounds inside window,
+   * non-overlapping rounds). Used by create/update and dedicated schedule CRUD.
+   */
+  validateAvailability(availability: any) {
+    if (availability === null) return null;
+    if (!availability || typeof availability !== 'object') {
+      throw new BadRequestException('Invalid availability payload');
+    }
+
+    const { startTime, endTime, days, rounds, startDate, endDate } =
+      availability;
+
+    if (startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      if (e < s) {
+        throw new BadRequestException(
+          'Availability end date must be on or after start date',
+        );
+      }
+    }
+
+    if (startTime && endTime) {
+      if (this.timeToMinutes(endTime) < this.timeToMinutes(startTime)) {
+        throw new BadRequestException(
+          'Availability end time must be on or after start time',
+        );
+      }
+    }
+
+    if (days && !Array.isArray(days)) {
+      throw new BadRequestException('Availability days must be an array');
+    }
+
+    const normalizedRounds = Array.isArray(rounds) ? rounds : [];
+    for (const round of normalizedRounds) {
+      if (!round?.start || !round?.end) {
+        throw new BadRequestException(
+          'Each round/session must include start and end times',
+        );
+      }
+      if (this.timeToMinutes(round.end) < this.timeToMinutes(round.start)) {
+        throw new BadRequestException(
+          `Round "${round.label || ''}" end must be on or after start`,
+        );
+      }
+      if (startTime && endTime) {
+        if (
+          this.timeToMinutes(round.start) < this.timeToMinutes(startTime) ||
+          this.timeToMinutes(round.end) > this.timeToMinutes(endTime)
+        ) {
+          throw new BadRequestException(
+            `Round "${round.label || ''}" must fall within consultation hours`,
+          );
+        }
+      }
+    }
+
+    // Detect overlapping rounds
+    const sorted = [...normalizedRounds].sort(
+      (a, b) => this.timeToMinutes(a.start) - this.timeToMinutes(b.start),
+    );
+    for (let i = 1; i < sorted.length; i++) {
+      if (
+        this.timeToMinutes(sorted[i].start) <
+        this.timeToMinutes(sorted[i - 1].end)
+      ) {
+        throw new BadRequestException(
+          'Consultation rounds/sessions overlap — adjust times',
+        );
+      }
+    }
+
+    const slotIntervalMinutes = Number(
+      availability.slotIntervalMinutes ?? 15,
+    );
+    if (
+      !Number.isFinite(slotIntervalMinutes) ||
+      slotIntervalMinutes < 5 ||
+      slotIntervalMinutes > 120
+    ) {
+      throw new BadRequestException(
+        'slotIntervalMinutes must be between 5 and 120',
+      );
+    }
+
+    return {
+      startDate: availability.startDate ?? null,
+      endDate: availability.endDate ?? null,
+      startTime: startTime ?? null,
+      endTime: endTime ?? null,
+      days: Array.isArray(days) ? days : [],
+      rounds: normalizedRounds,
+      slotIntervalMinutes,
+    };
+  }
+
+  private timeToMinutes(t: string): number {
+    const [h, m] = String(t)
+      .split(':')
+      .map((n) => parseInt(n, 10));
+    if (!Number.isFinite(h) || !Number.isFinite(m)) {
+      throw new BadRequestException(`Invalid time value: ${t}`);
+    }
+    return h * 60 + m;
+  }
+
+  async updateDoctorAvailability(id: string, availability: any) {
+    const validated =
+      availability === null ? null : this.validateAvailability(availability);
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(id), role: UserRole.DOCTOR },
+        { availability: validated },
+        { new: true },
+      )
+      .select('-password -refreshToken')
+      .lean();
+    if (!updated) {
+      throw new NotFoundException('Doctor not found');
+    }
+    return updated;
+  }
+
+  async deleteDoctorAvailability(id: string) {
+    return this.updateDoctorAvailability(id, null);
+  }
+
+  /**
+   * Daily / monthly admin summary — reuses billing, P&L, purchase entry data.
+   * Does not invent finance figures.
+   */
+  async getReportsSummary(query: {
+    mode?: string;
+    date?: string;
+    month?: string;
+    billingType?: string;
+    paymentStatus?: string;
+    department?: string;
+  }) {
+    const mode = query.mode === 'monthly' ? 'monthly' : 'daily';
+    let start: Date;
+    let end: Date;
+
+    if (mode === 'monthly') {
+      const monthStr =
+        query.month ||
+        `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      const [y, m] = monthStr.split('-').map(Number);
+      if (!y || !m) {
+        throw new BadRequestException('month must be YYYY-MM');
+      }
+      start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      end = new Date(y, m, 0, 23, 59, 59, 999);
+    } else {
+      const day = query.date ? new Date(query.date) : new Date();
+      if (Number.isNaN(day.getTime())) {
+        throw new BadRequestException('date must be YYYY-MM-DD');
+      }
+      start = new Date(day);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(day);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    const startIso = start.toISOString();
+    const endIso = end.toISOString();
+
+    const billingBase: any = {
+      createdAt: { $gte: start, $lte: end },
+    };
+
+    if (query.department && query.department !== 'All') {
+      const targetRole =
+        query.department === 'Lab' ? UserRole.LAB : UserRole.PHARMACY;
+      const deptUsers = await this.userModel
+        .find({ role: targetRole })
+        .select('_id')
+        .lean();
+      billingBase.user = { $in: deptUsers.map((u) => u._id) };
+    }
+
+    if (query.paymentStatus && query.paymentStatus !== 'all') {
+      // Derive payment status from cash/online vs item totals is complex;
+      // reuse bill status Draft/Completed plus method heuristics via admin billing.
+      if (query.paymentStatus === 'Draft' || query.paymentStatus === 'Completed') {
+        billingBase.status = query.paymentStatus;
+      }
+    }
+
+    const applyBillingType = (filter: any, billingType?: string) => {
+      if (!billingType || billingType === 'all') return filter;
+      const f = { ...filter };
+      if (billingType === 'Sale') f.transactionType = 'Sale';
+      else if (billingType === 'Return') f.transactionType = 'Return';
+      else if (billingType === 'Lab')
+        f.reportId = { $exists: true, $ne: null };
+      else if (billingType === 'Consultation') {
+        f['items.name'] = { $regex: /consultation/i };
+      } else if (billingType === 'Dressing') {
+        f['items.name'] = { $regex: /dressing/i };
+      } else if (billingType === 'Clinical') {
+        f['items.name'] = {
+          $regex:
+            /procedure|injection|cannulation|extraction|catheterisation|enema|dressing/i,
+        };
+      } else if (billingType === 'Pharmacy') {
+        f['items.name'] = {
+          $not: {
+            $regex:
+              /consultation|procedure|injection|cannulation|extraction|catheterisation|enema|dressing/i,
+          },
+        };
+      }
+      return f;
+    };
+
+    const types = [
+      'all',
+      'Consultation',
+      'Clinical',
+      'Dressing',
+      'Pharmacy',
+      'Lab',
+      'Sale',
+      'Return',
+    ];
+
+    const typeFilter = query.billingType || 'all';
+    const salesFilter = applyBillingType(billingBase, typeFilter);
+
+    const salesAgg = await this.billingModel.aggregate([
+      { $match: salesFilter },
+      {
+        $group: {
+          _id: null,
+          billCount: { $sum: 1 },
+          cash: { $sum: { $ifNull: ['$cash', 0] } },
+          online: { $sum: { $ifNull: ['$online', 0] } },
+          discount: { $sum: { $ifNull: ['$discount', 0] } },
+          revenue: {
+            $sum: {
+              $add: [
+                { $ifNull: ['$cash', 0] },
+                { $ifNull: ['$online', 0] },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const byType: Record<string, any> = {};
+    for (const t of types.filter((x) => x !== 'all')) {
+      const f = applyBillingType(billingBase, t);
+      const agg = await this.billingModel.aggregate([
+        { $match: f },
+        {
+          $group: {
+            _id: null,
+            billCount: { $sum: 1 },
+            revenue: {
+              $sum: {
+                $add: [
+                  { $ifNull: ['$cash', 0] },
+                  { $ifNull: ['$online', 0] },
+                ],
+              },
+            },
+          },
+        },
+      ]);
+      byType[t] = agg[0] || { billCount: 0, revenue: 0 };
+    }
+
+    const purchaseAgg = this.purchaseEntryModel
+      ? await this.purchaseEntryModel.aggregate([
+          {
+            $match: {
+              invoiceDate: { $gte: start, $lte: end },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 },
+              total: { $sum: { $ifNull: ['$total', 0] } },
+              paidAmount: { $sum: { $ifNull: ['$paidAmount', 0] } },
+            },
+          },
+        ])
+      : [];
+
+    // Supplier payments in period: entries updated in range with paidAmount > 0
+    // (no separate payment ledger — documented limitation).
+    const paymentsAgg = this.purchaseEntryModel
+      ? await this.purchaseEntryModel.aggregate([
+          {
+            $match: {
+              paidAmount: { $gt: 0 },
+              updatedAt: { $gte: start, $lte: end },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 },
+              paidAmount: { $sum: { $ifNull: ['$paidAmount', 0] } },
+            },
+          },
+        ])
+      : [];
+
+    const outstandingAgg = this.purchaseEntryModel
+      ? await this.purchaseEntryModel.aggregate([
+          {
+            $group: {
+              _id: null,
+              outstanding: {
+                $sum: {
+                  $subtract: [
+                    { $ifNull: ['$total', 0] },
+                    { $ifNull: ['$paidAmount', 0] },
+                  ],
+                },
+              },
+            },
+          },
+        ])
+      : [];
+
+    const pnl = await this.getProfitAndLoss(startIso, endIso);
+    const round2 = (n: number) =>
+      Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+    const sales = salesAgg[0] || {
+      billCount: 0,
+      cash: 0,
+      online: 0,
+      discount: 0,
+      revenue: 0,
+    };
+    const purchases = purchaseAgg[0] || { count: 0, total: 0, paidAmount: 0 };
+    const payments = paymentsAgg[0] || { count: 0, paidAmount: 0 };
+
+    return {
+      mode,
+      period: { startDate: startIso, endDate: endIso },
+      filters: {
+        billingType: typeFilter,
+        paymentStatus: query.paymentStatus || 'all',
+        department: query.department || 'All',
+      },
+      sales: {
+        billCount: sales.billCount,
+        cash: round2(sales.cash),
+        online: round2(sales.online),
+        discount: round2(sales.discount),
+        revenue: round2(sales.revenue),
+        byType,
+      },
+      purchases: {
+        count: purchases.count,
+        total: round2(purchases.total),
+        paidOnInvoices: round2(purchases.paidAmount),
+      },
+      supplierPayments: {
+        note: 'Derived from purchase entries with paidAmount > 0 updated in period (no separate payment ledger).',
+        count: payments.count,
+        paidAmount: round2(payments.paidAmount),
+      },
+      outstanding: {
+        note: 'Point-in-time supplier outstanding (not historical as-of).',
+        total: round2(outstandingAgg[0]?.outstanding || 0),
+      },
+      profit: pnl.profit,
+      pnl,
     };
   }
 }

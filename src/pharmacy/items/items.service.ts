@@ -6,8 +6,13 @@ import {
 import mongoose, { Model } from 'mongoose';
 import { AddItemDto } from './dto/add-items.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Item, ItemStatus } from './schemas/item.schema';
+import { BatchStatus, Item, ItemStatus } from './schemas/item.schema';
 import { GetItemsDto } from './dto/get-items.dto';
+import {
+  CreateBatchDto,
+  PatchBatchStatusDto,
+  UpdateBatchDto,
+} from './dto/batch.dto';
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
 
@@ -17,6 +22,167 @@ export class ItemsService {
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
   ) { }
+
+  /** Escape user search input so regex metacharacters cannot break queries. */
+  private sanitizeSearchRegex(q: string): string {
+    return String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /** Dual-read helpers for legacy flat / purchasePrice-only batches. */
+  resolvePurchaseRate(batch: any): number {
+    const rate = batch?.purchaseRate ?? batch?.purchasePrice;
+    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  }
+
+  resolveSaleRate(batch: any, itemFallback = 0): number {
+    const rate = batch?.saleRate ?? batch?.sellingPrice ?? itemFallback;
+    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  }
+
+  resolveBatchMrp(batch: any, itemFallback = 0): number {
+    const rate = batch?.mrp ?? itemFallback;
+    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  }
+
+  resolveBatchStatus(batch: any): BatchStatus {
+    const s = String(batch?.status || BatchStatus.Active).toLowerCase();
+    return s === BatchStatus.Inactive
+      ? BatchStatus.Inactive
+      : BatchStatus.Active;
+  }
+
+  isBatchActive(batch: any): boolean {
+    return this.resolveBatchStatus(batch) === BatchStatus.Active;
+  }
+
+  /**
+   * Legacy rows may have packing: 0 which fails schema min:1 on save (500).
+   * Normalize before any persist path.
+   */
+  ensureValidPacking(item: any): void {
+    const packing = Number(item?.packing);
+    if (!Number.isFinite(packing) || packing < 1) {
+      item.packing = 1;
+    }
+  }
+
+  /**
+   * Recalculate denormalized item.quantity / expiry / rates from active batches.
+   * When there are no batches, leave flat historical values untouched (dual-read).
+   */
+  recalculateItemStockFromBatches(item: any): void {
+    const batches = item.batches || [];
+    if (!batches.length) {
+      return;
+    }
+
+    const active = batches.filter((b: any) => this.isBatchActive(b));
+    item.quantity = active.reduce(
+      (sum: number, b: any) => sum + (Number(b.quantity) || 0),
+      0,
+    );
+
+    const withExpiry = active
+      .filter((b: any) => b?.expiryDate)
+      .sort(
+        (a: any, b: any) =>
+          new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
+      );
+    if (withExpiry.length) {
+      item.expiryDate = withExpiry[0].expiryDate;
+    }
+
+    // Prefer most recently created active batch for denormalized rates
+    const byCreated = [...active].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime(),
+    );
+    const latest = byCreated[0];
+    if (latest) {
+      item.purchasePrice = this.resolvePurchaseRate(latest);
+      item.unitPrice = this.resolveSaleRate(latest, item.unitPrice);
+      item.mrp = this.resolveBatchMrp(latest, item.mrp);
+      if (latest.supplier) {
+        item.supplier = latest.supplier;
+      }
+    }
+
+    item.markModified?.('batches');
+  }
+
+  /**
+   * Migration helper (non-destructive): if an item has flat stock/prices but
+   * no batches, synthesize one OPENING batch so batch-first flows work.
+   * Does NOT drop flat fields.
+   */
+  ensureLegacyBatchFromFlatItem(item: any): boolean {
+    if ((item.batches || []).length > 0) return false;
+    const qty = Number(item.quantity) || 0;
+    if (qty <= 0 && !(Number(item.unitPrice) > 0 || Number(item.mrp) > 0)) {
+      return false;
+    }
+    const purchaseRate = Number(item.purchasePrice) || 0;
+    const saleRate = Number(item.unitPrice) || 0;
+    const mrp = Number(item.mrp) || saleRate || 0;
+    item.batches = item.batches || [];
+    item.batches.push({
+      batchNumber: 'LEGACY-OPENING',
+      expiryDate: item.expiryDate || new Date('2099-12-31'),
+      mrp,
+      purchaseRate,
+      purchasePrice: purchaseRate,
+      saleRate,
+      startingQuantity: qty,
+      quantity: qty,
+      status: BatchStatus.Active,
+      supplier: item.supplier || '-',
+      createdAt: item.createdAt || new Date(),
+    });
+    item.markModified?.('batches');
+    return true;
+  }
+
+  private normalizeBatchInput(input: {
+    batchNumber: string;
+    expiryDate: Date | string;
+    quantity: number;
+    startingQuantity?: number;
+    mrp?: number;
+    purchaseRate?: number;
+    purchasePrice?: number;
+    saleRate?: number;
+    unitPrice?: number;
+    supplier?: string;
+    status?: BatchStatus;
+  }) {
+    const purchaseRate =
+      input.purchaseRate ?? input.purchasePrice ?? 0;
+    const saleRate = input.saleRate ?? input.unitPrice ?? 0;
+    const mrp = input.mrp ?? saleRate ?? 0;
+    const quantity = Number(input.quantity) || 0;
+    const startingQuantity =
+      input.startingQuantity != null
+        ? Number(input.startingQuantity)
+        : quantity;
+
+    return {
+      batchNumber: String(input.batchNumber).trim(),
+      expiryDate:
+        input.expiryDate instanceof Date
+          ? input.expiryDate
+          : new Date(input.expiryDate),
+      mrp: Number(mrp) || 0,
+      purchaseRate: Number(purchaseRate) || 0,
+      purchasePrice: Number(purchaseRate) || 0,
+      saleRate: Number(saleRate) || 0,
+      startingQuantity,
+      quantity,
+      status: input.status || BatchStatus.Active,
+      supplier: (input.supplier || '-').trim() || '-',
+      createdAt: new Date(),
+    };
+  }
 
   private async generateUniqueSKU(): Promise<string> {
     let sku: string;
@@ -71,10 +237,18 @@ export class ItemsService {
     }
 
     const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+    const saleRate =
+      addItemDto.saleRate ?? addItemDto.unitPrice ?? 0;
+    const purchaseRate =
+      addItemDto.purchaseRate ?? addItemDto.purchasePrice ?? 0;
+    const mrp = addItemDto.mrp ?? saleRate ?? 0;
 
     const data = await this.itemModel.create({
       ...addItemDto,
-      quantity: addItemDto.batchNumber ? 0 : openingQty, // will be incremented by addBatchItems if batch exists
+      unitPrice: saleRate,
+      purchasePrice: purchaseRate,
+      mrp,
+      quantity: addItemDto.batchNumber ? 0 : openingQty, // incremented by addBatchItems
       pharmacy,
     });
 
@@ -84,11 +258,15 @@ export class ItemsService {
         expiryDate: addItemDto?.expiryDate
           ? new Date(addItemDto?.expiryDate)
           : new Date(),
-        purchasePrice: addItemDto.purchasePrice,
+        purchaseRate,
+        purchasePrice: purchaseRate,
+        saleRate,
+        mrp,
         quantity: openingQty,
+        startingQuantity: openingQty,
         supplier: addItemDto.supplier || '-',
-      }, addItemDto.mrp);
-      return updatedItem; // ✅ return the DB-refreshed item with correct quantity
+      });
+      return updatedItem;
     }
     return data;
   }
@@ -118,14 +296,13 @@ export class ItemsService {
     } = {};
 
     if (q) {
-      const searchRegex = { $regex: '^' + q, $options: 'i' };
+      const escaped = this.sanitizeSearchRegex(q);
+      const searchRegex = { $regex: '^' + escaped, $options: 'i' };
       filter = {
         $or: [
           { name: searchRegex },
           { sku: searchRegex },
           { generic: searchRegex },
-          // { supplier: searchRegex },
-          // { manufacturer: searchRegex },
         ],
       };
     }
@@ -517,7 +694,12 @@ export class ItemsService {
     id: mongoose.Types.ObjectId,
     quantity: number,
     user?: mongoose.Types.ObjectId,
+    batchId?: string | null,
   ) {
+    if (batchId) {
+      return this.deductFromBatch(id, batchId, quantity, user);
+    }
+
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
 
@@ -525,29 +707,240 @@ export class ItemsService {
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
+
+    if (!allowNegativeStock && item.quantity < quantity) {
+      throw new BadRequestException(
+        `Insufficient stock for ${item.name}. Available: ${item.quantity}, requested: ${quantity}`,
+      );
+    }
+
     const newQuantity = allowNegativeStock
       ? item.quantity - quantity
       : Math.max(item.quantity - quantity, 0);
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
-      await item.save();
     }
 
-    if (quantity > 0 && newQuantity >= 0) {
-      const newSoldQuantity = item.soldQuantity + quantity;
-      item.soldQuantity = newSoldQuantity;
+    if (quantity > 0) {
+      item.soldQuantity = (item.soldQuantity || 0) + quantity;
       item.soldHistory.push({
         date: new Date(),
         quantity,
         unitPrice: item.unitPrice,
         total: item.unitPrice * quantity,
       });
+    }
+
+    this.ensureValidPacking(item);
+    await item.save();
+    return item;
+  }
+
+  /**
+   * Sort helpers for manual batch pickers. FEFO = earliest expiry first;
+   * FIFO = earliest createdAt first. Expired / inactive batches excluded by default.
+   */
+  sortBatches(
+    batches: any[],
+    mode: 'fefo' | 'fifo' = 'fefo',
+    opts: { includeExpired?: boolean; includeInactive?: boolean } = {},
+  ) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    let list = [...(batches || [])];
+    if (!opts.includeInactive) {
+      list = list.filter((b) => this.isBatchActive(b));
+    }
+    if (!opts.includeExpired) {
+      list = list.filter((b) => {
+        if (!b?.expiryDate) return true;
+        const exp = new Date(b.expiryDate);
+        exp.setHours(0, 0, 0, 0);
+        return exp >= now;
+      });
+    }
+    list.sort((a, b) => {
+      if (mode === 'fifo') {
+        return (
+          new Date(a.createdAt || 0).getTime() -
+          new Date(b.createdAt || 0).getTime()
+        );
+      }
+      const ae = new Date(a.expiryDate || 0).getTime();
+      const be = new Date(b.expiryDate || 0).getTime();
+      if (ae !== be) return ae - be;
+      return (
+        new Date(a.createdAt || 0).getTime() -
+        new Date(b.createdAt || 0).getTime()
+      );
+    });
+    return list;
+  }
+
+  async getItemBatches(
+    id: mongoose.Types.ObjectId,
+    sort: 'fefo' | 'fifo' = 'fefo',
+    includeExpired = false,
+    includeInactive = false,
+  ) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+
+    // Dual-read: seed a legacy batch in-memory for pickers (persist only when mutated)
+    const seeded = this.ensureLegacyBatchFromFlatItem(item);
+    const packingWasInvalid =
+      !Number.isFinite(Number(item.packing)) || Number(item.packing) < 1;
+    this.ensureValidPacking(item);
+    if (seeded || packingWasInvalid) {
       await item.save();
     }
 
+    const sorted = this.sortBatches(item.batches || [], sort, {
+      includeExpired,
+      includeInactive,
+    });
 
+    const lean = item.toObject();
 
+    return {
+      itemId: lean._id,
+      name: lean.name,
+      packing: lean.packing ?? 1,
+      unitPrice: lean.unitPrice,
+      mrp: lean.mrp,
+      gst: 0,
+      quantity: lean.quantity,
+      batches: sorted.map((b: any) => {
+        const exp = b.expiryDate ? new Date(b.expiryDate) : null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expired = exp
+          ? (() => {
+              const e = new Date(exp);
+              e.setHours(0, 0, 0, 0);
+              return e < today;
+            })()
+          : false;
+        const status = this.resolveBatchStatus(b);
+        const purchaseRate = this.resolvePurchaseRate(b);
+        const saleRate = this.resolveSaleRate(b, lean.unitPrice);
+        const mrp = this.resolveBatchMrp(b, lean.mrp);
+        const stock = Number(b.quantity) || 0;
+        return {
+          batchId: b._id?.toString?.() || b.batchNumber,
+          batchNumber: b.batchNumber,
+          expiryDate: b.expiryDate,
+          purchaseRate,
+          purchasePrice: purchaseRate,
+          saleRate,
+          sellingPrice: saleRate,
+          mrp,
+          gst: 0,
+          stock,
+          quantity: stock,
+          startingQuantity: Number(b.startingQuantity) || stock,
+          status,
+          supplier: b.supplier,
+          packing: lean.packing ?? 1,
+          createdAt: b.createdAt,
+          expired,
+          available:
+            !expired &&
+            status === BatchStatus.Active &&
+            stock > 0,
+        };
+      }),
+    };
+  }
+
+  async suggestBatch(
+    id: mongoose.Types.ObjectId,
+    sort: 'fefo' | 'fifo' = 'fefo',
+  ) {
+    const data = await this.getItemBatches(id, sort, false);
+    const pick = data.batches.find((b) => b.available);
+    return { suggested: pick || null, ...data };
+  }
+
+  async deductFromBatch(
+    itemId: mongoose.Types.ObjectId,
+    batchId: string,
+    quantity: number,
+    user?: mongoose.Types.ObjectId,
+  ) {
+    if (!quantity || quantity <= 0) {
+      throw new BadRequestException('Quantity must be positive');
+    }
+
+    const allowNegativeStock =
+      await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
+
+    const item = await this.itemModel.findById(itemId);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    const batchIndex = (item.batches || []).findIndex(
+      (b: any) =>
+        b._id?.toString() === batchId.toString() ||
+        b.batchNumber === batchId,
+    );
+    if (batchIndex === -1) {
+      throw new BadRequestException('Selected batch not found');
+    }
+
+    const batch: any = item.batches[batchIndex];
+    if (!this.isBatchActive(batch)) {
+      throw new BadRequestException(
+        `Cannot sell from inactive batch ${batch.batchNumber}`,
+      );
+    }
+
+    if (batch.expiryDate) {
+      const exp = new Date(batch.expiryDate);
+      exp.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (exp < today) {
+        throw new BadRequestException(
+          `Cannot sell from expired batch ${batch.batchNumber}`,
+        );
+      }
+    }
+
+    const batchQty = Number(batch.quantity) || 0;
+    if (batchQty <= 0) {
+      throw new BadRequestException(
+        `Batch ${batch.batchNumber} has zero stock`,
+      );
+    }
+    if (!allowNegativeStock && batchQty < quantity) {
+      throw new BadRequestException(
+        `Insufficient batch stock for ${item.name} (${batch.batchNumber}). Available: ${batchQty}, requested: ${quantity}`,
+      );
+    }
+
+    batch.quantity = allowNegativeStock
+      ? batchQty - quantity
+      : Math.max(batchQty - quantity, 0);
+    item.markModified('batches');
+
+    this.recalculateItemStockFromBatches(item);
+
+    const saleRate = this.resolveSaleRate(batch, item.unitPrice);
+    item.soldQuantity = (item.soldQuantity || 0) + quantity;
+    item.soldHistory.push({
+      date: new Date(),
+      quantity,
+      unitPrice: saleRate,
+      total: saleRate * quantity,
+    });
+
+    this.ensureValidPacking(item);
+    await item.save();
     return item;
   }
 
@@ -560,50 +953,162 @@ export class ItemsService {
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
+      this.ensureValidPacking(item);
       await item.save();
     }
 
     return item;
   }
 
+  /**
+   * Create or upsert a batch. Same batchNumber on the same item merges stock
+   * (purchase entry restock) and updates rates/expiry.
+   */
   async addBatchItems(
     id: mongoose.Types.ObjectId,
     batchData: {
       batchNumber: string;
       quantity: number;
-      expiryDate: Date;
-      purchasePrice: number;
-      supplier: string;
+      expiryDate: Date | string;
+      purchasePrice?: number;
+      purchaseRate?: number;
+      saleRate?: number;
+      unitPrice?: number;
+      mrp?: number;
+      startingQuantity?: number;
+      supplier?: string;
+      status?: BatchStatus;
     },
-    unitPrice?:number,
-    mrp?:number,
+    unitPrice?: number,
+    mrp?: number,
   ) {
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
 
-    item.batches.push({ ...batchData, createdAt: new Date() });
-    item.quantity += batchData.quantity;
+    const normalized = this.normalizeBatchInput({
+      ...batchData,
+      saleRate: batchData.saleRate ?? batchData.unitPrice ?? unitPrice,
+      unitPrice: batchData.unitPrice ?? unitPrice,
+      mrp: batchData.mrp ?? mrp,
+    });
 
-    // if (
-    //   !item.expiryDate ||
-    //   new Date(batchData.expiryDate) < new Date(item.expiryDate) ||
-    //   new Date() > new Date(item.expiryDate)
-    // ) {
-    item.expiryDate = batchData.expiryDate;
-    item.purchasePrice = batchData.purchasePrice;
-    item.supplier = batchData.supplier;
-    // }
-    if(unitPrice){
-        item.unitPrice = unitPrice ;
+    const existingIdx = (item.batches || []).findIndex(
+      (b: any) =>
+        String(b.batchNumber).toLowerCase() ===
+        normalized.batchNumber.toLowerCase(),
+    );
+
+    if (existingIdx >= 0) {
+      const existing: any = item.batches[existingIdx];
+      existing.quantity =
+        (Number(existing.quantity) || 0) + normalized.quantity;
+      existing.startingQuantity =
+        (Number(existing.startingQuantity) || 0) + normalized.quantity;
+      existing.expiryDate = normalized.expiryDate;
+      existing.mrp = normalized.mrp;
+      existing.purchaseRate = normalized.purchaseRate;
+      existing.purchasePrice = normalized.purchaseRate;
+      existing.saleRate = normalized.saleRate;
+      existing.supplier = normalized.supplier || existing.supplier;
+      if (normalized.status) {
+        existing.status = normalized.status;
+      } else if (!existing.status) {
+        existing.status = BatchStatus.Active;
+      }
+    } else {
+      item.batches.push(normalized as any);
     }
-    if(mrp){
-        item.mrp = mrp;
-    }
+
+    item.markModified('batches');
+    this.recalculateItemStockFromBatches(item);
+    this.ensureValidPacking(item);
     await item.save();
-
     return item;
+  }
+
+  async createBatch(id: mongoose.Types.ObjectId, dto: CreateBatchDto) {
+    return this.addBatchItems(id, {
+      batchNumber: dto.batchNumber,
+      quantity: dto.quantity,
+      expiryDate: dto.expiryDate,
+      purchaseRate: dto.purchaseRate,
+      purchasePrice: dto.purchasePrice,
+      saleRate: dto.saleRate,
+      unitPrice: dto.unitPrice,
+      mrp: dto.mrp,
+      startingQuantity: dto.startingQuantity,
+      supplier: dto.supplier,
+      status: dto.status,
+    });
+  }
+
+  async updateBatchByNumber(
+    id: mongoose.Types.ObjectId,
+    batchNumber: string,
+    dto: UpdateBatchDto,
+  ) {
+    const item = await this.itemModel.findById(id);
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    const batchIndex = (item.batches || []).findIndex(
+      (b: any) =>
+        String(b.batchNumber).toLowerCase() ===
+        String(batchNumber).toLowerCase(),
+    );
+    if (batchIndex === -1) {
+      throw new NotFoundException(`Batch ${batchNumber} not found`);
+    }
+
+    const batch: any = item.batches[batchIndex];
+    if (dto.expiryDate != null) batch.expiryDate = new Date(dto.expiryDate);
+    if (dto.mrp != null) batch.mrp = Number(dto.mrp);
+    if (dto.purchaseRate != null || dto.purchasePrice != null) {
+      const rate = dto.purchaseRate ?? dto.purchasePrice ?? 0;
+      batch.purchaseRate = Number(rate);
+      batch.purchasePrice = Number(rate);
+    }
+    if (dto.saleRate != null || dto.unitPrice != null) {
+      batch.saleRate = Number(dto.saleRate ?? dto.unitPrice ?? 0);
+    }
+    if (dto.quantity != null) batch.quantity = Number(dto.quantity);
+    if (dto.startingQuantity != null) {
+      batch.startingQuantity = Number(dto.startingQuantity);
+    }
+    if (dto.supplier != null) batch.supplier = dto.supplier;
+    if (dto.status != null) batch.status = dto.status;
+
+    // Backfill missing new fields on live edit of legacy batches
+    if (batch.purchaseRate == null) {
+      batch.purchaseRate = this.resolvePurchaseRate(batch);
+    }
+    if (batch.saleRate == null) {
+      batch.saleRate = this.resolveSaleRate(batch, item.unitPrice);
+    }
+    if (batch.mrp == null) {
+      batch.mrp = this.resolveBatchMrp(batch, item.mrp);
+    }
+    if (batch.startingQuantity == null) {
+      batch.startingQuantity = Number(batch.quantity) || 0;
+    }
+    if (!batch.status) batch.status = BatchStatus.Active;
+
+    item.markModified('batches');
+    this.recalculateItemStockFromBatches(item);
+    this.ensureValidPacking(item);
+    await item.save();
+    return item;
+  }
+
+  async patchBatchStatus(
+    id: mongoose.Types.ObjectId,
+    batchNumber: string,
+    dto: PatchBatchStatusDto,
+  ) {
+    return this.updateBatchByNumber(id, batchNumber, { status: dto.status });
   }
 
   async deleteBatch(
@@ -626,16 +1131,15 @@ export class ItemsService {
       throw new BadRequestException('Batch not found');
     }
 
-    const batch = item.batches[batchIndex];
+    item.batches.splice(batchIndex, 1);
+    item.markModified('batches');
 
-    if (deductStock) {
-      item.quantity = Math.max(0, (item.quantity || 0) - (Number(batch.quantity) || 0));
+    if (deductStock || (item.batches || []).length > 0) {
+      this.recalculateItemStockFromBatches(item);
     }
 
-    item.batches.splice(batchIndex, 1);
-
+    this.ensureValidPacking(item);
     await item.save();
-
     return item;
   }
 
