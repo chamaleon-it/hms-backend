@@ -21,6 +21,10 @@ describe('BillingService.getReconsultEligibility', () => {
       consultingModel as any,
       userModel as any,
       {} as any,
+      {
+        registerBootSeedJob: jest.fn(),
+        seedIfMissing: jest.fn(),
+      } as any,
     );
   });
 
