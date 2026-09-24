@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Counter } from './schemas/counter.schema';
@@ -14,17 +19,41 @@ export const COUNTER_KEYS = {
     `invoice:${String(prefix || 'INV').trim().toUpperCase()}`,
 } as const;
 
+/** Fixed keys that domain services register for boot-time first-time seed. */
+export const BOOT_SEED_COUNTER_KEYS = [
+  COUNTER_KEYS.PATIENT_PID,
+  COUNTER_KEYS.PHARMACY_ORDER,
+  COUNTER_KEYS.PHARMACY_PURCHASE,
+  COUNTER_KEYS.LAB_REPORT,
+] as const;
+
 function isDuplicateKeyError(err: unknown): boolean {
   return !!(err && typeof err === 'object' && (err as { code?: number }).code === 11000);
 }
 
+type BootSeeder = {
+  key: string;
+  getInitialMax: () => Promise<number>;
+};
+
 @Injectable()
-export class CountersService implements OnModuleInit {
+export class CountersService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(CountersService.name);
+  /** Domain services register getInitialMax during construction; run once at boot. */
+  private readonly bootSeeders: BootSeeder[] = [];
 
   constructor(
     @InjectModel(Counter.name) private readonly counterModel: Model<Counter>,
   ) {}
+
+  /**
+   * Register a first-time seed callback for a fixed counter key.
+   * Called from domain service constructors; executed in onApplicationBootstrap.
+   * Invoice prefixes are intentionally not registered — seeded on first use via next().
+   */
+  registerBootSeed(key: string, getInitialMax: () => Promise<number>): void {
+    this.bootSeeders.push({ key, getInitialMax });
+  }
 
   /**
    * Drop obsolete unique `name_1` (legacy field) so missing/null `name` no
@@ -63,6 +92,60 @@ export class CountersService implements OnModuleInit {
       this.logger.warn(
         `Counters index migration skipped/failed (manual: db.counters.dropIndex("name_1")): ${err?.message || err}`,
       );
+    }
+  }
+
+  /**
+   * After all modules construct (and register boot seeders), seed any missing
+   * fixed counter keys. Idempotent: existing keys are never overwritten.
+   */
+  async onApplicationBootstrap() {
+    await this.seedRegisteredCounters();
+  }
+
+  /**
+   * First-time seed only: if a doc with `key` already exists, skip.
+   * If missing, create with `seq` from getInitialMax and `name = key`.
+   * Never lowers or resets an existing seq.
+   * @returns true if a new counter was created, false if skipped / raced.
+   */
+  async seedIfMissing(
+    key: string,
+    getInitialMax: () => Promise<number> = async () => 0,
+  ): Promise<boolean> {
+    const existing = await this.counterModel.findOne({ key }).lean().exec();
+    if (existing) {
+      return false;
+    }
+
+    const max = Math.max(0, Math.floor(Number(await getInitialMax()) || 0));
+    try {
+      await this.counterModel.create({ key, name: key, seq: max });
+      this.logger.log(`Seeded counter ${key} at seq=${max} (first-time only)`);
+      return true;
+    } catch (err) {
+      if (isDuplicateKeyError(err)) {
+        // Another process/boot raced — existing doc wins; do not overwrite.
+        return false;
+      }
+      this.logger.warn(
+        `Counter seedIfMissing(${key}) failed: ${(err as Error)?.message || err}`,
+      );
+      throw err;
+    }
+  }
+
+  /** Run all registered boot seeders. Safe to call every boot. */
+  async seedRegisteredCounters(): Promise<void> {
+    for (const { key, getInitialMax } of this.bootSeeders) {
+      try {
+        await this.seedIfMissing(key, getInitialMax);
+      } catch (err: any) {
+        // Do not crash boot on seed failure — next()/peek() still fall back.
+        this.logger.warn(
+          `Boot seed for ${key} skipped/failed: ${err?.message || err}`,
+        );
+      }
     }
   }
 

@@ -21,7 +21,12 @@ export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     private readonly countersService: CountersService,
-  ) { }
+  ) {
+    // First-time boot seed only — never overwrites an existing patient_pid counter.
+    this.countersService.registerBootSeed(COUNTER_KEYS.PATIENT_PID, () =>
+      this.maxNumericMrn(),
+    );
+  }
 
   private async maxNumericMrn(): Promise<number> {
     const result = await this.patientModel.aggregate<{ max: number }>([

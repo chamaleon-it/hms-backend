@@ -38,7 +38,11 @@ export class ReportService implements OnModuleInit {
     @InjectModel(Group.name) private groupModel: Model<Group>,
     private billingService: BillingService,
     private readonly countersService: CountersService,
-  ) {}
+  ) {
+    this.countersService.registerBootSeed(COUNTER_KEYS.LAB_REPORT, () =>
+      this.maxLabReportMrn(),
+    );
+  }
 
   async onModuleInit() {
     try {
@@ -54,16 +58,20 @@ export class ReportService implements OnModuleInit {
     }
   }
 
+  private async maxLabReportMrn(): Promise<number> {
+    const last = await this.reportModel
+      .findOne()
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
+    return last?.mrn ? Number(last.mrn) : 0;
+  }
+
   private async nextLabReportMrn(): Promise<number> {
-    return this.countersService.next(COUNTER_KEYS.LAB_REPORT, async () => {
-      const last = await this.reportModel
-        .findOne()
-        .sort({ mrn: -1 })
-        .select('mrn')
-        .lean()
-        .exec();
-      return last?.mrn ? Number(last.mrn) : 0;
-    });
+    return this.countersService.next(COUNTER_KEYS.LAB_REPORT, () =>
+      this.maxLabReportMrn(),
+    );
   }
 
   async createReport(@Body() dto: CreateReportDto) {

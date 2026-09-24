@@ -12,6 +12,7 @@ describe('CountersService', () => {
   ) => {
     const service = Object.create(CountersService.prototype) as CountersService;
     (service as any).logger = { warn: jest.fn(), log: jest.fn() };
+    (service as any).bootSeeders = [];
 
     const assertLegacyName = (doc: Partial<CounterDoc>) => {
       if (!opts.legacyNameUnique) return;
@@ -232,5 +233,71 @@ describe('CountersService', () => {
     expect(created).toEqual([
       { keys: { key: 1 }, opts: { unique: true, name: 'key_1' } },
     ]);
+  });
+
+  it('seedIfMissing creates when key is missing', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    const getInitialMax = jest.fn(async () => 99);
+
+    const created = await service.seedIfMissing(
+      COUNTER_KEYS.PATIENT_PID,
+      getInitialMax,
+    );
+
+    expect(created).toBe(true);
+    expect(getInitialMax).toHaveBeenCalledTimes(1);
+    expect(store.get(COUNTER_KEYS.PATIENT_PID)).toEqual({
+      key: COUNTER_KEYS.PATIENT_PID,
+      name: COUNTER_KEYS.PATIENT_PID,
+      seq: 99,
+    });
+    // First next after seed continues from seeded seq (no re-seed race).
+    expect(await service.next(COUNTER_KEYS.PATIENT_PID, async () => 0)).toBe(
+      100,
+    );
+  });
+
+  it('seedIfMissing skips when key already exists (does not lower seq)', async () => {
+    const store = new Map<string, CounterDoc>();
+    store.set(COUNTER_KEYS.PHARMACY_ORDER, {
+      key: COUNTER_KEYS.PHARMACY_ORDER,
+      name: COUNTER_KEYS.PHARMACY_ORDER,
+      seq: 500,
+    });
+    const service = makeService(store);
+    const getInitialMax = jest.fn(async () => 1);
+
+    const created = await service.seedIfMissing(
+      COUNTER_KEYS.PHARMACY_ORDER,
+      getInitialMax,
+    );
+
+    expect(created).toBe(false);
+    expect(getInitialMax).not.toHaveBeenCalled();
+    expect(store.get(COUNTER_KEYS.PHARMACY_ORDER)?.seq).toBe(500);
+  });
+
+  it('seedRegisteredCounters runs boot seeders idempotently', async () => {
+    const store = new Map<string, CounterDoc>();
+    const service = makeService(store);
+    (service as any).bootSeeders = [];
+
+    service.registerBootSeed(COUNTER_KEYS.LAB_REPORT, async () => 7);
+    service.registerBootSeed(COUNTER_KEYS.PATIENT_PID, async () => 3);
+
+    await service.seedRegisteredCounters();
+    expect(store.get(COUNTER_KEYS.LAB_REPORT)?.seq).toBe(7);
+    expect(store.get(COUNTER_KEYS.PATIENT_PID)?.seq).toBe(3);
+
+    // Second boot must not overwrite.
+    store.set(COUNTER_KEYS.LAB_REPORT, {
+      key: COUNTER_KEYS.LAB_REPORT,
+      name: COUNTER_KEYS.LAB_REPORT,
+      seq: 70,
+    });
+    await service.seedRegisteredCounters();
+    expect(store.get(COUNTER_KEYS.LAB_REPORT)?.seq).toBe(70);
+    expect(store.get(COUNTER_KEYS.PATIENT_PID)?.seq).toBe(3);
   });
 });

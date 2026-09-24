@@ -14,7 +14,11 @@ export class PurchaseService {
   constructor(
     @InjectModel(Purchase.name) private purchaseModel: Model<Purchase>,
     private readonly countersService: CountersService,
-  ) {}
+  ) {
+    this.countersService.registerBootSeed(COUNTER_KEYS.PHARMACY_PURCHASE, () =>
+      this.maxPurchaseSeq(),
+    );
+  }
 
   async createPurchase(createPurchaseDto: CreatePurchaseDto) {
     const mrn = await this.generateUniqueMRN();
@@ -56,22 +60,24 @@ export class PurchaseService {
     };
   }
 
+  private async maxPurchaseSeq(): Promise<number> {
+    const last = await this.purchaseModel
+      .findOne({ mrn: { $regex: /^RXW\d+$/ } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
+    if (!last?.mrn) return 0;
+    const match = String(last.mrn).match(/^RXW(\d+)$/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+
   private async generateUniqueMRN(): Promise<string> {
     return this.countersService.nextFormatted(COUNTER_KEYS.PHARMACY_PURCHASE, {
       prefix: 'RXW',
       pad: 7,
-      getInitialMax: async () => {
-        const last = await this.purchaseModel
-          .findOne({ mrn: { $regex: /^RXW\d+$/ } })
-          .collation({ locale: 'en_US', numericOrdering: true })
-          .sort({ mrn: -1 })
-          .select('mrn')
-          .lean()
-          .exec();
-        if (!last?.mrn) return 0;
-        const match = String(last.mrn).match(/^RXW(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-      },
+      getInitialMax: () => this.maxPurchaseSeq(),
     });
   }
 }

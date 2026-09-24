@@ -34,24 +34,30 @@ export class OrdersService {
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
     private readonly countersService: CountersService,
-  ) { }
+  ) {
+    this.countersService.registerBootSeed(COUNTER_KEYS.PHARMACY_ORDER, () =>
+      this.maxOrderSeq(),
+    );
+  }
+
+  private async maxOrderSeq(): Promise<number> {
+    const last = await this.orderModel
+      .findOne({ mrn: { $regex: /^RX\d+$/ } })
+      .collation({ locale: 'en_US', numericOrdering: true })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
+    if (!last?.mrn) return 0;
+    const match = String(last.mrn).match(/^RX(\d+)$/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
 
   private async generateUniqueMRN(): Promise<string> {
     return this.countersService.nextFormatted(COUNTER_KEYS.PHARMACY_ORDER, {
       prefix: 'RX',
       pad: 7,
-      getInitialMax: async () => {
-        const last = await this.orderModel
-          .findOne({ mrn: { $regex: /^RX\d+$/ } })
-          .collation({ locale: 'en_US', numericOrdering: true })
-          .sort({ mrn: -1 })
-          .select('mrn')
-          .lean()
-          .exec();
-        if (!last?.mrn) return 0;
-        const match = String(last.mrn).match(/^RX(\d+)$/);
-        return match ? parseInt(match[1], 10) : 0;
-      },
+      getInitialMax: () => this.maxOrderSeq(),
     });
   }
 
