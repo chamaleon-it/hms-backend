@@ -261,6 +261,8 @@ describe('ItemsService batch helpers', () => {
       sumActiveQuantity: service.sumActiveQuantity.bind(service),
       recalculateItemStockFromBatches:
         service.recalculateItemStockFromBatches.bind(service),
+      findBatchIndex: service.findBatchIndex.bind(service),
+      ensurePersistedBatchIds: jest.fn().mockResolvedValue(false),
     });
     svc.itemModel = {
       findById: jest.fn().mockResolvedValue(item),
@@ -290,5 +292,17 @@ describe('ItemsService batch helpers', () => {
     expect(item.soldQuantity).toBe(2);
     expect(item.soldHistory[0].unitPrice).toBe(14);
     expect(item.save).toHaveBeenCalled();
+  });
+
+  it('findBatchIndex matches by _id, batchId-as-number, or batchNumber', () => {
+    const list = [
+      { _id: 'oid1', batchNumber: 'B0' },
+      { _id: 'oid2', batchNumber: 'NEW' },
+    ];
+    expect(service.findBatchIndex(list, 'oid1')).toBe(0);
+    expect(service.findBatchIndex(list, 'B0')).toBe(0);
+    expect(service.findBatchIndex(list, 'stale-oid', 'B0')).toBe(0);
+    expect(service.findBatchIndex(list, 'missing', 'new')).toBe(1);
+    expect(service.findBatchIndex(list, 'nope', 'nope')).toBe(-1);
   });
 });

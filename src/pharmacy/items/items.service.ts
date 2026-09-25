@@ -41,6 +41,52 @@ export class ItemsService {
   }
 
   /**
+   * Resolve a batch on an item by stable subdoc `_id` and/or `batchNumber`.
+   * B0 import wrote batches without `_id`; Mongoose invents a new id per load,
+   * so order lines must also match on batchNumber (e.g. "B0").
+   */
+  findBatchIndex(
+    batches: any[] | null | undefined,
+    batchId?: string | null,
+    batchNumber?: string | null,
+  ): number {
+    const list = batches || [];
+    const id = batchId != null ? String(batchId).trim() : '';
+    const num = batchNumber != null ? String(batchNumber).trim() : '';
+    if (!id && !num) return -1;
+
+    return list.findIndex((b: any) => {
+      const bid = b?._id != null ? String(b._id) : '';
+      const bnum = String(b?.batchNumber || '').trim();
+      if (id && bid && bid === id) return true;
+      // batchId may be the batchNumber when `_id` was missing at pick time
+      if (id && bnum && bnum.toLowerCase() === id.toLowerCase()) return true;
+      if (num && bnum && bnum.toLowerCase() === num.toLowerCase()) return true;
+      return false;
+    });
+  }
+
+  /**
+   * Persist ObjectIds on batch subdocs that were inserted without `_id`
+   * (raw Mongo replaceOne import). Call before returning batchIds to the FE.
+   */
+  async ensurePersistedBatchIds(
+    id: mongoose.Types.ObjectId | string,
+  ): Promise<boolean> {
+    const lean = await this.itemModel.findById(id).lean().exec();
+    if (!lean) return false;
+    const batches = (lean as any).batches || [];
+    if (!batches.some((b: any) => !b?._id)) return false;
+
+    const healed = batches.map((b: any) => ({
+      ...b,
+      _id: b._id || new mongoose.Types.ObjectId(),
+    }));
+    await this.itemModel.updateOne({ _id: id }, { $set: { batches: healed } });
+    return true;
+  }
+
+  /**
    * Pack/strip purchase rate → stock purchase value on current qty:
    * (purchaseRate / packing) × quantity when packing > 0, else rate × qty.
    * Must use current quantity so value falls as stock is sold (like selling value).
@@ -735,9 +781,10 @@ export class ItemsService {
     quantity: number,
     user?: mongoose.Types.ObjectId,
     batchId?: string | null,
+    batchNumber?: string | null,
   ) {
-    if (batchId) {
-      return this.deductFromBatch(id, batchId, quantity, user);
+    if (batchId || batchNumber) {
+      return this.deductFromBatch(id, batchId || batchNumber || '', quantity, user, batchNumber);
     }
 
     const allowNegativeStock =
@@ -841,6 +888,9 @@ export class ItemsService {
     includeExpired = false,
     includeInactive = false,
   ) {
+    // Stabilize batchIds before exposing them to FE / order create validation
+    await this.ensurePersistedBatchIds(id);
+
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new NotFoundException('Item not found.');
@@ -879,8 +929,10 @@ export class ItemsService {
         const unitPrice = this.resolveUnitPrice(b);
         const mrp = this.resolveBatchMrp(b);
         const stock = Number(b.quantity) || 0;
+        const persistedId = b._id != null ? String(b._id) : '';
         return {
-          batchId: b._id?.toString?.() || b.batchNumber,
+          // Prefer persisted ObjectId; fall back to batchNumber for legacy rows
+          batchId: persistedId || String(b.batchNumber || ''),
           batchNumber: b.batchNumber,
           expiryDate: b.expiryDate,
           purchaseRate,
@@ -917,6 +969,7 @@ export class ItemsService {
     batchId: string,
     quantity: number,
     user?: mongoose.Types.ObjectId,
+    batchNumber?: string | null,
   ) {
     if (!quantity || quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
@@ -925,15 +978,17 @@ export class ItemsService {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
 
+    await this.ensurePersistedBatchIds(itemId);
+
     const item = await this.itemModel.findById(itemId);
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
 
-    const batchIndex = (item.batches || []).findIndex(
-      (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
+    const batchIndex = this.findBatchIndex(
+      item.batches || [],
+      batchId,
+      batchNumber,
     );
     if (batchIndex === -1) {
       throw new BadRequestException('Selected batch not found');
@@ -1187,11 +1242,7 @@ export class ItemsService {
       throw new BadRequestException('Item is not available');
     }
 
-    const batchIndex = item.batches.findIndex(
-      (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
-    );
+    const batchIndex = this.findBatchIndex(item.batches, batchId, batchId);
 
     if (batchIndex === -1) {
       throw new BadRequestException('Batch not found');
