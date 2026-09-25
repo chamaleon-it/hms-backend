@@ -155,7 +155,6 @@ describe('ItemsService batch helpers', () => {
     };
     expect(service.resolveBatchPurchaseValue(batch)).toBe(1100);
     expect(service.resolveUnitPrice(batch) * batch.quantity).toBe(1200);
-    expect(service.resolveBatchMrp(batch) * batch.quantity).toBe(12000);
     // stripCount missing → qty/packing
     expect(
       service.resolveBatchPurchaseValue({

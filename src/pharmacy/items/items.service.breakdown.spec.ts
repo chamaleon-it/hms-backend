@@ -12,7 +12,7 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
     service = new ItemsService(itemModel as any, {} as any);
   });
 
-  it('returns category and total purchase vs selling vs mrp values', async () => {
+  it('returns category and total purchase vs selling values (no MRP value)', async () => {
     itemModel.aggregate
       .mockResolvedValueOnce([
         {
@@ -21,7 +21,6 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
           quantity: 10,
           sellingValue: 200,
           purchaseValue: 100,
-          mrpValue: 250,
         },
         {
           _id: 'Consumables',
@@ -29,14 +28,12 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
           quantity: 5,
           sellingValue: 50,
           purchaseValue: 30,
-          mrpValue: 60,
         },
       ])
       .mockResolvedValueOnce([
         {
           sellingValue: 250,
           purchaseValue: 130,
-          mrpValue: 310,
           totalQuantity: 15,
           totalItems: 3,
         },
@@ -49,7 +46,6 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
           quantity: 10,
           sellingValue: 200,
           purchaseValue: 100,
-          mrpValue: 250,
         },
       ]);
 
@@ -57,7 +53,7 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
 
     expect(result.totals.sellingValue).toBe(250);
     expect(result.totals.purchaseValue).toBe(130);
-    expect(result.totals.mrpValue).toBe(310);
+    expect((result.totals as any).mrpValue).toBeUndefined();
     expect(result.byCategory).toHaveLength(2);
     expect(result.byCategory[0].category).toBe('Medicine');
     expect(result.topItems[0].sellingValue).toBe(200);

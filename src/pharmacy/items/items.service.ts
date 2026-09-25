@@ -587,7 +587,6 @@ export class ItemsService {
         quantity: this.activeQuantityExpr(),
         sellingValue: this.batchValueExpr('unitPrice'),
         purchaseValue: this.batchPurchaseValueExpr(),
-        mrpValue: this.batchValueExpr('mrp'),
       },
     };
 
@@ -602,7 +601,6 @@ export class ItemsService {
             quantity: { $sum: '$quantity' },
             sellingValue: { $sum: '$sellingValue' },
             purchaseValue: { $sum: '$purchaseValue' },
-            mrpValue: { $sum: '$mrpValue' },
           },
         },
         { $sort: { sellingValue: -1 } },
@@ -615,7 +613,6 @@ export class ItemsService {
             _id: null,
             sellingValue: { $sum: '$sellingValue' },
             purchaseValue: { $sum: '$purchaseValue' },
-            mrpValue: { $sum: '$mrpValue' },
             totalQuantity: { $sum: '$quantity' },
             totalItems: { $sum: 1 },
           },
@@ -633,7 +630,6 @@ export class ItemsService {
             quantity: 1,
             sellingValue: 1,
             purchaseValue: 1,
-            mrpValue: 1,
           },
         },
       ]),
@@ -645,7 +641,6 @@ export class ItemsService {
     const total = totals[0] || {
       sellingValue: 0,
       purchaseValue: 0,
-      mrpValue: 0,
       totalQuantity: 0,
       totalItems: 0,
     };
@@ -654,7 +649,6 @@ export class ItemsService {
       totals: {
         sellingValue: round2(total.sellingValue),
         purchaseValue: round2(total.purchaseValue),
-        mrpValue: round2(total.mrpValue),
         totalQuantity: round2(total.totalQuantity),
         totalItems: total.totalItems || 0,
       },
@@ -664,7 +658,6 @@ export class ItemsService {
         quantity: round2(row.quantity),
         sellingValue: round2(row.sellingValue),
         purchaseValue: round2(row.purchaseValue),
-        mrpValue: round2(row.mrpValue),
       })),
       topItems: topItems.map((item: any) => ({
         id: item._id,
@@ -673,7 +666,6 @@ export class ItemsService {
         quantity: item.quantity || 0,
         sellingValue: round2(item.sellingValue || 0),
         purchaseValue: round2(item.purchaseValue || 0),
-        mrpValue: round2(item.mrpValue || 0),
       })),
     };
   }
