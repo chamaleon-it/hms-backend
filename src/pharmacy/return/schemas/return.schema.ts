@@ -3,17 +3,6 @@ import mongoose, { HydratedDocument } from 'mongoose';
 
 export type ReturnDocument = HydratedDocument<Return>;
 
-export enum RefundMode {
-  Cash = 'Cash',
-  UPI = 'UPI',
-  AdjustNextBill = 'Adjust in Next Bill',
-}
-
-export enum ReturnedBy {
-  Patient = 'Patient',
-  Staff = 'Staff',
-}
-
 export enum ReturnReason {
   DoctorChangedRx = 'Doctor Changed Rx',
   Expired = 'Expired',
@@ -37,15 +26,6 @@ export class Return {
 
   @Prop({ required: true, type: mongoose.Schema.Types.ObjectId, ref: 'Order' })
   order: mongoose.Types.ObjectId;
-
-  @Prop({ required: true, enum: Object.values(RefundMode) })
-  refundMode: RefundMode;
-
-  @Prop({ required: true, enum: Object.values(ReturnedBy) })
-  returnedBy: ReturnedBy;
-
-  @Prop({ default: null })
-  remarks: string;
 
   @Prop({
     default: () => [],

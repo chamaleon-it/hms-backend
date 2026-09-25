@@ -11,42 +11,78 @@ import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
-  ) { }
+    private readonly countersService: CountersService,
+  ) {
+    // First-time boot seed only — never overwrites an existing patient_pid counter.
+    this.countersService.registerBootSeed(COUNTER_KEYS.PATIENT_PID, () =>
+      this.maxNumericMrn(),
+    );
+  }
+
+  private async maxNumericMrn(): Promise<number> {
+    const result = await this.patientModel.aggregate<{ max: number }>([
+      { $match: { mrn: { $regex: /^\d+$/ } } },
+      {
+        $project: {
+          n: {
+            $convert: {
+              input: '$mrn',
+              to: 'int',
+              onError: 0,
+              onNull: 0,
+            },
+          },
+        },
+      },
+      { $group: { _id: null, max: { $max: '$n' } } },
+    ]);
+    return result[0]?.max ?? 0;
+  }
 
   private async generateUniqueMRN(): Promise<string> {
-    let mrn: string;
-    let exists = true;
+    // Sequential patient PID. Seed from max numeric mrn already in DB.
+    return this.countersService.nextFormatted(COUNTER_KEYS.PATIENT_PID, {
+      getInitialMax: () => this.maxNumericMrn(),
+    });
+  }
 
-    do {
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      mrn = `${randomNum}`;
-
-      // Check if MRN already exists
-      const existing = await this.patientModel.exists({ mrn });
-      exists = !!existing;
-    } while (exists);
-
-    return mrn;
+  /** Preview next Customer ID (PID) without consuming the counter. */
+  async peekNextPid(): Promise<string> {
+    return this.countersService.peekFormatted(COUNTER_KEYS.PATIENT_PID, {
+      getInitialMax: () => this.maxNumericMrn(),
+    });
   }
 
   async register(
     patientRegisterDto: PatientRegisterDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
-    if (!patientRegisterDto.mrn) {
-      const mrn = await this.generateUniqueMRN();
-      patientRegisterDto.mrn = mrn;
+    const requested = String(patientRegisterDto.mrn || '').trim();
+    if (!requested) {
+      patientRegisterDto.mrn = await this.generateUniqueMRN();
     } else {
-      const mrn = await this.patientModel.exists({
-        mrn: patientRegisterDto.mrn,
-      });
-      if (mrn) {
-        throw new BadRequestException('MRN already exists');
+      const exists = await this.patientModel.exists({ mrn: requested });
+      if (exists) {
+        // Peek can race with another create — fall back to allocate.
+        patientRegisterDto.mrn = await this.generateUniqueMRN();
+      } else {
+        patientRegisterDto.mrn = requested;
+        // Keep patient_pid floor in sync when client used a peeked/manual PID.
+        if (/^\d+$/.test(requested)) {
+          await this.countersService.ensureAtLeast(
+            COUNTER_KEYS.PATIENT_PID,
+            Number(requested),
+          );
+        }
       }
     }
     const patient = await this.patientModel.create({

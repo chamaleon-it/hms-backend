@@ -63,7 +63,7 @@ export class BillingController {
   }
 
   @Get('drop-down')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
     const data = await this.billingService.getBillDropDown(getBillDropDownDto);
     return {
@@ -73,6 +73,7 @@ export class BillingController {
   }
 
   @Get('single')
+  @UseGuards(JwtAuthGuard)
   async getSingleCustomerBill(@Query('q') q: string) {
     const data = await this.billingService.getSingleCustomerBill(q);
     return {
@@ -151,6 +152,24 @@ export class BillingController {
     return {
       data,
       message: 'Bill retrieved successfully by report ID.',
+    };
+  }
+
+  @Get('reconsult_eligibility')
+  @UseGuards(JwtAuthGuard)
+  async getReconsultEligibility(
+    @Query('patientId') patientId: string,
+    @Query('doctorId') doctorId: string | undefined,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.getReconsultEligibility(
+      patientId,
+      doctorId,
+      user.id,
+    );
+    return {
+      data,
+      message: 'Reconsult eligibility retrieved successfully',
     };
   }
 

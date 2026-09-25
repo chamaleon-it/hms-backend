@@ -3,15 +3,19 @@ import { PurchaseService } from './purchase.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { FindAllPurchaseDto } from './dto/find-all-purchase.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 
 @Controller('pharmacy/purchase')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   async createPurchase(
     @Body() createPurchaseDto: CreatePurchaseDto,
     @GetUser() user: JWTUserInterface,

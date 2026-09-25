@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import {
-  AppointmentMethod,
   AppointmentStatus,
   AppointmentType,
 } from '../schemas/appointment.schema';
@@ -21,12 +20,6 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsMongoId({ message: 'Doctor must be a valid MongoDB ObjectId.' })
   doctor?: mongoose.Types.ObjectId;
-
-  @IsOptional()
-  @IsEnum(AppointmentMethod, {
-    message: 'Method must be a valid appointment method.',
-  })
-  method?: AppointmentMethod;
 
   @IsOptional()
   @IsDateString({}, { message: 'Date must be a valid ISO date string.' })

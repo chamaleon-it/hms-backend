@@ -12,12 +12,14 @@ import {
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { LisApiKeyGuard } from 'src/auth/lis-api-key.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ResultDto } from './dto/result.dto';
 import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
+import { GetLabPatientsDto } from './dto/get-lab-patients.dto';
 import { LisResultDto } from './dto/lis-result.dto';
 
 @Controller('lab/report')
@@ -47,6 +49,7 @@ export class ReportController {
   }
 
   @Post('sample_collected/:id')
+  @UseGuards(JwtAuthGuard)
   async sampleCollected(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() dto: SampleCollectedDto,
@@ -59,6 +62,7 @@ export class ReportController {
   }
 
   @Post('start_test/:id')
+  @UseGuards(JwtAuthGuard)
   async startTest(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.startTest(id);
     return {
@@ -68,6 +72,7 @@ export class ReportController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async deleteReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.deleteReport(id);
     return {
@@ -86,8 +91,12 @@ export class ReportController {
     };
   }
 
+  /**
+   * LIS / instrument ingest — intentionally not JWT (machines have no user session).
+   * Protected by shared API key header `x-lis-api-key` matching env `LIS_API_KEY`.
+   */
   @Post('lis-result')
-  // No JwtAuthGuard here to allow local scripts to call it automatically
+  @UseGuards(LisApiKeyGuard)
   async receiveLisResult(@Body() dto: LisResultDto) {
     const data = await this.reportService.updateFromLis(dto);
     return {
@@ -97,6 +106,7 @@ export class ReportController {
   }
 
   @Get(`patient/:id`)
+  @UseGuards(JwtAuthGuard)
   async getPatientReports(@Param('id') patient: mongoose.Types.ObjectId) {
     const data = await this.reportService.getPatientReports(patient);
     return {
@@ -106,15 +116,18 @@ export class ReportController {
   }
 
   @Get('patients')
-  async getPatients() {
-    const data = await this.reportService.getPatients();
+  @UseGuards(JwtAuthGuard)
+  async getPatients(@Query() query: GetLabPatientsDto) {
+    const { data, total } = await this.reportService.getPatients(query);
     return {
       data,
+      total,
       message: 'All patient data retrived',
     };
   }
 
   @Get('statistics')
+  @UseGuards(JwtAuthGuard)
   async getStatistics() {
     const data = await this.reportService.getStatistics();
     return {
@@ -123,24 +136,8 @@ export class ReportController {
     };
   }
 
-  @Post('mark_as_flagged/:id')
-  async markAsFlagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsFlagged(id);
-    return {
-      message: 'Report is marked as flagged',
-      data,
-    };
-  }
-  @Post('mark_as_unflagged/:id')
-  async markAsUnflagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsUnflagged(id);
-    return {
-      message: 'Report is marked as unflagged',
-      data,
-    };
-  }
-
   @Post('reset_timer/:id')
+  @UseGuards(JwtAuthGuard)
   async resetTimer(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() dto: { duration: number },
@@ -153,6 +150,7 @@ export class ReportController {
   }
 
   @Post('recover/:id')
+  @UseGuards(JwtAuthGuard)
   async recoverReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.recoverReport(id);
     return {
@@ -162,6 +160,7 @@ export class ReportController {
   }
 
   @Post('repeat/:id')
+  @UseGuards(JwtAuthGuard)
   async repeatReport(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.reportService.repeatReport(id);
     return {

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { RefundMode, ReturnedBy, ReturnReason } from '../schemas/return.schema';
+import { ReturnReason } from '../schemas/return.schema';
 
 export class CreateReturnDto {
   patient: mongoose.Types.ObjectId;
@@ -12,12 +12,6 @@ export class CreateReturnDto {
     reason: ReturnReason;
     unitPrice: number;
   }[];
-
-  refundMode: RefundMode;
-
-  returnedBy: ReturnedBy;
-
-  remarks?: string;
 
   billNo?: string;
 }

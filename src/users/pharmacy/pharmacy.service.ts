@@ -5,7 +5,6 @@ import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Injectable()
 export class PharmacyService {
@@ -22,6 +21,15 @@ export class PharmacyService {
           address: dto.address,
           'pharmacy.general.owner': dto.owner,
           'pharmacy.general.gstin': dto.gstin,
+          ...(dto.slogan !== undefined && {
+            'pharmacy.general.slogan': dto.slogan,
+          }),
+          ...(dto.advertisement !== undefined && {
+            'pharmacy.general.advertisement': dto.advertisement,
+          }),
+          ...(dto.services !== undefined && {
+            'pharmacy.general.services': dto.services,
+          }),
         },
       },
       { new: true, runValidators: true }, // return updated document
@@ -44,6 +52,12 @@ export class PharmacyService {
           'pharmacy.billing.autoGenerateBill': dto.autoGenerateBill,
           'pharmacy.billing.autoGeneratePrescription':
             dto.autoGeneratePrescription,
+          ...(dto.printDualCopies !== undefined && {
+            'pharmacy.billing.printDualCopies': dto.printDualCopies,
+          }),
+          ...(dto.freeReconsultDays !== undefined && {
+            'pharmacy.billing.freeReconsultDays': dto.freeReconsultDays,
+          }),
         },
       },
       { new: true, runValidators: true },
@@ -67,32 +81,6 @@ export class PharmacyService {
           'pharmacy.inventory.lowStockThreshold': dto.lowStockThreshold,
           'pharmacy.inventory.expiryAlert': dto.expiryAlert,
           'pharmacy.inventory.allowNegativeStock': dto.allowNegativeStock,
-        },
-      },
-      { new: true, runValidators: true, context: 'query' },
-    );
-
-    if (!updated) {
-      throw new NotFoundException('Pharmacy Not found');
-    }
-
-    return updated;
-  }
-
-  async updateNotifications(
-    user: mongoose.Types.ObjectId,
-    dto: UpdateNotificationsDto,
-  ) {
-    const updated = await this.userModel.findByIdAndUpdate(
-      user,
-      {
-        $set: {
-          'pharmacy.notifications.whatsapp': dto.whatsapp,
-          'pharmacy.notifications.sms': dto.sms,
-          'pharmacy.notifications.inApp': dto.inApp,
-          ...(dto.note && {
-            'pharmacy.notifications.note': dto.note,
-          }),
         },
       },
       { new: true, runValidators: true, context: 'query' },

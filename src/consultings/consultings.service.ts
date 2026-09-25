@@ -10,7 +10,7 @@ import {
 } from 'src/pharmacy/orders/schemas/order.schema';
 import { ReportService } from 'src/lab/report/report.service';
 import { ReportStatus } from 'src/lab/report/schemas/report.schema';
-import configuration from 'src/config/configuration';
+import { getInHouseObjectId } from 'src/config/in-house';
 
 @Injectable()
 export class ConsultingsService {
@@ -55,8 +55,7 @@ export class ConsultingsService {
     }[] = consultingDto.test.map((t) => ({
       patient: consultingDto.patient,
       doctor: doctorId,
-      lab:
-        t.lab ?? new mongoose.Types.ObjectId(configuration().in_house_lab_id),
+      lab: t.lab ?? getInHouseObjectId('lab'),
       date: t.date,
       test: t.name.map((n) => ({ name: n })),
       priority: t.priority,

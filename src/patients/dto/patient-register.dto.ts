@@ -31,8 +31,10 @@ export class PatientRegisterDto {
   @IsIn(['Male', 'Female'])
   gender: string;
 
+  /** Optional — pharmacy registration omits DOB; doctor/lab still collect it. */
+  @IsOptional()
   @IsString()
-  dateOfBirth: string;
+  dateOfBirth?: string;
 
   @IsOptional()
   @Transform(({ value }) => {

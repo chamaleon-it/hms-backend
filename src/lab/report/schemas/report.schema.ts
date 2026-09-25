@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Model, Types } from 'mongoose';
-import configuration from 'src/config/configuration';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
 
 export type ReportDocument = HydratedDocument<Report>;
 
@@ -27,7 +26,6 @@ export class Report {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    default: configuration().in_house_lab_id,
   })
   lab: Types.ObjectId;
 
@@ -87,7 +85,7 @@ export class Report {
   @Prop({
     type: String,
     enum: Object.values(ReportStatus),
-    default: ReportStatus.UPCOMING,
+    default: ReportStatus.WAITING_FOR_RESULT,
   })
   status: ReportStatus;
 
@@ -97,6 +95,7 @@ export class Report {
   @Prop({ default: false })
   isFlagged: boolean;
 
+  /** Sequential lab report id — assigned via CountersService (lab_report). */
   @Prop({ type: Number, unique: true })
   mrn: number;
 
@@ -114,19 +113,3 @@ export const ReportSchema = SchemaFactory.createForClass(Report);
 
 ReportSchema.index({ createdAt: -1 });
 ReportSchema.index({ sampleId: 1 });
-
-ReportSchema.pre('save', async function (next) {
-  if (this.isNew) {
-    const model = this.constructor as Model<ReportDocument>;
-
-    const lastReport = await model
-      .findOne()
-      .sort({ mrn: -1 })
-      .select('mrn')
-      .lean();
-
-    this.mrn = lastReport ? lastReport.mrn + 1 : 1;
-  }
-
-  next();
-});

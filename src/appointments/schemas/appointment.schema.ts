@@ -3,12 +3,6 @@ import mongoose, { HydratedDocument } from 'mongoose';
 
 export type AppointmentDocument = HydratedDocument<Appointment>;
 
-export enum AppointmentMethod {
-  IN_CLINIC = 'In clinic',
-  VIDEO = 'Video',
-  PHONE = 'Phone',
-}
-
 export enum AppointmentType {
   NEW = 'New',
   FOLLOW_UP = 'Follow up',
@@ -25,6 +19,10 @@ export enum AppointmentStatus {
   timestamps: true,
 })
 export class Appointment {
+  /** Sequential appointment id (CountersService key: appointment). */
+  @Prop({ required: false, unique: true, sparse: true })
+  mrn?: number;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' })
   patient: mongoose.Types.ObjectId;
 
@@ -33,13 +31,6 @@ export class Appointment {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
   createdBy: mongoose.Types.ObjectId;
-
-  @Prop({
-    required: true,
-    enum: Object.values(AppointmentMethod),
-    default: AppointmentMethod.IN_CLINIC,
-  })
-  method: AppointmentMethod;
 
   @Prop({ required: true })
   date: Date;

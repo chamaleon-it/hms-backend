@@ -9,6 +9,7 @@ export enum UserRole {
   PHARMACY = 'Pharmacy',
   LAB = 'Lab',
   ADMIN = 'Admin',
+  SUPER_ADMIN = 'Super Admin',
 }
 
 export enum UserStatus {
@@ -49,6 +50,10 @@ export class Availability {
 
   @Prop({ type: [SchemaFactory.createForClass(Round)], default: [] })
   rounds?: Round[];
+
+  /** Slot length in minutes for booking UI (default 15 when unset). */
+  @Prop({ type: Number, default: 15, min: 5 })
+  slotIntervalMinutes?: number;
 }
 
 @Schema({
@@ -71,6 +76,20 @@ export class User {
 
   @Prop({ required: true, select: false })
   password: string;
+
+  /**
+   * Optional login alias. Legacy DBs may have a non-sparse unique `username_1`
+   * index that blocks multiple null usernames — UsersService migrates it to a
+   * partial unique index on startup. Sparse unique here allows many missing values.
+   */
+  @Prop({
+    type: String,
+    trim: true,
+    sparse: true,
+    unique: true,
+    default: undefined,
+  })
+  username?: string | null;
 
   @Prop({ type: Date, default: Date.now })
   lastLogin: Date;
@@ -110,6 +129,10 @@ export class User {
   @Prop({ trim: true, default: null })
   qualification?: string;
 
+  /** Optional professional designation (e.g. Consultant, Senior Resident). */
+  @Prop({ trim: true, default: null })
+  designation?: string;
+
   @Prop({ trim: true, default: null })
   signature?: string;
 
@@ -130,12 +153,17 @@ export class User {
       general: {
         owner: { type: String, default: null, trim: true },
         gstin: { type: String, default: null, trim: true, uppercase: true },
+        slogan: { type: String, default: null, trim: true },
+        advertisement: { type: String, default: null, trim: true },
+        services: { type: [String], default: [] },
       },
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         autoPrintAfterSave: { type: Boolean, default: false },
         autoGenerateBill: { type: Boolean, default: false },
         autoGeneratePrescription: { type: Boolean, default: false },
+        printDualCopies: { type: Boolean, default: true },
+        freeReconsultDays: { type: Number, default: 7 },
       },
       inventory: {
         lowStockThreshold: { type: Number, default: 20 },
@@ -154,11 +182,17 @@ export class User {
     general: {
       owner: string | null;
       gstin: string | null;
+      slogan: string | null;
+      advertisement: string | null;
+      services: string[];
     };
     billing: {
       prefix: string;
       autoPrintAfterSave: boolean;
       autoGenerateBill: boolean;
+      autoGeneratePrescription?: boolean;
+      printDualCopies?: boolean;
+      freeReconsultDays?: number;
     };
     inventory: {
       lowStockThreshold: number;
@@ -178,6 +212,9 @@ export class User {
       general: {
         owner: { type: String, default: null, trim: true },
         gstin: { type: String, default: null, trim: true, uppercase: true },
+        slogan: { type: String, default: null, trim: true },
+        advertisement: { type: String, default: null, trim: true },
+        services: { type: [String], default: [] },
       },
       catalogue: {
         showProfilesOnPatientBill: { type: Boolean, default: false },
@@ -186,6 +223,7 @@ export class User {
       billing: {
         prefix: { type: String, default: 'INV', trim: true, uppercase: true },
         autoPrintAfterSave: { type: Boolean, default: false },
+        printDualCopies: { type: Boolean, default: true },
       },
       notifications: {
         whatsapp: { type: Boolean, default: false },
@@ -205,10 +243,14 @@ export class User {
     general: {
       owner: string | null;
       gstin: string | null;
+      slogan: string | null;
+      advertisement: string | null;
+      services: string[];
     };
     billing: {
       prefix: string;
       autoPrintAfterSave: boolean;
+      printDualCopies?: boolean;
     };
     catalogue: {
       showProfilesOnPatientBill: boolean;

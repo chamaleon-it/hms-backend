@@ -16,6 +16,7 @@ import { ItemStatus } from '../schemas/item.schema';
 const trim = ({ value }: { value: string }) =>
   typeof value === 'string' ? value.trim() : value;
 
+/** Item master create/update. Opening-batch keys create the first batch. */
 export class AddItemDto {
   @IsString({ message: 'Name must be a string.' })
   @MinLength(2, { message: 'Name must be at least 2 characters.' })
@@ -30,19 +31,9 @@ export class AddItemDto {
   @Transform(trim)
   generic?: string;
 
-  // India GST HSN code is typically 4–8 digits
   @IsOptional()
-  // @Matches(/^\d{4,8}$/, { message: 'HSN code must be 4–8 digits.' })
   @Transform(trim)
   hsnCode?: string;
-
-  @IsOptional()
-  @IsString({ message: 'SKU must be a string.' })
-  @MaxLength(64, { message: 'SKU must be at most 64 characters.' })
-  @Transform(({ value }: { value: string }) =>
-    typeof value === 'string' ? value.trim().toUpperCase() : value,
-  )
-  sku?: string;
 
   @IsString({ message: 'Category must be a string.' })
   @Transform(trim)
@@ -50,50 +41,21 @@ export class AddItemDto {
   category!: string;
 
   @IsOptional()
-  @IsString({ message: 'Supplier must be a string.' })
-  @Transform(trim)
-  supplier?: string;
-
-  @IsOptional()
-  @IsString({ message: 'Supplier must be a string.' })
+  @IsString({ message: 'Manufacturer must be a string.' })
   @Transform(trim)
   manufacturer?: string;
 
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'Unit price must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'Unit price cannot be negative.' })
-  unitPrice!: number;
-
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'MRP must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'MRP cannot be negative.' })
-  mrp!: number;
-
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'Unit price must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'Purchase price cannot be negative.' })
-  purchasePrice!: number;
-
+  /** Opening batch qty when batchNumber is supplied. */
+  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Opening stock must be an integer.' })
   @Min(0, { message: 'Opening stock cannot be negative.' })
-  @IsOptional()
   openingStockQuantity?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Quantity must be an integer.' })
   @Min(0, { message: 'Quantity cannot be negative.' })
-  @IsOptional()
   quantity?: number;
 
   @IsOptional()
@@ -109,17 +71,50 @@ export class AddItemDto {
   batchNumber?: string;
 
   @IsOptional()
-  @IsString({ message: 'Rack location must be a string.' })
-  @Transform(trim)
-  rackLocation?: string;
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitPrice?: number;
 
   @IsOptional()
-  @IsNumber({}, { message: 'Packing must be a number.' })
-  @Min(1, { message: 'Packing must be at least 1.' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  mrp?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  purchaseRate?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Supplier must be a string.' })
+  @Transform(trim)
+  supplier?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   packing?: number;
 
   @IsOptional()
-  noOfpacking?: number;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  stripCount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  gst?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Rack location must be a string.' })
+  @Transform(trim)
+  rackLocation?: string;
 
   @IsOptional()
   @IsEnum(ItemStatus, {

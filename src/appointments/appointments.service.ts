@@ -9,20 +9,47 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class AppointmentsService {
   constructor(
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly countersService: CountersService,
+  ) {
+    this.countersService.registerBootSeed(COUNTER_KEYS.APPOINTMENT, () =>
+      this.maxAppointmentMrn(),
+    );
+  }
+
+  private async maxAppointmentMrn(): Promise<number> {
+    const last = await this.appointmentModel
+      .findOne({ mrn: { $type: 'number' } })
+      .sort({ mrn: -1 })
+      .select('mrn')
+      .lean()
+      .exec();
+    return last?.mrn ? Number(last.mrn) : 0;
+  }
+
+  private async nextAppointmentMrn(): Promise<number> {
+    return this.countersService.next(COUNTER_KEYS.APPOINTMENT, () =>
+      this.maxAppointmentMrn(),
+    );
+  }
 
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
+    const mrn = await this.nextAppointmentMrn();
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
+      mrn,
       createdBy,
     });
 
@@ -285,6 +312,7 @@ export class AppointmentsService {
     const $match: Record<string, any> = {
       date: { $gte: startOfDay, $lte: endOfDay },
       doctor,
+      isDeleted: false,
     };
 
     const data = await this.appointmentModel
@@ -302,7 +330,7 @@ export class AppointmentsService {
     const data = await this.appointmentModel
       .find({ patient })
       .populate('patient')
-      .populate('doctor', 'name specialization')
+      .populate('doctor', 'name specialization qualification designation')
       .sort({ date: -1 })
       .lean();
     return data;
@@ -362,11 +390,13 @@ export class AppointmentsService {
     createAppointmentDto: CreateAppointmentDto,
     id: mongoose.Types.ObjectId,
   ) {
-    const data = await this.appointmentModel.findByIdAndUpdate(
-      id,
-      createAppointmentDto,
-      { new: true },
-    );
+    // Appointment mrn is allocated once at create — never overwrite from client.
+    const { mrn: _ignored, ...rest } = createAppointmentDto as CreateAppointmentDto & {
+      mrn?: number;
+    };
+    const data = await this.appointmentModel.findByIdAndUpdate(id, rest, {
+      new: true,
+    });
     if (!data) {
       throw new BadRequestException('No appointment found');
     }

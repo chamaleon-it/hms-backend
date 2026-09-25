@@ -18,6 +18,12 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { Consulting } from 'src/consultings/schemas/consulting.schema';
+import { User } from 'src/users/schemas/user.schema';
+import {
+  COUNTER_KEYS,
+  CountersService,
+} from 'src/counters/counters.service';
 
 @Injectable()
 export class BillingService {
@@ -25,27 +31,93 @@ export class BillingService {
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
     @InjectModel(BillingItem.name) private billingItemModel: Model<BillingItem>,
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(Consulting.name) private consultingModel: Model<Consulting>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private readonly usersService: UsersService,
-  ) { }
+    private readonly countersService: CountersService,
+  ) {
+    // Discover pharmacy/lab invoice prefixes and seed each missing counter once.
+    this.countersService.registerBootSeedJob(() => this.seedInvoiceCounters());
+  }
 
-  private async generateUniqueMRN(prefix: string): Promise<string> {
+  /** Leading letter prefix from bill MRNs like INV0042 → INV. */
+  private normalizeInvoicePrefix(prefix: string): string {
+    return String(prefix || 'INV').trim().toUpperCase() || 'INV';
+  }
+
+  private async maxInvoiceSeq(prefix: string): Promise<number> {
+    const safePrefix = this.normalizeInvoicePrefix(prefix);
     const lastRecord = await this.billingModel
-      .findOne({ mrn: { $regex: `^${prefix}` } })
+      .findOne({ mrn: { $regex: `^${safePrefix}\\d+$` } })
       .collation({ locale: 'en_US', numericOrdering: true })
       .sort({ mrn: -1 })
       .select('mrn')
       .lean()
       .exec();
 
-    if (lastRecord && lastRecord.mrn) {
-      const match = lastRecord.mrn.match(new RegExp(`^${prefix}(\\d+)$`));
-      if (match && match[1]) {
-        const nextNumber = parseInt(match[1], 10) + 1;
-        return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+    if (lastRecord?.mrn) {
+      const match = String(lastRecord.mrn).match(
+        new RegExp(`^${safePrefix}(\\d+)$`),
+      );
+      if (match?.[1]) return parseInt(match[1], 10);
+    }
+    return 0;
+  }
+
+  /**
+   * Collect invoice prefixes from configured pharmacy/lab billing settings and
+   * existing bill MRNs. Always includes INV. Never invents unsafe keys.
+   */
+  private async discoverInvoicePrefixes(): Promise<string[]> {
+    const prefixes = new Set<string>(['INV']);
+
+    const users = await this.userModel
+      .find({})
+      .select('pharmacy.billing.prefix lab.billing.prefix')
+      .lean()
+      .exec();
+    for (const u of users) {
+      const pharmacyPrefix = (u as any)?.pharmacy?.billing?.prefix;
+      const labPrefix = (u as any)?.lab?.billing?.prefix;
+      if (pharmacyPrefix) {
+        prefixes.add(this.normalizeInvoicePrefix(pharmacyPrefix));
+      }
+      if (labPrefix) {
+        prefixes.add(this.normalizeInvoicePrefix(labPrefix));
       }
     }
 
-    return `${prefix}0001`;
+    const mrns = await this.billingModel
+      .distinct('mrn', { mrn: { $regex: /^[A-Za-z]+\d+$/ } })
+      .exec();
+    for (const mrn of mrns) {
+      const match = String(mrn).match(/^([A-Za-z]+)\d+$/);
+      if (match?.[1]) {
+        prefixes.add(this.normalizeInvoicePrefix(match[1]));
+      }
+    }
+
+    return [...prefixes];
+  }
+
+  /** First-time seed for each discovered invoice:<PREFIX> counter. */
+  async seedInvoiceCounters(): Promise<void> {
+    const prefixes = await this.discoverInvoicePrefixes();
+    for (const prefix of prefixes) {
+      await this.countersService.seedIfMissing(
+        COUNTER_KEYS.invoice(prefix),
+        () => this.maxInvoiceSeq(prefix),
+      );
+    }
+  }
+
+  private async generateUniqueMRN(prefix: string): Promise<string> {
+    const safePrefix = this.normalizeInvoicePrefix(prefix);
+    return this.countersService.nextFormatted(COUNTER_KEYS.invoice(safePrefix), {
+      prefix: safePrefix,
+      pad: 4,
+      getInitialMax: () => this.maxInvoiceSeq(safePrefix),
+    });
   }
 
   async generateBill(createBill: CreateBillingDto) {
@@ -64,34 +136,28 @@ export class BillingService {
           (createBill.cash ?? 0) +
           (createBill.online ?? 0) +
           (createBill.discount ?? 0);
-        order.paidAmount =
-          paidAmount >=
-            order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            ? order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            : paidAmount;
+        // Prefer bill line totals; fall back to order batch snapshot (Item has no unitPrice)
+        const orderTotal =
+          (createBill.items ?? []).reduce(
+            (total, item) =>
+              total +
+              (Number(item.total) ||
+                (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)),
+            0,
+          ) ||
+          (order.items ?? []).reduce((total, item) => {
+            const unit =
+              item.batchSellingPrice ??
+              item.name?.unitPrice ??
+              0;
+            return total + (Number(item.quantity) || 0) * (Number(unit) || 0);
+          }, 0);
+        order.paidAmount = paidAmount >= orderTotal ? orderTotal : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
-        } else if (
-          paidAmount <
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else if (paidAmount < orderTotal) {
           order.paymentStatus = PaymentStatus.Partial;
-        } else if (
-          paidAmount >=
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else {
           order.paymentStatus = PaymentStatus.Paid;
         }
         await order.save();
@@ -111,24 +177,52 @@ export class BillingService {
       startDate,
       endDate,
       activeDate,
+      billingType,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
-    const qEndFound = await this.billingModel.exists({
-      mrn: qEnd?.toUpperCase(),
-    });
+
+    // Legacy invoice-range: From/To MRN when both q and qEnd are set and qEnd exists
+    const qEndFound =
+      qEnd &&
+      (await this.billingModel.exists({
+        mrn: qEnd?.toUpperCase(),
+      }));
 
     if (q && qEnd && qEndFound) {
       match.mrn = { $gte: q.toUpperCase(), $lte: qEnd.toUpperCase() };
+    } else if (q?.trim()) {
+      // Single search: invoice (bill mrn / salesMRN), patient PID, name, phone
+      const escaped = q
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
+      const patientDocs = await this.billingModel.db
+        .collection('patients')
+        .find({
+          $or: [
+            { name: searchRegex },
+            { phoneNumber: searchRegex },
+            { mrn: searchRegex },
+          ],
+        })
+        .project({ _id: 1 })
+        .toArray();
+      const patientIds = patientDocs.map((p) => p._id);
+      match.$or = [
+        { mrn: searchRegex },
+        { salesMRN: searchRegex },
+        ...(patientIds.length
+          ? [{ patient: { $in: patientIds } }]
+          : []),
+      ];
     }
-    // else if (q) {
-    //   match.mrn = { $regex: '^' + q, $options: 'i' };
-    // }
 
-    if (!q && startDate && endDate) {
+    // Date filter always applies alongside search (and when no search)
+    if (startDate && endDate) {
       match.createdAt = { $gte: startDate, $lte: endDate };
     }
 
@@ -140,6 +234,14 @@ export class BillingService {
       } else if (method === 'Online') {
         match.online = { $ne: 0 };
       }
+    }
+
+    if (billingType === 'Sale') {
+      match.transactionType = 'Sale';
+    } else if (billingType === 'Return') {
+      match.transactionType = 'Return';
+    } else if (billingType === 'Lab') {
+      match.reportId = { $exists: true, $ne: null };
     }
 
     pipeline.push({ $match: match });
@@ -183,6 +285,82 @@ export class BillingService {
               },
               { totalPaid: { $gt: 0 } },
             ],
+          },
+        });
+      }
+    }
+
+    // Soft billing-type line heuristics (include-if-any). Catalogue names from billing_items.
+    if (
+      billingType &&
+      ['Consultation', 'Clinical', 'Pharmacy', 'Dressing'].includes(billingType)
+    ) {
+      const catalogue = await this.billingItemModel.find().select('item').lean();
+      const catalogueNames = catalogue.map((c) => c.item).filter(Boolean);
+      const clinicalKeywords = [
+        'procedure',
+        'injection',
+        'cannulation',
+        'extraction',
+        'catheterisation',
+        'enema',
+        'dressing',
+      ];
+
+      if (billingType === 'Consultation') {
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: { name: { $regex: /consultation/i } },
+            },
+          },
+        });
+      } else if (billingType === 'Dressing') {
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: { name: { $regex: /dressing/i } },
+            },
+          },
+        });
+      } else if (billingType === 'Clinical') {
+        pipeline.push({
+          $match: {
+            $or: [
+              {
+                'items.name': {
+                  $regex: new RegExp(clinicalKeywords.join('|'), 'i'),
+                },
+              },
+              ...(catalogueNames.length
+                ? [
+                    {
+                      $and: [
+                        { 'items.name': { $in: catalogueNames } },
+                        {
+                          'items.name': {
+                            $not: { $regex: /consultation/i },
+                          },
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+            ],
+          },
+        });
+      } else if (billingType === 'Pharmacy') {
+        // Include-if-any line that is not consultation and not in clinical catalogue
+        pipeline.push({
+          $match: {
+            items: {
+              $elemMatch: {
+                name: {
+                  $nin: catalogueNames,
+                  $not: { $regex: /consultation/i },
+                },
+              },
+            },
           },
         });
       }
@@ -435,5 +613,78 @@ export class BillingService {
       .lean()
       .exec();
     return data;
+  }
+
+  /**
+   * Free re-consultation eligibility based on last consulting record
+   * and pharmacy.billing.freeReconsultDays (default 7).
+   */
+  async getReconsultEligibility(
+    patientId: string,
+    doctorId?: string,
+    pharmacyUserId?: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(patientId)) {
+      throw new BadRequestException('Invalid patientId');
+    }
+
+    let freeDays = 7;
+    if (pharmacyUserId && mongoose.isValidObjectId(pharmacyUserId)) {
+      const pharmacyUser = await this.userModel
+        .findById(pharmacyUserId)
+        .select('pharmacy.billing.freeReconsultDays')
+        .lean();
+      const configured = (pharmacyUser as any)?.pharmacy?.billing
+        ?.freeReconsultDays;
+      if (typeof configured === 'number' && configured >= 0) {
+        freeDays = configured;
+      }
+    }
+
+    const filter: Record<string, unknown> = {
+      patient: new mongoose.Types.ObjectId(patientId),
+    };
+    if (doctorId && mongoose.isValidObjectId(doctorId)) {
+      filter.doctor = new mongoose.Types.ObjectId(doctorId);
+    }
+
+    const lastConsult = await this.consultingModel
+      .findOne(filter)
+      .sort({ createdAt: -1 })
+      .select('createdAt doctor')
+      .lean();
+
+    if (!lastConsult) {
+      return {
+        eligible: false,
+        freeDays,
+        reason: 'No prior consultation found',
+        lastConsultAt: null,
+        daysSinceLastConsult: null,
+        suggestedFee: null,
+      };
+    }
+
+    const lastConsultAt = new Date((lastConsult as any).createdAt);
+    const now = new Date();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysSinceLastConsult = Math.floor(
+      (now.getTime() - lastConsultAt.getTime()) / msPerDay,
+    );
+    const eligible = daysSinceLastConsult <= freeDays;
+
+    return {
+      eligible,
+      freeDays,
+      reason: eligible
+        ? `Within free re-consultation window (${freeDays} days)`
+        : `Outside free window (${daysSinceLastConsult} days since last consult)`,
+      lastConsultAt: lastConsultAt.toISOString(),
+      daysSinceLastConsult,
+      suggestedFee: eligible ? 0 : null,
+      doctorId: (lastConsult as any).doctor
+        ? String((lastConsult as any).doctor)
+        : null,
+    };
   }
 }

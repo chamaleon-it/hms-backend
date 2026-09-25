@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "pack": "pkg dist/main.js --config package.json --out-path ./release"
+    "pack": "pkg dist/main.js --config package.json --out-path ./release",
+    "import:items": "npx tsx scripts/import-item.ts",
+    "import:items:apply": "npx tsx scripts/import-item.ts --apply"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -29,6 +31,7 @@
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^12.0.1",
     "@nestjs/serve-static": "^5.0.4",
     "@serialport/parser-readline": "^13.0.0",
     "bcrypt": "^6.0.0",
@@ -81,6 +84,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
