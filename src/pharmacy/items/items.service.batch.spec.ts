@@ -144,6 +144,28 @@ describe('ItemsService batch helpers', () => {
     expect(service.resolveUnitPrice({})).toBe(0);
   });
 
+  it('purchase stock value uses strip/pack rate not unit qty (110×10=1100)', () => {
+    const batch = {
+      purchaseRate: 110,
+      packing: 10,
+      stripCount: 10,
+      quantity: 100,
+      unitPrice: 12,
+      mrp: 120,
+    };
+    expect(service.resolveBatchPurchaseValue(batch)).toBe(1100);
+    expect(service.resolveUnitPrice(batch) * batch.quantity).toBe(1200);
+    expect(service.resolveBatchMrp(batch) * batch.quantity).toBe(12000);
+    // stripCount missing → qty/packing
+    expect(
+      service.resolveBatchPurchaseValue({
+        purchaseRate: 110,
+        packing: 10,
+        quantity: 100,
+      }),
+    ).toBe(1100);
+  });
+
   it('enrichItem adds computed display fields from latest active batch', () => {
     const lean = {
       name: 'Para',

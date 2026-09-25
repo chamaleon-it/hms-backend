@@ -40,6 +40,20 @@ export class ItemsService {
     return Number(batch?.purchaseRate) || 0;
   }
 
+  /**
+   * Pack/strip purchase rate → stock purchase value.
+   * Prefer stripCount; else qty/packing; else qty.
+   */
+  resolveBatchPurchaseValue(batch: any): number {
+    const rate = this.resolvePurchaseRate(batch);
+    const qty = Number(batch?.quantity) || 0;
+    const packing = Number(batch?.packing) || 0;
+    const strips = Number(batch?.stripCount) || 0;
+    if (strips > 0) return rate * strips;
+    if (packing > 0 && qty > 0) return rate * (qty / packing);
+    return rate * qty;
+  }
+
   resolveUnitPrice(batch: any): number {
     return Number(batch?.unitPrice) || 0;
   }
@@ -224,6 +238,61 @@ export class ItemsService {
               { $ifNull: ['$$ab.quantity', 0] },
               { $ifNull: [`$$ab.${priceField}`, 0] },
             ],
+          },
+        },
+      },
+    };
+  }
+
+  /**
+   * Purchase rate is pack/strip-level (purchase entry: gross = strips × rate).
+   * Value = purchaseRate × stripCount, or purchaseRate × (qty/packing), else × qty.
+   * Example: P.Rate 110, pack 10, qty 100 / strips 10 → ₹1,100 (not 110×100).
+   */
+  private batchPurchaseValueExpr() {
+    return {
+      $sum: {
+        $map: {
+          input: {
+            $filter: {
+              input: { $ifNull: ['$batches', []] },
+              as: 'b',
+              cond: ACTIVE_BATCH_COND,
+            },
+          },
+          as: 'ab',
+          in: {
+            $let: {
+              vars: {
+                rate: { $ifNull: ['$$ab.purchaseRate', 0] },
+                qty: { $ifNull: ['$$ab.quantity', 0] },
+                packing: { $ifNull: ['$$ab.packing', 0] },
+                strips: { $ifNull: ['$$ab.stripCount', 0] },
+              },
+              in: {
+                $multiply: [
+                  '$$rate',
+                  {
+                    $cond: [
+                      { $gt: ['$$strips', 0] },
+                      '$$strips',
+                      {
+                        $cond: [
+                          {
+                            $and: [
+                              { $gt: ['$$packing', 0] },
+                              { $gt: ['$$qty', 0] },
+                            ],
+                          },
+                          { $divide: ['$$qty', '$$packing'] },
+                          '$$qty',
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
           },
         },
       },
@@ -517,7 +586,7 @@ export class ItemsService {
       $addFields: {
         quantity: this.activeQuantityExpr(),
         sellingValue: this.batchValueExpr('unitPrice'),
-        purchaseValue: this.batchValueExpr('purchaseRate'),
+        purchaseValue: this.batchPurchaseValueExpr(),
         mrpValue: this.batchValueExpr('mrp'),
       },
     };
