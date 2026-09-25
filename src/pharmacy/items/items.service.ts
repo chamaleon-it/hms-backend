@@ -87,6 +87,68 @@ export class ItemsService {
   }
 
   /**
+   * Resolve a sellable batch for pack/complete. Handles stale ObjectIds left on
+   * order lines after B0 import (batches rewritten without matching `_id`).
+   * Preference: exact id/number → B0 → sole active stocked → FEFO first stocked.
+   */
+  async resolveBatchForSale(
+    itemId: mongoose.Types.ObjectId | string,
+    batchId?: string | null,
+    batchNumber?: string | null,
+  ): Promise<{ batchId: string; batchNumber: string; index: number } | null> {
+    await this.ensurePersistedBatchIds(itemId);
+    const item = await this.itemModel.findById(itemId).exec();
+    if (!item) {
+      throw new BadRequestException('Item is not available');
+    }
+
+    const batches = item.batches || [];
+    let index = this.findBatchIndex(batches, batchId, batchNumber);
+
+    if (index < 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sellable = batches.filter((b: any) => {
+        if (!this.isBatchActive(b)) return false;
+        if ((Number(b.quantity) || 0) <= 0) return false;
+        if (b.expiryDate) {
+          const exp = new Date(b.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          if (exp < today) return false;
+        }
+        return true;
+      });
+
+      const b0 = sellable.find(
+        (b: any) => String(b.batchNumber || '').toUpperCase() === 'B0',
+      );
+      const pick =
+        b0 ||
+        (sellable.length === 1
+          ? sellable[0]
+          : this.sortBatches(sellable, 'fefo')[0]);
+
+      if (!pick) return null;
+      index = batches.indexOf(pick);
+      if (index < 0) {
+        index = this.findBatchIndex(
+          batches,
+          pick._id != null ? String(pick._id) : null,
+          pick.batchNumber,
+        );
+      }
+    }
+
+    if (index < 0) return null;
+    const batch: any = batches[index];
+    return {
+      batchId: batch._id != null ? String(batch._id) : String(batch.batchNumber),
+      batchNumber: String(batch.batchNumber || ''),
+      index,
+    };
+  }
+
+  /**
    * Pack/strip purchase rate → stock purchase value on current qty:
    * (purchaseRate / packing) × quantity when packing > 0, else rate × qty.
    * Must use current quantity so value falls as stock is sold (like selling value).
@@ -978,7 +1040,14 @@ export class ItemsService {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
 
-    await this.ensurePersistedBatchIds(itemId);
+    const resolved = await this.resolveBatchForSale(
+      itemId,
+      batchId,
+      batchNumber,
+    );
+    if (!resolved) {
+      throw new BadRequestException('Selected batch not found');
+    }
 
     const item = await this.itemModel.findById(itemId);
     if (!item) {
@@ -987,14 +1056,14 @@ export class ItemsService {
 
     const batchIndex = this.findBatchIndex(
       item.batches || [],
-      batchId,
-      batchNumber,
+      resolved.batchId,
+      resolved.batchNumber,
     );
-    if (batchIndex === -1) {
+    const batch: any =
+      batchIndex >= 0 ? item.batches[batchIndex] : item.batches[resolved.index];
+    if (!batch) {
       throw new BadRequestException('Selected batch not found');
     }
-
-    const batch: any = item.batches[batchIndex];
     if (!this.isBatchActive(batch)) {
       throw new BadRequestException(
         `Cannot sell from inactive batch ${batch.batchNumber}`,
