@@ -91,7 +91,12 @@ export class OrdersService {
       if (item.batchId) {
         const batch = batchInfo.batches.find(
           (b) =>
-            b.batchId === item.batchId || b.batchNumber === item.batchNumber,
+            String(b.batchId) === String(item.batchId) ||
+            String(b.batchNumber || '').toLowerCase() ===
+              String(item.batchId).toLowerCase() ||
+            (item.batchNumber &&
+              String(b.batchNumber || '').toLowerCase() ===
+                String(item.batchNumber).toLowerCase()),
         );
         if (!batch) {
           throw new BadRequestException(
@@ -311,6 +316,7 @@ export class OrdersService {
       qty,
       user,
       (line as any)?.batchId || null,
+      (line as any)?.batchNumber || null,
     );
   }
 
@@ -335,6 +341,7 @@ export class OrdersService {
             it.quantity,
             user,
             (it as any).batchId || null,
+            (it as any).batchNumber || null,
           ),
         ),
       );
@@ -663,9 +670,62 @@ export class OrdersService {
     };
   }
 
-  updateOrder(dto: UpdateOrderDto) {
-    const order = this.orderModel
-      .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
+  async updateOrder(dto: UpdateOrderDto) {
+    const payload: any = { ...dto };
+
+    if (Array.isArray(dto.items)) {
+      payload.items = [];
+      for (const raw of dto.items) {
+        const line: any = { ...raw };
+        // FE often sends populated item master; persist ObjectId only
+        const nameRef = (raw as any)?.name;
+        if (nameRef && typeof nameRef === 'object') {
+          line.name = nameRef._id || nameRef.id;
+        }
+
+        if (line.batchId || line.batchNumber) {
+          const itemId = line.name;
+          const batchInfo = await this.itemsService.getItemBatches(
+            itemId,
+            'fefo',
+            true,
+            true,
+          );
+          const batch = (batchInfo.batches || []).find(
+            (b) =>
+              String(b.batchId) === String(line.batchId) ||
+              String(b.batchNumber || '').toLowerCase() ===
+                String(line.batchId || '').toLowerCase() ||
+              (line.batchNumber &&
+                String(b.batchNumber || '').toLowerCase() ===
+                  String(line.batchNumber).toLowerCase()),
+          );
+          if (!batch) {
+            throw new BadRequestException(
+              `Selected batch not found for item ${batchInfo.name}`,
+            );
+          }
+          // Re-bind to persisted batchId so pack/complete lookups stay stable
+          line.batchId = batch.batchId;
+          line.batchNumber = line.batchNumber || batch.batchNumber;
+          line.batchExpiryDate = line.batchExpiryDate || batch.expiryDate;
+          line.batchMrp = line.batchMrp ?? batch.mrp;
+          line.batchPurchasePrice =
+            line.batchPurchasePrice ?? batch.purchaseRate;
+          line.batchSellingPrice =
+            line.batchSellingPrice ?? batch.unitPrice;
+          line.batchGst = line.batchGst ?? batch.gst;
+          line.batchStock = line.batchStock ?? batch.stock;
+          line.batchSupplier = line.batchSupplier || batch.supplier;
+          line.batchPacking = line.batchPacking ?? batch.packing;
+        }
+
+        payload.items.push(line);
+      }
+    }
+
+    const order = await this.orderModel
+      .findByIdAndUpdate(dto._id, payload, { new: true, runValidators: true })
       .lean();
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -692,6 +752,7 @@ export class OrdersService {
             it.quantity,
             userId,
             (it as any).batchId || null,
+            (it as any).batchNumber || null,
           );
         }
       }
