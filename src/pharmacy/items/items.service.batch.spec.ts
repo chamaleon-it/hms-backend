@@ -12,7 +12,6 @@ describe('ItemsService batch helpers', () => {
       quantity: 10,
       expiryDate: new Date('2030-01-01'),
       purchaseRate: 5,
-      purchasePrice: 5,
       unitPrice: 12,
       mrp: 15,
       startingQuantity: 10,
@@ -93,48 +92,91 @@ describe('ItemsService batch helpers', () => {
     ]);
   });
 
-  it('recalculateItemStockFromBatches sums only active batches (no item pricing write)', () => {
+  it('sumActiveQuantity sums only active batches; recalculate does not write quantity', () => {
     const item: any = {
       batches: [
-        { quantity: 10, status: 'active', expiryDate: new Date('2030-01-01'), unitPrice: 12, purchaseRate: 5, mrp: 15, createdAt: new Date('2024-01-01'), supplier: 'A' },
-        { quantity: 5, status: 'inactive', expiryDate: new Date('2029-01-01'), unitPrice: 14, purchaseRate: 6, mrp: 18, createdAt: new Date('2025-01-01'), supplier: 'B' },
-        { quantity: 3, status: 'active', expiryDate: new Date('2028-01-01'), unitPrice: 11, purchaseRate: 4, mrp: 13, createdAt: new Date('2025-06-01'), supplier: 'C' },
+        {
+          quantity: 10,
+          status: 'active',
+          expiryDate: new Date('2030-01-01'),
+          unitPrice: 12,
+          purchaseRate: 5,
+          mrp: 15,
+          createdAt: new Date('2024-01-01'),
+          supplier: 'A',
+        },
+        {
+          quantity: 5,
+          status: 'inactive',
+          expiryDate: new Date('2029-01-01'),
+          unitPrice: 14,
+          purchaseRate: 6,
+          mrp: 18,
+          createdAt: new Date('2025-01-01'),
+          supplier: 'B',
+        },
+        {
+          quantity: 3,
+          status: 'active',
+          expiryDate: new Date('2028-01-01'),
+          unitPrice: 11,
+          purchaseRate: 4,
+          mrp: 13,
+          createdAt: new Date('2025-06-01'),
+          supplier: 'C',
+        },
       ],
       markModified: jest.fn(),
     };
+    expect(service.sumActiveQuantity(item)).toBe(13);
+    expect(service.earliestExpiry(item)).toEqual(new Date('2028-01-01'));
     service.recalculateItemStockFromBatches(item);
-    expect(item.quantity).toBe(13);
-    expect(item.expiryDate).toEqual(new Date('2028-01-01'));
-    // Pricing stays on batches — Item.unitPrice/mrp/purchasePrice not written
-    expect(item.unitPrice).toBeUndefined();
-    expect(item.mrp).toBeUndefined();
+    expect(item.quantity).toBeUndefined();
+    expect(item.expiryDate).toBeUndefined();
+    expect(item.markModified).toHaveBeenCalledWith('batches');
   });
 
-  it('dual-reads unitPrice from saleRate legacy and purchasePrice when purchaseRate missing', () => {
-    expect(service.resolvePurchaseRate({ purchasePrice: 9 })).toBe(9);
-    expect(service.resolveUnitPrice({ unitPrice: 11 }, 5)).toBe(11);
-    expect(service.resolveUnitPrice({ saleRate: 11 }, 5)).toBe(11);
-    expect(service.resolveUnitPrice({}, 5)).toBe(5);
-    expect(service.resolveSaleRate({ saleRate: 11 }, 5)).toBe(11);
+  it('resolves unitPrice and purchaseRate from batch fields only', () => {
+    expect(service.resolvePurchaseRate({ purchaseRate: 9 })).toBe(9);
+    expect(service.resolvePurchaseRate({ purchasePrice: 9 })).toBe(0);
+    expect(service.resolveUnitPrice({ unitPrice: 11 })).toBe(11);
+    expect(service.resolveUnitPrice({ saleRate: 11 })).toBe(0);
+    expect(service.resolveUnitPrice({})).toBe(0);
   });
 
-  it('ensureLegacyBatchFromFlatItem seeds opening batch with unitPrice', () => {
-    const item: any = {
-      batches: [],
-      quantity: 25,
-      unitPrice: 10,
-      purchasePrice: 6,
-      mrp: 12,
-      supplier: 'LegacyCo',
-      expiryDate: new Date('2030-05-01'),
-      markModified: jest.fn(),
+  it('enrichItem adds computed display fields from latest active batch', () => {
+    const lean = {
+      name: 'Para',
+      batches: [
+        {
+          quantity: 10,
+          status: 'active',
+          expiryDate: new Date('2030-01-01'),
+          unitPrice: 12,
+          purchaseRate: 5,
+          mrp: 15,
+          supplier: 'A',
+          createdAt: new Date('2024-01-01'),
+        },
+        {
+          quantity: 3,
+          status: 'active',
+          expiryDate: new Date('2028-01-01'),
+          unitPrice: 14,
+          purchaseRate: 6,
+          mrp: 18,
+          supplier: 'B',
+          createdAt: new Date('2025-06-01'),
+        },
+      ],
     };
-    expect(service.ensureLegacyBatchFromFlatItem(item)).toBe(true);
-    expect(item.batches).toHaveLength(1);
-    expect(item.batches[0].batchNumber).toBe('LEGACY-OPENING');
-    expect(item.batches[0].quantity).toBe(25);
-    expect(item.batches[0].unitPrice).toBe(10);
-    expect(item.unitPrice).toBe(10); // flat fields preserved on dual-read source
+    const enriched = service.enrichItem(lean);
+    expect(enriched.quantity).toBe(13);
+    expect(enriched.expiryDate).toEqual(new Date('2028-01-01'));
+    expect(enriched.unitPrice).toBe(14);
+    expect(enriched.mrp).toBe(18);
+    expect(enriched.purchasePrice).toBe(6);
+    expect(enriched.supplier).toBe('B');
   });
 
   it('sanitizeSearchRegex escapes metacharacters', () => {
@@ -146,7 +188,6 @@ describe('ItemsService batch helpers', () => {
   it('deductFromBatch blocks expired, inactive, zero, and oversell', async () => {
     const item: any = {
       name: 'Para',
-      quantity: 33,
       soldQuantity: 0,
       soldHistory: [],
       batches: [
@@ -186,11 +227,12 @@ describe('ItemsService batch helpers', () => {
     Object.assign(svc, {
       resolvePurchaseRate: service.resolvePurchaseRate.bind(service),
       resolveUnitPrice: service.resolveUnitPrice.bind(service),
-      resolveSaleRate: service.resolveSaleRate.bind(service),
       resolveItemUnitPrice: service.resolveItemUnitPrice.bind(service),
       resolveBatchMrp: service.resolveBatchMrp.bind(service),
       resolveBatchStatus: service.resolveBatchStatus.bind(service),
       isBatchActive: service.isBatchActive.bind(service),
+      activeBatches: service.activeBatches.bind(service),
+      sumActiveQuantity: service.sumActiveQuantity.bind(service),
       recalculateItemStockFromBatches:
         service.recalculateItemStockFromBatches.bind(service),
     });
@@ -217,8 +259,8 @@ describe('ItemsService batch helpers', () => {
 
     await svc.deductFromBatch('item1', 'b2', 2);
     expect(item.batches[1].quantity).toBe(3);
-    // Aggregate = all active-status batches (expired still counted until deactivated)
-    expect(item.quantity).toBe(23);
+    expect(service.sumActiveQuantity(item)).toBe(23);
+    expect(item.quantity).toBeUndefined();
     expect(item.soldQuantity).toBe(2);
     expect(item.soldHistory[0].unitPrice).toBe(14);
     expect(item.save).toHaveBeenCalled();

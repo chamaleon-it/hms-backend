@@ -19,7 +19,7 @@ describe('Medicine master vs batch DTO', () => {
       category: 'Medicine',
       unitPrice: 10,
       mrp: 12,
-      purchasePrice: 8,
+      purchaseRate: 8,
       batchNumber: 'B1',
       expiryDate: '2027-01-01',
       openingStockQuantity: 100,

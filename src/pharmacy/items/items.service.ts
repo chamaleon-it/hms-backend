@@ -16,60 +16,36 @@ import {
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
 
+/** Active-batch filter for aggregation pipelines. */
+const ACTIVE_BATCH_COND = {
+  $ne: [
+    { $toLower: { $ifNull: ['$$b.status', BatchStatus.Active] } },
+    BatchStatus.Inactive,
+  ],
+};
+
 @Injectable()
 export class ItemsService {
   constructor(
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /** Escape user search input so regex metacharacters cannot break queries. */
   private sanitizeSearchRegex(q: string): string {
     return String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  /** Dual-read helpers for legacy flat / purchasePrice-only batches. */
   resolvePurchaseRate(batch: any): number {
-    const rate = batch?.purchaseRate ?? batch?.purchasePrice;
-    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+    return Number(batch?.purchaseRate) || 0;
   }
 
-  /**
-   * Canonical batch sale field is unitPrice.
-   * Dual-read: unitPrice ?? saleRate ?? sellingPrice (legacy Atlas / clients).
-   */
-  resolveUnitPrice(batch: any, itemFallback = 0): number {
-    const rate =
-      batch?.unitPrice ?? batch?.saleRate ?? batch?.sellingPrice ?? itemFallback;
-    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  resolveUnitPrice(batch: any): number {
+    return Number(batch?.unitPrice) || 0;
   }
 
-  /** @deprecated Prefer resolveUnitPrice */
-  resolveSaleRate(batch: any, itemFallback = 0): number {
-    return this.resolveUnitPrice(batch, itemFallback);
-  }
-
-  resolveBatchMrp(batch: any, itemFallback = 0): number {
-    const rate = batch?.mrp ?? itemFallback;
-    return Number.isFinite(Number(rate)) ? Number(rate) : 0;
-  }
-
-  /** Latest active batch unit price (for list/stats when Item has no unitPrice). */
-  resolveItemUnitPrice(item: any): number {
-    const batches = (item?.batches || []).filter((b: any) =>
-      this.isBatchActive(b),
-    );
-    if (!batches.length) {
-      // Legacy Atlas dual-read of removed Item.unitPrice
-      const legacy = item?.unitPrice;
-      return Number.isFinite(Number(legacy)) ? Number(legacy) : 0;
-    }
-    const byCreated = [...batches].sort(
-      (a: any, b: any) =>
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime(),
-    );
-    return this.resolveUnitPrice(byCreated[0], Number(item?.unitPrice) || 0);
+  resolveBatchMrp(batch: any): number {
+    return Number(batch?.mrp) || 0;
   }
 
   resolveBatchStatus(batch: any): BatchStatus {
@@ -83,67 +59,66 @@ export class ItemsService {
     return this.resolveBatchStatus(batch) === BatchStatus.Active;
   }
 
-  /**
-   * Recalculate denormalized item.quantity + earliest expiry from active batches.
-   * Does NOT write pricing/supplier/packing onto Item (those live on batches only).
-   */
-  recalculateItemStockFromBatches(item: any): void {
-    const batches = item.batches || [];
-    if (!batches.length) {
-      return;
-    }
+  activeBatches(item: any): any[] {
+    return (item?.batches || []).filter((b: any) => this.isBatchActive(b));
+  }
 
-    const active = batches.filter((b: any) => this.isBatchActive(b));
-    item.quantity = active.reduce(
+  sumActiveQuantity(item: any): number {
+    return this.activeBatches(item).reduce(
       (sum: number, b: any) => sum + (Number(b.quantity) || 0),
       0,
     );
+  }
 
-    const withExpiry = active
+  earliestExpiry(item: any): Date | null {
+    const withExpiry = this.activeBatches(item)
       .filter((b: any) => b?.expiryDate)
       .sort(
         (a: any, b: any) =>
           new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime(),
       );
-    if (withExpiry.length) {
-      item.expiryDate = withExpiry[0].expiryDate;
-    }
+    return withExpiry.length ? withExpiry[0].expiryDate : null;
+  }
 
-    item.markModified?.('batches');
+  latestActiveBatch(item: any): any | null {
+    const batches = this.activeBatches(item);
+    if (!batches.length) return null;
+    const byCreated = [...batches].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime(),
+    );
+    return byCreated[0];
+  }
+
+  /** Latest active batch unit price. */
+  resolveItemUnitPrice(item: any): number {
+    const latest = this.latestActiveBatch(item);
+    return latest ? this.resolveUnitPrice(latest) : 0;
   }
 
   /**
-   * Migration helper (non-destructive): if an item has flat stock/prices but
-   * no batches, synthesize one OPENING batch so batch-first flows work.
-   * Reads legacy Item.unitPrice/mrp/purchasePrice/supplier from Atlas docs.
+   * API/FE display enrichment only — computed from batches, not persisted.
    */
-  ensureLegacyBatchFromFlatItem(item: any): boolean {
-    if ((item.batches || []).length > 0) return false;
-    const qty = Number(item.quantity) || 0;
-    const legacyUnit = Number(item.unitPrice) || 0;
-    const legacyMrp = Number(item.mrp) || 0;
-    if (qty <= 0 && !(legacyUnit > 0 || legacyMrp > 0)) {
-      return false;
-    }
-    const purchaseRate = Number(item.purchasePrice) || 0;
-    const unitPrice = legacyUnit;
-    const mrp = legacyMrp || unitPrice || 0;
-    item.batches = item.batches || [];
-    item.batches.push({
-      batchNumber: 'LEGACY-OPENING',
-      expiryDate: item.expiryDate || new Date('2099-12-31'),
-      mrp,
-      purchaseRate,
-      purchasePrice: purchaseRate,
-      unitPrice,
-      startingQuantity: qty,
-      quantity: qty,
-      status: BatchStatus.Active,
-      supplier: item.supplier || '-',
-      createdAt: item.createdAt || new Date(),
-    });
+  enrichItem(lean: any): any {
+    if (!lean) return lean;
+    const latest = this.latestActiveBatch(lean);
+    return {
+      ...lean,
+      quantity: this.sumActiveQuantity(lean),
+      expiryDate: this.earliestExpiry(lean),
+      unitPrice: latest ? this.resolveUnitPrice(latest) : 0,
+      mrp: latest ? this.resolveBatchMrp(latest) : 0,
+      purchasePrice: latest ? this.resolvePurchaseRate(latest) : 0,
+      supplier: latest?.supplier || '-',
+    };
+  }
+
+  /**
+   * No denormalized Item.quantity/expiryDate — mark batches dirty only.
+   */
+  recalculateItemStockFromBatches(item: any): void {
     item.markModified?.('batches');
-    return true;
   }
 
   private normalizeBatchInput(input: {
@@ -153,8 +128,6 @@ export class ItemsService {
     startingQuantity?: number;
     mrp?: number;
     purchaseRate?: number;
-    purchasePrice?: number;
-    saleRate?: number;
     unitPrice?: number;
     supplier?: string;
     status?: BatchStatus;
@@ -162,10 +135,9 @@ export class ItemsService {
     stripCount?: number;
     gst?: number;
   }) {
-    const purchaseRate = input.purchaseRate ?? input.purchasePrice ?? 0;
-    // Prefer unitPrice; accept legacy saleRate from clients / Atlas dual-read
-    const unitPrice = input.unitPrice ?? input.saleRate ?? 0;
-    const mrp = input.mrp ?? unitPrice ?? 0;
+    const purchaseRate = Number(input.purchaseRate) || 0;
+    const unitPrice = Number(input.unitPrice) || 0;
+    const mrp = Number(input.mrp ?? unitPrice) || 0;
     const quantity = Number(input.quantity) || 0;
     const startingQuantity =
       input.startingQuantity != null
@@ -178,10 +150,9 @@ export class ItemsService {
         input.expiryDate instanceof Date
           ? input.expiryDate
           : new Date(input.expiryDate),
-      mrp: Number(mrp) || 0,
-      purchaseRate: Number(purchaseRate) || 0,
-      purchasePrice: Number(purchaseRate) || 0,
-      unitPrice: Number(unitPrice) || 0,
+      mrp,
+      purchaseRate,
+      unitPrice,
       startingQuantity,
       quantity,
       status: input.status || BatchStatus.Active,
@@ -193,36 +164,73 @@ export class ItemsService {
     };
   }
 
-  private async generateUniqueSKU(): Promise<string> {
-    let sku: string;
-    let exists = true;
+  /** Aggregation expression: sum of active batch quantities. */
+  private activeQuantityExpr() {
+    return {
+      $sum: {
+        $map: {
+          input: {
+            $filter: {
+              input: { $ifNull: ['$batches', []] },
+              as: 'b',
+              cond: ACTIVE_BATCH_COND,
+            },
+          },
+          as: 'ab',
+          in: { $ifNull: ['$$ab.quantity', 0] },
+        },
+      },
+    };
+  }
 
-    do {
-      const randomNum = Math.floor(10000 + Math.random() * 90000);
-      sku = `MED${randomNum}`;
+  /** Aggregation expression: earliest active batch expiry. */
+  private earliestExpiryExpr() {
+    return {
+      $min: {
+        $map: {
+          input: {
+            $filter: {
+              input: { $ifNull: ['$batches', []] },
+              as: 'b',
+              cond: {
+                $and: [
+                  ACTIVE_BATCH_COND,
+                  { $ne: [{ $ifNull: ['$$b.expiryDate', null] }, null] },
+                ],
+              },
+            },
+          },
+          as: 'ab',
+          in: '$$ab.expiryDate',
+        },
+      },
+    };
+  }
 
-      // Check if SKU already exists
-      const existing = await this.itemModel.exists({ sku });
-      exists = !!existing;
-    } while (exists);
-
-    return sku;
+  private batchValueExpr(priceField: string) {
+    return {
+      $sum: {
+        $map: {
+          input: {
+            $filter: {
+              input: { $ifNull: ['$batches', []] },
+              as: 'b',
+              cond: ACTIVE_BATCH_COND,
+            },
+          },
+          as: 'ab',
+          in: {
+            $multiply: [
+              { $ifNull: ['$$ab.quantity', 0] },
+              { $ifNull: [`$$ab.${priceField}`, 0] },
+            ],
+          },
+        },
+      },
+    };
   }
 
   async addItems(pharmacy: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
-    if (!addItemDto.sku) {
-      addItemDto.sku = await this.generateUniqueSKU();
-    } else {
-      const found = await this.itemModel
-        .findOne({ sku: addItemDto.sku })
-        .lean();
-      if (found) {
-        throw new BadRequestException(
-          'This SKU is already assigned to another product.',
-        );
-      }
-    }
-
     if (!addItemDto.generic) {
       addItemDto.generic = addItemDto.name;
     }
@@ -241,32 +249,28 @@ export class ItemsService {
     const openingQty =
       addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
     const unitPrice = addItemDto.unitPrice ?? 0;
-    const purchaseRate =
-      addItemDto.purchaseRate ?? addItemDto.purchasePrice ?? 0;
+    const purchaseRate = addItemDto.purchaseRate ?? 0;
     const mrp = addItemDto.mrp ?? unitPrice ?? 0;
 
-    // Master-only create — do not persist pricing/supplier/packing on Item
+    // Master-only create — pricing/stock live on batches
     const data = await this.itemModel.create({
       name: addItemDto.name,
       generic: addItemDto.generic,
       hsnCode: addItemDto.hsnCode,
-      sku: addItemDto.sku,
       category: addItemDto.category,
       manufacturer: addItemDto.manufacturer,
       rackLocation: addItemDto.rackLocation,
       status: addItemDto.status,
-      quantity: 0,
       pharmacy,
     });
 
     if (addItemDto.batchNumber) {
-      const updatedItem = await this.addBatchItems(data._id, {
+      return this.addBatchItems(data._id, {
         batchNumber: addItemDto.batchNumber,
         expiryDate: addItemDto?.expiryDate
           ? new Date(addItemDto?.expiryDate)
           : new Date(),
         purchaseRate,
-        purchasePrice: purchaseRate,
         unitPrice,
         mrp,
         quantity: openingQty,
@@ -276,10 +280,8 @@ export class ItemsService {
         stripCount: addItemDto.stripCount,
         gst: addItemDto.gst,
       });
-      return updatedItem;
     }
 
-    // Flat opening qty without batchNumber → synthesize LEGACY-OPENING batch
     if (openingQty > 0) {
       return this.addBatchItems(data._id, {
         batchNumber: 'OPENING',
@@ -287,7 +289,6 @@ export class ItemsService {
           ? new Date(addItemDto.expiryDate)
           : new Date('2099-12-31'),
         purchaseRate,
-        purchasePrice: purchaseRate,
         unitPrice,
         mrp,
         quantity: openingQty,
@@ -316,31 +317,27 @@ export class ItemsService {
     } = query;
 
     const skip = (page - 1) * limit;
+    const threshold = Number(lowStockThreshold ?? 20);
 
-    let filter: {
-      $or?: Array<Record<string, Record<string, string>>>;
-      category?: string;
-      quantity?: number | Record<string, number>;
-      expiryDate?: Record<string, Date>;
-      status?: Record<string, string>;
-      'batches.supplier'?: string;
-    } = {};
+    const match: Record<string, unknown> = {
+      status: { $ne: ItemStatus.Deleted },
+    };
 
     if (q) {
       const escaped = this.sanitizeSearchRegex(q);
       const searchRegex = { $regex: '^' + escaped, $options: 'i' };
-      filter = {
-        $or: [
-          { name: searchRegex },
-          { sku: searchRegex },
-          { generic: searchRegex },
-        ],
-      };
+      match.$or = [{ name: searchRegex }, { generic: searchRegex }];
     }
 
     if (category) {
-      filter.category = category;
+      match.category = category;
     }
+
+    if (query.supplier) {
+      match['batches.supplier'] = query.supplier;
+    }
+
+    const postMatch: Record<string, unknown> = {};
 
     if (stock && !lowStockItemsView) {
       const stockConditions: Record<string, number | Record<string, number>> = {
@@ -348,11 +345,10 @@ export class ItemsService {
         Low: { $gt: 0, $lt: 20 },
         Out: 0,
       };
-
-      filter.quantity = stockConditions[stock];
+      postMatch.quantity = stockConditions[stock];
     }
-    if (lowStockItemsView && (stock === "Low" || stock === "Out" || !stock)) {
-      filter.quantity = { $lte: Number(lowStockThreshold ?? 20) };
+    if (lowStockItemsView && (stock === 'Low' || stock === 'Out' || !stock)) {
+      postMatch.quantity = { $lte: threshold };
     }
 
     if (query.expiry) {
@@ -361,39 +357,49 @@ export class ItemsService {
         const now = new Date();
         const targetDate = new Date();
         targetDate.setDate(now.getDate() + days);
-        filter.expiryDate = { $gte: now, $lte: targetDate };
+        postMatch.expiryDate = { $gte: now, $lte: targetDate };
       }
     }
 
-    if (query.supplier) {
-      filter['batches.supplier'] = query.supplier;
-    }
+    const sortDir = orderBy === 'asc' ? 1 : -1;
+    const sortSpec: Record<string, 1 | -1> = q
+      ? { name: 1, [sortBy]: sortDir }
+      : { [sortBy]: sortDir };
 
-    filter.status = { $ne: ItemStatus.Deleted };
+    const shouldCountLowStock = stock === 'Low' || stock === 'Out' || !stock;
 
-    const shouldCountLowStock = stock === "Low" || stock === "Out" || !stock;
-    const lowStockFilter = {
-      ...filter,
-      quantity: { $lte: Number(lowStockThreshold ?? 20) },
+    const addComputed = {
+      $addFields: {
+        quantity: this.activeQuantityExpr(),
+        expiryDate: this.earliestExpiryExpr(),
+      },
     };
 
-    const [items, total, lowStockCount] = await Promise.all([
-      this.itemModel
-        .find(filter)
-        .sort(q ? { name: 1, [sortBy]: orderBy === 'asc' ? 1 : -1 } : { [sortBy]: orderBy === 'asc' ? 1 : -1 })  // sort BEFORE skip/limit
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      this.itemModel.countDocuments(filter),
-      shouldCountLowStock
-        ? this.itemModel.countDocuments(lowStockFilter)
-        : Promise.resolve(0),
-    ]);
+    const pipeline: any[] = [{ $match: match }, addComputed];
+    if (Object.keys(postMatch).length) {
+      pipeline.push({ $match: postMatch });
+    }
 
-    // const lowStockCount = stock === "Low" || stock === "Out" || !stock ? await this.itemModel.countDocuments({
-    //   ...filter,
-    //   quantity: { $lte: Number(lowStockThreshold ?? 20) },
-    // }) : 0;
+    const facetPipeline: any[] = [
+      ...pipeline,
+      {
+        $facet: {
+          items: [{ $sort: sortSpec }, { $skip: skip }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+          lowStock: shouldCountLowStock
+            ? [
+                { $match: { quantity: { $lte: threshold } } },
+                { $count: 'count' },
+              ]
+            : [],
+        },
+      },
+    ];
+
+    const [facet] = await this.itemModel.aggregate(facetPipeline);
+    const items = (facet?.items || []).map((row: any) => this.enrichItem(row));
+    const total = facet?.total?.[0]?.count || 0;
+    const lowStockCount = facet?.lowStock?.[0]?.count || 0;
 
     return { items, total, lowStockCount };
   }
@@ -406,51 +412,28 @@ export class ItemsService {
       this.itemModel.aggregate([
         { $match: baseFilter },
         {
+          $addFields: {
+            quantity: this.activeQuantityExpr(),
+            itemValue: this.batchValueExpr('unitPrice'),
+          },
+        },
+        {
           $group: {
             _id: null,
             totalItems: { $sum: 1 },
             totalQuantity: {
               $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $isNumber: '$quantity' },
-                      { $gt: ['$quantity', 0] },
-                    ],
-                  },
-                  '$quantity',
-                  0,
-                ],
+                $cond: [{ $gt: ['$quantity', 0] }, '$quantity', 0],
               },
             },
             totalValue: {
               $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $isNumber: '$quantity' },
-                      { $gt: ['$quantity', 0] },
-                      { $isNumber: '$unitPrice' },
-                      { $gt: ['$unitPrice', 0] },
-                    ],
-                  },
-                  { $multiply: ['$quantity', '$unitPrice'] },
-                  0,
-                ],
+                $cond: [{ $gt: ['$itemValue', 0] }, '$itemValue', 0],
               },
             },
             outOfStockCount: {
               $sum: {
-                $cond: [
-                  {
-                    $or: [
-                      { $not: [{ $isNumber: '$quantity' }] },
-                      { $lte: ['$quantity', 0] },
-                    ],
-                  },
-                  1,
-                  0,
-                ],
+                $cond: [{ $lte: ['$quantity', 0] }, 1, 0],
               },
             },
             lowStockCount: {
@@ -458,7 +441,6 @@ export class ItemsService {
                 $cond: [
                   {
                     $and: [
-                      { $isNumber: '$quantity' },
                       { $gt: ['$quantity', 0] },
                       { $lte: ['$quantity', threshold] },
                     ],
@@ -474,12 +456,12 @@ export class ItemsService {
       this.itemModel
         .findOne({ ...baseFilter, soldQuantity: { $gt: 0 } })
         .sort({ soldQuantity: -1 })
-        .select('name generic sku soldQuantity unitPrice')
+        .select('name generic soldQuantity')
         .lean(),
       this.itemModel
         .findOne(baseFilter)
         .sort({ soldQuantity: 1 })
-        .select('name generic sku soldQuantity unitPrice')
+        .select('name generic soldQuantity')
         .lean(),
     ]);
 
@@ -531,90 +513,61 @@ export class ItemsService {
   async getInventoryValueBreakdown() {
     const baseFilter = { status: { $ne: ItemStatus.Deleted } };
 
+    const addValues = {
+      $addFields: {
+        quantity: this.activeQuantityExpr(),
+        sellingValue: this.batchValueExpr('unitPrice'),
+        purchaseValue: this.batchValueExpr('purchaseRate'),
+        mrpValue: this.batchValueExpr('mrp'),
+      },
+    };
+
     const [byCategory, totals, topItems] = await Promise.all([
       this.itemModel.aggregate([
         { $match: baseFilter },
+        addValues,
         {
           $group: {
             _id: { $ifNull: ['$category', 'Uncategorized'] },
             itemCount: { $sum: 1 },
-            quantity: {
-              $sum: {
-                $cond: [
-                  { $and: [{ $isNumber: '$quantity' }, { $gt: ['$quantity', 0] }] },
-                  '$quantity',
-                  0,
-                ],
-              },
-            },
-            sellingValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$unitPrice', 0] },
-                ],
-              },
-            },
-            purchaseValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$purchasePrice', 0] },
-                ],
-              },
-            },
-            mrpValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$mrp', 0] },
-                ],
-              },
-            },
+            quantity: { $sum: '$quantity' },
+            sellingValue: { $sum: '$sellingValue' },
+            purchaseValue: { $sum: '$purchaseValue' },
+            mrpValue: { $sum: '$mrpValue' },
           },
         },
         { $sort: { sellingValue: -1 } },
       ]),
       this.itemModel.aggregate([
         { $match: baseFilter },
+        addValues,
         {
           $group: {
             _id: null,
-            sellingValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$unitPrice', 0] },
-                ],
-              },
-            },
-            purchaseValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$purchasePrice', 0] },
-                ],
-              },
-            },
-            mrpValue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$quantity', 0] },
-                  { $ifNull: ['$mrp', 0] },
-                ],
-              },
-            },
-            totalQuantity: { $sum: { $ifNull: ['$quantity', 0] } },
+            sellingValue: { $sum: '$sellingValue' },
+            purchaseValue: { $sum: '$purchaseValue' },
+            mrpValue: { $sum: '$mrpValue' },
+            totalQuantity: { $sum: '$quantity' },
             totalItems: { $sum: 1 },
           },
         },
       ]),
-      this.itemModel
-        .find(baseFilter)
-        .select('name category quantity unitPrice purchasePrice mrp sku')
-        .sort({ quantity: -1 })
-        .limit(25)
-        .lean(),
+      this.itemModel.aggregate([
+        { $match: baseFilter },
+        addValues,
+        { $sort: { quantity: -1 } },
+        { $limit: 25 },
+        {
+          $project: {
+            name: 1,
+            category: 1,
+            quantity: 1,
+            sellingValue: 1,
+            purchaseValue: 1,
+            mrpValue: 1,
+          },
+        },
+      ]),
     ]);
 
     const round2 = (n: number) =>
@@ -647,12 +600,11 @@ export class ItemsService {
       topItems: topItems.map((item: any) => ({
         id: item._id,
         name: item.name,
-        sku: item.sku,
         category: item.category,
         quantity: item.quantity || 0,
-        sellingValue: round2((item.quantity || 0) * (item.unitPrice || 0)),
-        purchaseValue: round2((item.quantity || 0) * (item.purchasePrice || 0)),
-        mrpValue: round2((item.quantity || 0) * (item.mrp || 0)),
+        sellingValue: round2(item.sellingValue || 0),
+        purchaseValue: round2(item.purchaseValue || 0),
+        mrpValue: round2(item.mrpValue || 0),
       })),
     };
   }
@@ -668,7 +620,7 @@ export class ItemsService {
       throw new NotFoundException('Item not found.');
     }
 
-    return data;
+    return this.enrichItem(data);
   }
 
   async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
@@ -676,13 +628,11 @@ export class ItemsService {
       throw new BadRequestException('Invalid item ID.');
     }
 
-    // Master-only update — strip identity + batch-only fields
+    // Master-only update — strip batch/opening fields
     const {
-      sku: _sku,
       unitPrice: _unitPrice,
       mrp: _mrp,
       purchaseRate: _purchaseRate,
-      purchasePrice: _purchasePrice,
       openingStockQuantity: _opening,
       quantity: _quantity,
       expiryDate: _expiry,
@@ -702,7 +652,7 @@ export class ItemsService {
       throw new NotFoundException('Item not found.');
     }
 
-    return data;
+    return this.enrichItem(data);
   }
 
   async deleteItem(id: mongoose.Types.ObjectId) {
@@ -727,7 +677,7 @@ export class ItemsService {
 
   async exportCsv() {
     const items = await this.itemModel.find().lean().exec();
-    const csv = parse(items);
+    const csv = parse(items.map((i) => this.enrichItem(i)));
     const filename = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
     return { csv, filename };
   }
@@ -750,19 +700,36 @@ export class ItemsService {
       throw new BadRequestException('Item is not available');
     }
 
-    if (!allowNegativeStock && item.quantity < quantity) {
+    const available = this.sumActiveQuantity(item);
+    if (!allowNegativeStock && available < quantity) {
       throw new BadRequestException(
-        `Insufficient stock for ${item.name}. Available: ${item.quantity}, requested: ${quantity}`,
+        `Insufficient stock for ${item.name}. Available: ${available}, requested: ${quantity}`,
       );
     }
 
-    const newQuantity = allowNegativeStock
-      ? item.quantity - quantity
-      : Math.max(item.quantity - quantity, 0);
-
-    if (newQuantity !== item.quantity) {
-      item.quantity = newQuantity;
+    let remaining = quantity;
+    const fefo = this.sortBatches(item.batches || [], 'fefo');
+    for (const batch of fefo) {
+      if (remaining <= 0) break;
+      const q = Number(batch.quantity) || 0;
+      if (q <= 0) continue;
+      const take = Math.min(q, remaining);
+      (batch as any).quantity = q - take;
+      remaining -= take;
     }
+
+    // Negative stock: put remainder on first active (incl. expired) batch
+    if (remaining > 0 && allowNegativeStock) {
+      const actives = this.activeBatches(item);
+      if (actives.length) {
+        const target = actives[0];
+        target.quantity = (Number(target.quantity) || 0) - remaining;
+        remaining = 0;
+      }
+    }
+
+    item.markModified('batches');
+    this.recalculateItemStockFromBatches(item);
 
     if (quantity > 0) {
       item.soldQuantity = (item.soldQuantity || 0) + quantity;
@@ -831,12 +798,6 @@ export class ItemsService {
       throw new NotFoundException('Item not found.');
     }
 
-    // Dual-read: seed a legacy batch in-memory for pickers (persist only when mutated)
-    const seeded = this.ensureLegacyBatchFromFlatItem(item);
-    if (seeded) {
-      await item.save();
-    }
-
     const sorted = this.sortBatches(item.batches || [], sort, {
       includeExpired,
       includeInactive,
@@ -844,15 +805,16 @@ export class ItemsService {
 
     const lean = item.toObject();
     const itemUnitPrice = this.resolveItemUnitPrice(lean);
+    const latest = this.latestActiveBatch(lean);
 
     return {
       itemId: lean._id,
       name: lean.name,
-      packing: 1,
+      packing: Number(latest?.packing) || 1,
       unitPrice: itemUnitPrice,
-      mrp: Number((lean as any).mrp) || 0,
-      gst: 0,
-      quantity: lean.quantity,
+      mrp: latest ? this.resolveBatchMrp(latest) : 0,
+      gst: Number(latest?.gst) || 0,
+      quantity: this.sumActiveQuantity(lean),
       batches: sorted.map((b: any) => {
         const exp = b.expiryDate ? new Date(b.expiryDate) : null;
         const today = new Date();
@@ -866,18 +828,15 @@ export class ItemsService {
           : false;
         const status = this.resolveBatchStatus(b);
         const purchaseRate = this.resolvePurchaseRate(b);
-        const unitPrice = this.resolveUnitPrice(b, itemUnitPrice);
-        const mrp = this.resolveBatchMrp(b, Number((lean as any).mrp) || 0);
+        const unitPrice = this.resolveUnitPrice(b);
+        const mrp = this.resolveBatchMrp(b);
         const stock = Number(b.quantity) || 0;
         return {
           batchId: b._id?.toString?.() || b.batchNumber,
           batchNumber: b.batchNumber,
           expiryDate: b.expiryDate,
           purchaseRate,
-          purchasePrice: purchaseRate,
           unitPrice,
-          saleRate: unitPrice, // dual-read alias for older FE
-          sellingPrice: unitPrice,
           mrp,
           gst: Number(b.gst) || 0,
           stock,
@@ -890,9 +849,7 @@ export class ItemsService {
           createdAt: b.createdAt,
           expired,
           available:
-            !expired &&
-            status === BatchStatus.Active &&
-            stock > 0,
+            !expired && status === BatchStatus.Active && stock > 0,
         };
       }),
     };
@@ -972,7 +929,7 @@ export class ItemsService {
 
     this.recalculateItemStockFromBatches(item);
 
-    const unitPrice = this.resolveUnitPrice(batch, this.resolveItemUnitPrice(item));
+    const unitPrice = this.resolveUnitPrice(batch);
     item.soldQuantity = (item.soldQuantity || 0) + quantity;
     item.soldHistory.push({
       date: new Date(),
@@ -990,13 +947,31 @@ export class ItemsService {
     if (!item) {
       throw new BadRequestException('Item is not available');
     }
-    const newQuantity = item.quantity + quantity;
 
-    if (newQuantity !== item.quantity) {
-      item.quantity = newQuantity;
-      await item.save();
+    const actives = this.activeBatches(item);
+    if (actives.length) {
+      const target = actives[0];
+      target.quantity = (Number(target.quantity) || 0) + quantity;
+      item.markModified('batches');
+    } else {
+      item.batches = item.batches || [];
+      item.batches.push(
+        this.normalizeBatchInput({
+          batchNumber: 'OPENING',
+          expiryDate: new Date('2099-12-31'),
+          quantity,
+          startingQuantity: quantity,
+          unitPrice: 0,
+          purchaseRate: 0,
+          mrp: 0,
+          supplier: '-',
+        }) as any,
+      );
+      item.markModified('batches');
     }
 
+    this.recalculateItemStockFromBatches(item);
+    await item.save();
     return item;
   }
 
@@ -1010,9 +985,7 @@ export class ItemsService {
       batchNumber: string;
       quantity: number;
       expiryDate: Date | string;
-      purchasePrice?: number;
       purchaseRate?: number;
-      saleRate?: number;
       unitPrice?: number;
       mrp?: number;
       startingQuantity?: number;
@@ -1032,8 +1005,7 @@ export class ItemsService {
 
     const normalized = this.normalizeBatchInput({
       ...batchData,
-      unitPrice: batchData.unitPrice ?? batchData.saleRate ?? unitPrice,
-      saleRate: batchData.saleRate ?? batchData.unitPrice ?? unitPrice,
+      unitPrice: batchData.unitPrice ?? unitPrice,
       mrp: batchData.mrp ?? mrp,
     });
 
@@ -1052,12 +1024,7 @@ export class ItemsService {
       existing.expiryDate = normalized.expiryDate;
       existing.mrp = normalized.mrp;
       existing.purchaseRate = normalized.purchaseRate;
-      existing.purchasePrice = normalized.purchaseRate;
       existing.unitPrice = normalized.unitPrice;
-      // Clear legacy saleRate on write so unitPrice is canonical
-      if (existing.saleRate != null) {
-        existing.saleRate = undefined;
-      }
       existing.supplier = normalized.supplier || existing.supplier;
       if (normalized.packing != null) existing.packing = normalized.packing;
       if (normalized.stripCount != null) {
@@ -1085,9 +1052,7 @@ export class ItemsService {
       quantity: dto.quantity,
       expiryDate: dto.expiryDate,
       purchaseRate: dto.purchaseRate,
-      purchasePrice: dto.purchasePrice,
-      unitPrice: dto.unitPrice ?? dto.saleRate,
-      saleRate: dto.saleRate,
+      unitPrice: dto.unitPrice,
       mrp: dto.mrp,
       startingQuantity: dto.startingQuantity,
       supplier: dto.supplier,
@@ -1120,15 +1085,11 @@ export class ItemsService {
     const batch: any = item.batches[batchIndex];
     if (dto.expiryDate != null) batch.expiryDate = new Date(dto.expiryDate);
     if (dto.mrp != null) batch.mrp = Number(dto.mrp);
-    if (dto.purchaseRate != null || dto.purchasePrice != null) {
-      const rate = dto.purchaseRate ?? dto.purchasePrice ?? 0;
-      batch.purchaseRate = Number(rate);
-      batch.purchasePrice = Number(rate);
+    if (dto.purchaseRate != null) {
+      batch.purchaseRate = Number(dto.purchaseRate);
     }
-    if (dto.unitPrice != null || dto.saleRate != null) {
-      batch.unitPrice = Number(dto.unitPrice ?? dto.saleRate ?? 0);
-      // Prefer unitPrice — clear legacy saleRate on write
-      batch.saleRate = undefined;
+    if (dto.unitPrice != null) {
+      batch.unitPrice = Number(dto.unitPrice);
     }
     if (dto.quantity != null) batch.quantity = Number(dto.quantity);
     if (dto.startingQuantity != null) {
@@ -1140,18 +1101,14 @@ export class ItemsService {
     if (dto.gst != null) batch.gst = Number(dto.gst);
     if (dto.status != null) batch.status = dto.status;
 
-    // Backfill missing new fields on live edit of legacy batches
     if (batch.purchaseRate == null) {
       batch.purchaseRate = this.resolvePurchaseRate(batch);
     }
     if (batch.unitPrice == null) {
-      batch.unitPrice = this.resolveUnitPrice(
-        batch,
-        this.resolveItemUnitPrice(item),
-      );
+      batch.unitPrice = this.resolveUnitPrice(batch);
     }
     if (batch.mrp == null) {
-      batch.mrp = this.resolveBatchMrp(batch, 0);
+      batch.mrp = this.resolveBatchMrp(batch);
     }
     if (batch.startingQuantity == null) {
       batch.startingQuantity = Number(batch.quantity) || 0;
@@ -1214,39 +1171,6 @@ export class ItemsService {
   }
 
   async addMRP() {
-    const cursor = this.itemModel.find({}).cursor();
-
-    for await (const item of cursor) {
-      let changed = false;
-      for (const batch of item.batches || []) {
-        const b: any = batch;
-        if (b.mrp == null || b.mrp === undefined) {
-          const rate = this.resolveUnitPrice(b, 0);
-          b.mrp = rate;
-          changed = true;
-        }
-        // Migrate legacy saleRate → unitPrice on batch
-        if (
-          (b.unitPrice == null || b.unitPrice === 0) &&
-          Number(b.saleRate) > 0
-        ) {
-          b.unitPrice = Number(b.saleRate);
-          changed = true;
-        }
-      }
-      if (changed) {
-        item.markModified('batches');
-        this.recalculateItemStockFromBatches(item);
-        await item.save();
-        console.log(`Migrated rates for: ${item.name}`);
-        await this.delay(20);
-      }
-    }
-
-    console.log('✅ Completed updating all items');
-  }
-
-  private delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return { message: 'noop' };
   }
 }

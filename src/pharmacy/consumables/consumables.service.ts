@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
-import { Item, ItemStatus } from '../items/schemas/item.schema';
+import { BatchStatus, Item, ItemStatus } from '../items/schemas/item.schema';
 import { ConsumableIssue } from './schemas/consumable-issue.schema';
 import { IssueConsumableDto } from './dto/issue-consumable.dto';
 
@@ -17,6 +17,19 @@ export class ConsumablesService {
     private issueModel: Model<ConsumableIssue>,
   ) {}
 
+  private isBatchActive(batch: any): boolean {
+    return (
+      String(batch?.status || BatchStatus.Active).toLowerCase() !==
+      BatchStatus.Inactive
+    );
+  }
+
+  private sumActiveQuantity(item: any): number {
+    return (item?.batches || [])
+      .filter((b: any) => this.isBatchActive(b))
+      .reduce((sum: number, b: any) => sum + (Number(b.quantity) || 0), 0);
+  }
+
   async listConsumables(q?: string) {
     const filter: Record<string, unknown> = {
       status: { $ne: ItemStatus.Deleted },
@@ -26,16 +39,18 @@ export class ConsumablesService {
       filter.$or = [
         { name: { $regex: q.trim(), $options: 'i' } },
         { generic: { $regex: q.trim(), $options: 'i' } },
-        { sku: { $regex: q.trim(), $options: 'i' } },
       ];
     }
-    return this.itemModel
+    const rows = await this.itemModel
       .find(filter)
-      .select(
-        'name generic sku category quantity batches status',
-      )
+      .select('name generic category batches status')
       .sort({ name: 1 })
       .lean();
+
+    return rows.map((item: any) => ({
+      ...item,
+      quantity: this.sumActiveQuantity(item),
+    }));
   }
 
   async issue(userId: mongoose.Types.ObjectId, dto: IssueConsumableDto) {
@@ -60,26 +75,47 @@ export class ConsumablesService {
         );
       }
 
-      if ((item.quantity || 0) < dto.quantity) {
+      const available = this.sumActiveQuantity(item);
+      if (available < dto.quantity) {
         throw new BadRequestException(
-          `Insufficient stock. Available: ${item.quantity || 0}`,
+          `Insufficient stock. Available: ${available}`,
         );
       }
 
-      item.quantity = (item.quantity || 0) - dto.quantity;
+      // FEFO deduct from active non-expired batches with stock
+      let remaining = dto.quantity;
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const sorted = [...(item.batches || [])]
+        .filter((b: any) => this.isBatchActive(b))
+        .filter((b: any) => {
+          if (!b?.expiryDate) return true;
+          const exp = new Date(b.expiryDate);
+          exp.setHours(0, 0, 0, 0);
+          return exp >= now;
+        })
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.expiryDate || 0).getTime() -
+            new Date(b.expiryDate || 0).getTime(),
+        );
+
+      for (const batch of sorted) {
+        if (remaining <= 0) break;
+        const q = Number(batch.quantity) || 0;
+        if (q <= 0) continue;
+        const take = Math.min(q, remaining);
+        (batch as any).quantity = q - take;
+        remaining -= take;
+      }
+
+      item.markModified('batches');
       await item.save({ session });
 
-      // Prefer active batch purchaseRate; dual-read legacy Item.purchasePrice
-      const activeBatch = (item.batches || []).find(
-        (b: any) =>
-          String(b?.status || 'active').toLowerCase() !== 'inactive',
+      const activeBatch = (item.batches || []).find((b: any) =>
+        this.isBatchActive(b),
       ) as any;
-      const unitPurchasePrice =
-        Number(
-          activeBatch?.purchaseRate ??
-            activeBatch?.purchasePrice ??
-            (item as any).purchasePrice,
-        ) || 0;
+      const unitPurchasePrice = Number(activeBatch?.purchaseRate) || 0;
       const [issue] = await this.issueModel.create(
         [
           {
@@ -108,7 +144,7 @@ export class ConsumablesService {
   async listIssues(limit = 50) {
     return this.issueModel
       .find()
-      .populate('item', 'name sku category')
+      .populate('item', 'name category')
       .populate('issuedBy', 'name role')
       .sort({ createdAt: -1 })
       .limit(Math.min(Number(limit) || 50, 200))

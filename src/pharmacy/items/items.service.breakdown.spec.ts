@@ -40,29 +40,18 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
           totalQuantity: 15,
           totalItems: 3,
         },
+      ])
+      .mockResolvedValueOnce([
+        {
+          _id: '1',
+          name: 'Paracetamol',
+          category: 'Medicine',
+          quantity: 10,
+          sellingValue: 200,
+          purchaseValue: 100,
+          mrpValue: 250,
+        },
       ]);
-
-    itemModel.find.mockReturnValue({
-      select: () => ({
-        sort: () => ({
-          limit: () => ({
-            lean: () =>
-              Promise.resolve([
-                {
-                  _id: '1',
-                  name: 'Paracetamol',
-                  sku: 'MED1',
-                  category: 'Medicine',
-                  quantity: 10,
-                  unitPrice: 20,
-                  purchasePrice: 10,
-                  mrp: 25,
-                },
-              ]),
-          }),
-        }),
-      }),
-    });
 
     const result = await service.getInventoryValueBreakdown();
 
@@ -72,5 +61,7 @@ describe('ItemsService.getInventoryValueBreakdown', () => {
     expect(result.byCategory).toHaveLength(2);
     expect(result.byCategory[0].category).toBe('Medicine');
     expect(result.topItems[0].sellingValue).toBe(200);
+    expect(result.topItems[0].name).toBe('Paracetamol');
+    expect(itemModel.find).not.toHaveBeenCalled();
   });
 });

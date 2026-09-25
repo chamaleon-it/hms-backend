@@ -63,7 +63,6 @@ export class PurchaseEntryService {
           quantity: item.quantity,
           expiryDate: item.expiryDate,
           purchaseRate: item.purchasePrice,
-          purchasePrice: item.purchasePrice,
           unitPrice,
           mrp: item.unitPrice,
           startingQuantity: item.quantity,
@@ -83,7 +82,7 @@ export class PurchaseEntryService {
     return await this.purchaseEntryModel
       .find({ supplier: id })
       .populate('supplier', 'name paymentTerms balance')
-      .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .populate('items.item', 'name generic hsnCode')
       .exec();
   }
 
@@ -91,7 +90,7 @@ export class PurchaseEntryService {
     return await this.purchaseEntryModel
       .findById(id)
       .populate('supplier', 'name paymentTerms balance')
-      .populate('items.item', 'name generic hsnCode sku unitPrice')
+      .populate('items.item', 'name generic hsnCode')
       .exec();
   }
 

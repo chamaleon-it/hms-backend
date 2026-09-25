@@ -127,14 +127,9 @@ export class OrdersService {
         item.batchExpiryDate = item.batchExpiryDate || batch.expiryDate;
         item.batchMrp = item.batchMrp ?? batch.mrp;
         item.batchPurchasePrice =
-          item.batchPurchasePrice ??
-          batch.purchaseRate ??
-          batch.purchasePrice;
+          item.batchPurchasePrice ?? batch.purchaseRate;
         item.batchSellingPrice =
-          item.batchSellingPrice ??
-          batch.unitPrice ??
-          batch.saleRate ??
-          batch.sellingPrice;
+          item.batchSellingPrice ?? batch.unitPrice;
         item.batchGst = item.batchGst ?? batch.gst;
         item.batchStock = item.batchStock ?? batch.stock;
         item.batchSupplier = item.batchSupplier || batch.supplier;
@@ -168,7 +163,7 @@ export class OrdersService {
             expiryDate: item.batchExpiryDate || undefined,
             mrp: item.batchMrp ?? itemData.mrp,
             purchasePrice:
-              item.batchPurchasePrice ?? itemData.purchasePrice,
+              item.batchPurchasePrice ?? itemData.purchasePrice ?? 0,
             gst: item.batchGst ?? 0,
             supplier: item.batchSupplier || itemData.supplier || undefined,
             packing: item.batchPacking ?? itemData.packing ?? 1,

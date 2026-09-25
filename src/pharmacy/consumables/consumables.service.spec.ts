@@ -33,8 +33,14 @@ describe('ConsumablesService', () => {
         Promise.resolve({
           status: 'Active',
           category: 'Medicine',
-          quantity: 10,
-          purchasePrice: 5,
+          batches: [
+            {
+              quantity: 10,
+              status: 'active',
+              purchaseRate: 5,
+              expiryDate: new Date('2030-01-01'),
+            },
+          ],
           save,
         }),
     });
@@ -53,9 +59,16 @@ describe('ConsumablesService', () => {
         Promise.resolve({
           status: 'Active',
           category: 'Consumables',
-          quantity: 1,
-          purchasePrice: 5,
+          batches: [
+            {
+              quantity: 1,
+              status: 'active',
+              purchaseRate: 5,
+              expiryDate: new Date('2030-01-01'),
+            },
+          ],
           save: jest.fn(),
+          markModified: jest.fn(),
         }),
     });
 
