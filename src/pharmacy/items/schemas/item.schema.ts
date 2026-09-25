@@ -15,9 +15,8 @@ export enum BatchStatus {
 }
 
 /**
- * Batch-level pricing & stock. Item-level unitPrice/mrp/quantity/expiryDate
- * remain for dual-read / historical docs and are recalculated from active
- * batches by ItemsService (no destructive drops).
+ * Batch-level pricing, stock, supplier, expiry, packing.
+ * Canonical sale field is `unitPrice` (legacy Atlas docs may still have `saleRate`).
  */
 @Schema({ _id: true, timestamps: false, versionKey: false })
 export class ItemBatch {
@@ -41,9 +40,16 @@ export class ItemBatch {
   @Prop({ type: Number, min: 0 })
   purchasePrice?: number;
 
-  /** Canonical sale / unit rate for this batch. */
+  /** Canonical sale / unit rate for this batch (replaces saleRate). */
   @Prop({ type: Number, required: true, min: 0, default: 0 })
-  saleRate: number;
+  unitPrice: number;
+
+  /**
+   * Legacy Atlas dual-read. Prefer unitPrice; do not write on new saves.
+   * resolveUnitPrice reads unitPrice ?? saleRate ?? sellingPrice.
+   */
+  @Prop({ type: Number, min: 0 })
+  saleRate?: number;
 
   /** Quantity when the batch was first created / last restocked. */
   @Prop({ type: Number, required: true, min: 0, default: 0 })
@@ -78,6 +84,20 @@ export class ItemBatch {
   createdAt: Date;
 }
 
+/**
+ * Item master — identity + category metadata only.
+ * Pricing / supplier / packing / opening stock live on batches.
+ *
+ * Retained operational denorm (not pricing):
+ * - sku: auto-generated unique identity / search key
+ * - quantity: sum of active batch quantities (stock filters / list)
+ * - expiryDate: earliest active batch expiry (expiry filters)
+ *
+ * Removed from Item (were incorrectly master-level):
+ * supplier, unitPrice, mrp, purchasePrice, openingStockQuantity,
+ * packing, noOfPacking. Legacy Atlas docs may still contain them;
+ * lean() dual-read is OK — do not write them on new saves.
+ */
 @Schema({ timestamps: true, versionKey: false })
 export class Item {
   @Prop({ required: true, trim: true })
@@ -95,6 +115,7 @@ export class Item {
   })
   hsnCode?: string;
 
+  /** System identity — auto-generated; not user-editable pricing. */
   @Prop({
     required: true,
     trim: true,
@@ -107,56 +128,11 @@ export class Item {
   category: string;
 
   @Prop({ trim: true, default: '-' })
-  supplier?: string;
-
-  @Prop({ trim: true, default: '-' })
   manufacturer?: string;
 
   /**
-   * Denormalized sale rate (from active batches / last mutation).
-   * Prefer batch.saleRate at order time. Kept for dual-read of flat-priced
-   * historical items — do not drop.
-   */
-  @Prop({
-    required: true,
-    type: Number,
-    min: [0, 'Unit price cannot be negative'],
-    default: 0,
-  })
-  unitPrice: number;
-
-  /**
-   * Denormalized MRP. Prefer batch.mrp. Kept for dual-read — do not drop.
-   */
-  @Prop({
-    required: true,
-    type: Number,
-    min: [0, 'MRP cannot be negative'],
-    default: 0,
-  })
-  mrp: number;
-
-  /**
-   * Denormalized purchase rate. Prefer batch.purchaseRate. Kept for dual-read.
-   */
-  @Prop({
-    required: true,
-    type: Number,
-    min: [0, 'Unit price cannot be negative'],
-    default: 0,
-  })
-  purchasePrice: number;
-
-  @Prop({
-    default: 0,
-    type: Number,
-    min: [0, 'Opening stock cannot be negative'],
-  })
-  openingStockQuantity: number;
-
-  /**
    * Aggregate stock = sum of active batch quantities (recalculated on batch
-   * mutations). Flat quantity remains for dual-read of batch-less items.
+   * mutations). Kept for list/filter performance — not a pricing field.
    */
   @Prop({
     type: Number,
@@ -190,18 +166,12 @@ export class Item {
     total: number;
   }[];
 
-  /** Earliest expiry among active batches (denormalized). */
+  /** Earliest expiry among active batches (denormalized for filters). */
   @Prop({ type: Date })
   expiryDate?: Date;
 
   @Prop({ type: String, default: '-' })
   rackLocation: string;
-
-  @Prop({ type: Number, default: 1, min: 1 })
-  packing: number;
-
-  @Prop({ type: Number, default: 0 })
-  noOfPacking: number;
 
   @Prop({
     enum: ItemStatus,
@@ -217,7 +187,8 @@ export class Item {
         mrp: { type: Number, required: true, min: 0, default: 0 },
         purchaseRate: { type: Number, required: true, min: 0, default: 0 },
         purchasePrice: { type: Number, min: 0 },
-        saleRate: { type: Number, required: true, min: 0, default: 0 },
+        unitPrice: { type: Number, required: true, min: 0, default: 0 },
+        saleRate: { type: Number, min: 0 },
         startingQuantity: { type: Number, required: true, min: 0, default: 0 },
         quantity: { type: Number, required: true, min: 0 },
         status: {

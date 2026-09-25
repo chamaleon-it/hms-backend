@@ -44,18 +44,22 @@ export class CreateBatchDto {
   @IsOptional()
   purchasePrice?: number;
 
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @IsOptional()
-  saleRate?: number;
-
-  /** Legacy alias — mapped to saleRate when saleRate omitted. */
+  /** Canonical sale / unit rate. */
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @IsOptional()
   unitPrice?: number;
+
+  /**
+   * Legacy alias — mapped to unitPrice when unitPrice omitted.
+   * Prefer unitPrice; kept for older clients / Atlas dual-read migration.
+   */
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  saleRate?: number;
 
   @Type(() => Number)
   @IsInt()
@@ -123,13 +127,14 @@ export class UpdateBatchDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @IsOptional()
-  saleRate?: number;
+  unitPrice?: number;
 
+  /** Legacy alias — mapped to unitPrice. */
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @IsOptional()
-  unitPrice?: number;
+  saleRate?: number;
 
   @Type(() => Number)
   @IsInt()

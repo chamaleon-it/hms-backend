@@ -19,7 +19,7 @@ describe('ItemsController.updateBatch stock policy (H3)', () => {
       controller.updateBatch(
         id,
         'B1',
-        { quantity: 999, saleRate: 12 },
+        { quantity: 999, unitPrice: 12 },
         { id, email: 'p@x.com', role: UserRole.PHARMACY } as any,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -31,7 +31,7 @@ describe('ItemsController.updateBatch stock policy (H3)', () => {
     await controller.updateBatch(
       id,
       'B1',
-      { saleRate: 15, mrp: 20 },
+      { unitPrice: 15, mrp: 20 },
       { id, email: 'p@x.com', role: UserRole.PHARMACY } as any,
     );
     expect(itemsService.updateBatchByNumber).toHaveBeenCalled();

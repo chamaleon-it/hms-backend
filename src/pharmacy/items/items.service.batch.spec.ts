@@ -13,7 +13,7 @@ describe('ItemsService batch helpers', () => {
       expiryDate: new Date('2030-01-01'),
       purchaseRate: 5,
       purchasePrice: 5,
-      saleRate: 12,
+      unitPrice: 12,
       mrp: 15,
       startingQuantity: 10,
       status: BatchStatus.Active,
@@ -26,7 +26,7 @@ describe('ItemsService batch helpers', () => {
       quantity: 5,
       expiryDate: new Date('2028-06-01'),
       purchaseRate: 6,
-      saleRate: 14,
+      unitPrice: 14,
       mrp: 18,
       startingQuantity: 5,
       status: BatchStatus.Active,
@@ -39,7 +39,7 @@ describe('ItemsService batch helpers', () => {
       quantity: 20,
       expiryDate: new Date('2020-01-01'),
       purchaseRate: 4,
-      saleRate: 10,
+      unitPrice: 10,
       mrp: 12,
       startingQuantity: 20,
       status: BatchStatus.Active,
@@ -52,7 +52,7 @@ describe('ItemsService batch helpers', () => {
       quantity: 8,
       expiryDate: new Date('2031-01-01'),
       purchaseRate: 7,
-      saleRate: 16,
+      unitPrice: 16,
       mrp: 20,
       startingQuantity: 8,
       status: BatchStatus.Inactive,
@@ -93,29 +93,32 @@ describe('ItemsService batch helpers', () => {
     ]);
   });
 
-  it('recalculateItemStockFromBatches sums only active batches', () => {
+  it('recalculateItemStockFromBatches sums only active batches (no item pricing write)', () => {
     const item: any = {
       batches: [
-        { quantity: 10, status: 'active', expiryDate: new Date('2030-01-01'), saleRate: 12, purchaseRate: 5, mrp: 15, createdAt: new Date('2024-01-01'), supplier: 'A' },
-        { quantity: 5, status: 'inactive', expiryDate: new Date('2029-01-01'), saleRate: 14, purchaseRate: 6, mrp: 18, createdAt: new Date('2025-01-01'), supplier: 'B' },
-        { quantity: 3, status: 'active', expiryDate: new Date('2028-01-01'), saleRate: 11, purchaseRate: 4, mrp: 13, createdAt: new Date('2025-06-01'), supplier: 'C' },
+        { quantity: 10, status: 'active', expiryDate: new Date('2030-01-01'), unitPrice: 12, purchaseRate: 5, mrp: 15, createdAt: new Date('2024-01-01'), supplier: 'A' },
+        { quantity: 5, status: 'inactive', expiryDate: new Date('2029-01-01'), unitPrice: 14, purchaseRate: 6, mrp: 18, createdAt: new Date('2025-01-01'), supplier: 'B' },
+        { quantity: 3, status: 'active', expiryDate: new Date('2028-01-01'), unitPrice: 11, purchaseRate: 4, mrp: 13, createdAt: new Date('2025-06-01'), supplier: 'C' },
       ],
       markModified: jest.fn(),
     };
     service.recalculateItemStockFromBatches(item);
     expect(item.quantity).toBe(13);
-    expect(item.unitPrice).toBe(11); // latest active by createdAt
-    expect(item.purchasePrice).toBe(4);
-    expect(item.mrp).toBe(13);
+    expect(item.expiryDate).toEqual(new Date('2028-01-01'));
+    // Pricing stays on batches — Item.unitPrice/mrp/purchasePrice not written
+    expect(item.unitPrice).toBeUndefined();
+    expect(item.mrp).toBeUndefined();
   });
 
-  it('dual-reads purchasePrice when purchaseRate missing', () => {
+  it('dual-reads unitPrice from saleRate legacy and purchasePrice when purchaseRate missing', () => {
     expect(service.resolvePurchaseRate({ purchasePrice: 9 })).toBe(9);
+    expect(service.resolveUnitPrice({ unitPrice: 11 }, 5)).toBe(11);
+    expect(service.resolveUnitPrice({ saleRate: 11 }, 5)).toBe(11);
+    expect(service.resolveUnitPrice({}, 5)).toBe(5);
     expect(service.resolveSaleRate({ saleRate: 11 }, 5)).toBe(11);
-    expect(service.resolveSaleRate({}, 5)).toBe(5);
   });
 
-  it('ensureLegacyBatchFromFlatItem seeds opening batch without dropping flat fields', () => {
+  it('ensureLegacyBatchFromFlatItem seeds opening batch with unitPrice', () => {
     const item: any = {
       batches: [],
       quantity: 25,
@@ -130,8 +133,8 @@ describe('ItemsService batch helpers', () => {
     expect(item.batches).toHaveLength(1);
     expect(item.batches[0].batchNumber).toBe('LEGACY-OPENING');
     expect(item.batches[0].quantity).toBe(25);
-    expect(item.batches[0].saleRate).toBe(10);
-    expect(item.unitPrice).toBe(10); // flat fields preserved
+    expect(item.batches[0].unitPrice).toBe(10);
+    expect(item.unitPrice).toBe(10); // flat fields preserved on dual-read source
   });
 
   it('sanitizeSearchRegex escapes metacharacters', () => {
@@ -140,25 +143,10 @@ describe('ItemsService batch helpers', () => {
     expect(svc.sanitizeSearchRegex('a(b)')).toBe('a\\(b\\)');
   });
 
-  it('H4: ensureValidPacking normalizes packing < 1 to 1 (avoids schema 500)', () => {
-    const item: any = { packing: 0 };
-    service.ensureValidPacking(item);
-    expect(item.packing).toBe(1);
-
-    const missing: any = {};
-    service.ensureValidPacking(missing);
-    expect(missing.packing).toBe(1);
-
-    const ok: any = { packing: 10 };
-    service.ensureValidPacking(ok);
-    expect(ok.packing).toBe(10);
-  });
-
   it('deductFromBatch blocks expired, inactive, zero, and oversell', async () => {
     const item: any = {
       name: 'Para',
       quantity: 33,
-      unitPrice: 10,
       soldQuantity: 0,
       soldHistory: [],
       batches: [
@@ -168,7 +156,7 @@ describe('ItemsService batch helpers', () => {
           quantity: 20,
           expiryDate: new Date('2020-01-01'),
           status: BatchStatus.Active,
-          saleRate: 10,
+          unitPrice: 10,
         },
         {
           _id: { toString: () => 'b2' },
@@ -176,7 +164,7 @@ describe('ItemsService batch helpers', () => {
           quantity: 5,
           expiryDate: new Date('2030-01-01'),
           status: BatchStatus.Active,
-          saleRate: 14,
+          unitPrice: 14,
           purchaseRate: 6,
           mrp: 18,
           createdAt: new Date('2025-01-01'),
@@ -187,7 +175,7 @@ describe('ItemsService batch helpers', () => {
           quantity: 8,
           expiryDate: new Date('2031-01-01'),
           status: BatchStatus.Inactive,
-          saleRate: 16,
+          unitPrice: 16,
         },
       ],
       markModified: jest.fn(),
@@ -197,7 +185,9 @@ describe('ItemsService batch helpers', () => {
     const svc: any = Object.create(ItemsService.prototype);
     Object.assign(svc, {
       resolvePurchaseRate: service.resolvePurchaseRate.bind(service),
+      resolveUnitPrice: service.resolveUnitPrice.bind(service),
       resolveSaleRate: service.resolveSaleRate.bind(service),
+      resolveItemUnitPrice: service.resolveItemUnitPrice.bind(service),
       resolveBatchMrp: service.resolveBatchMrp.bind(service),
       resolveBatchStatus: service.resolveBatchStatus.bind(service),
       isBatchActive: service.isBatchActive.bind(service),

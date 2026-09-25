@@ -32,7 +32,7 @@ export class ConsumablesService {
     return this.itemModel
       .find(filter)
       .select(
-        'name generic sku category quantity unitPrice purchasePrice mrp status',
+        'name generic sku category quantity batches status',
       )
       .sort({ name: 1 })
       .lean();
@@ -69,7 +69,17 @@ export class ConsumablesService {
       item.quantity = (item.quantity || 0) - dto.quantity;
       await item.save({ session });
 
-      const unitPurchasePrice = item.purchasePrice || 0;
+      // Prefer active batch purchaseRate; dual-read legacy Item.purchasePrice
+      const activeBatch = (item.batches || []).find(
+        (b: any) =>
+          String(b?.status || 'active').toLowerCase() !== 'inactive',
+      ) as any;
+      const unitPurchasePrice =
+        Number(
+          activeBatch?.purchaseRate ??
+            activeBatch?.purchasePrice ??
+            (item as any).purchasePrice,
+        ) || 0;
       const [issue] = await this.issueModel.create(
         [
           {

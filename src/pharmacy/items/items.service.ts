@@ -34,14 +34,42 @@ export class ItemsService {
     return Number.isFinite(Number(rate)) ? Number(rate) : 0;
   }
 
-  resolveSaleRate(batch: any, itemFallback = 0): number {
-    const rate = batch?.saleRate ?? batch?.sellingPrice ?? itemFallback;
+  /**
+   * Canonical batch sale field is unitPrice.
+   * Dual-read: unitPrice ?? saleRate ?? sellingPrice (legacy Atlas / clients).
+   */
+  resolveUnitPrice(batch: any, itemFallback = 0): number {
+    const rate =
+      batch?.unitPrice ?? batch?.saleRate ?? batch?.sellingPrice ?? itemFallback;
     return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  }
+
+  /** @deprecated Prefer resolveUnitPrice */
+  resolveSaleRate(batch: any, itemFallback = 0): number {
+    return this.resolveUnitPrice(batch, itemFallback);
   }
 
   resolveBatchMrp(batch: any, itemFallback = 0): number {
     const rate = batch?.mrp ?? itemFallback;
     return Number.isFinite(Number(rate)) ? Number(rate) : 0;
+  }
+
+  /** Latest active batch unit price (for list/stats when Item has no unitPrice). */
+  resolveItemUnitPrice(item: any): number {
+    const batches = (item?.batches || []).filter((b: any) =>
+      this.isBatchActive(b),
+    );
+    if (!batches.length) {
+      // Legacy Atlas dual-read of removed Item.unitPrice
+      const legacy = item?.unitPrice;
+      return Number.isFinite(Number(legacy)) ? Number(legacy) : 0;
+    }
+    const byCreated = [...batches].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() -
+        new Date(a.createdAt || 0).getTime(),
+    );
+    return this.resolveUnitPrice(byCreated[0], Number(item?.unitPrice) || 0);
   }
 
   resolveBatchStatus(batch: any): BatchStatus {
@@ -56,19 +84,8 @@ export class ItemsService {
   }
 
   /**
-   * Legacy rows may have packing: 0 which fails schema min:1 on save (500).
-   * Normalize before any persist path.
-   */
-  ensureValidPacking(item: any): void {
-    const packing = Number(item?.packing);
-    if (!Number.isFinite(packing) || packing < 1) {
-      item.packing = 1;
-    }
-  }
-
-  /**
-   * Recalculate denormalized item.quantity / expiry / rates from active batches.
-   * When there are no batches, leave flat historical values untouched (dual-read).
+   * Recalculate denormalized item.quantity + earliest expiry from active batches.
+   * Does NOT write pricing/supplier/packing onto Item (those live on batches only).
    */
   recalculateItemStockFromBatches(item: any): void {
     const batches = item.batches || [];
@@ -92,39 +109,25 @@ export class ItemsService {
       item.expiryDate = withExpiry[0].expiryDate;
     }
 
-    // Prefer most recently created active batch for denormalized rates
-    const byCreated = [...active].sort(
-      (a: any, b: any) =>
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime(),
-    );
-    const latest = byCreated[0];
-    if (latest) {
-      item.purchasePrice = this.resolvePurchaseRate(latest);
-      item.unitPrice = this.resolveSaleRate(latest, item.unitPrice);
-      item.mrp = this.resolveBatchMrp(latest, item.mrp);
-      if (latest.supplier) {
-        item.supplier = latest.supplier;
-      }
-    }
-
     item.markModified?.('batches');
   }
 
   /**
    * Migration helper (non-destructive): if an item has flat stock/prices but
    * no batches, synthesize one OPENING batch so batch-first flows work.
-   * Does NOT drop flat fields.
+   * Reads legacy Item.unitPrice/mrp/purchasePrice/supplier from Atlas docs.
    */
   ensureLegacyBatchFromFlatItem(item: any): boolean {
     if ((item.batches || []).length > 0) return false;
     const qty = Number(item.quantity) || 0;
-    if (qty <= 0 && !(Number(item.unitPrice) > 0 || Number(item.mrp) > 0)) {
+    const legacyUnit = Number(item.unitPrice) || 0;
+    const legacyMrp = Number(item.mrp) || 0;
+    if (qty <= 0 && !(legacyUnit > 0 || legacyMrp > 0)) {
       return false;
     }
     const purchaseRate = Number(item.purchasePrice) || 0;
-    const saleRate = Number(item.unitPrice) || 0;
-    const mrp = Number(item.mrp) || saleRate || 0;
+    const unitPrice = legacyUnit;
+    const mrp = legacyMrp || unitPrice || 0;
     item.batches = item.batches || [];
     item.batches.push({
       batchNumber: 'LEGACY-OPENING',
@@ -132,7 +135,7 @@ export class ItemsService {
       mrp,
       purchaseRate,
       purchasePrice: purchaseRate,
-      saleRate,
+      unitPrice,
       startingQuantity: qty,
       quantity: qty,
       status: BatchStatus.Active,
@@ -159,10 +162,10 @@ export class ItemsService {
     stripCount?: number;
     gst?: number;
   }) {
-    const purchaseRate =
-      input.purchaseRate ?? input.purchasePrice ?? 0;
-    const saleRate = input.saleRate ?? input.unitPrice ?? 0;
-    const mrp = input.mrp ?? saleRate ?? 0;
+    const purchaseRate = input.purchaseRate ?? input.purchasePrice ?? 0;
+    // Prefer unitPrice; accept legacy saleRate from clients / Atlas dual-read
+    const unitPrice = input.unitPrice ?? input.saleRate ?? 0;
+    const mrp = input.mrp ?? unitPrice ?? 0;
     const quantity = Number(input.quantity) || 0;
     const startingQuantity =
       input.startingQuantity != null
@@ -178,7 +181,7 @@ export class ItemsService {
       mrp: Number(mrp) || 0,
       purchaseRate: Number(purchaseRate) || 0,
       purchasePrice: Number(purchaseRate) || 0,
-      saleRate: Number(saleRate) || 0,
+      unitPrice: Number(unitPrice) || 0,
       startingQuantity,
       quantity,
       status: input.status || BatchStatus.Active,
@@ -230,31 +233,29 @@ export class ItemsService {
     if (!addItemDto.hsnCode) {
       addItemDto.hsnCode = '-';
     }
-    if (!addItemDto.supplier) {
-      addItemDto.supplier = '-';
-    }
 
     if (!addItemDto.manufacturer) {
       addItemDto.manufacturer = '-';
     }
 
-    if (addItemDto.packing === undefined || addItemDto.packing < 1) {
-      addItemDto.packing = 1;
-    }
-
-    const openingQty = addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
-    const saleRate =
-      addItemDto.saleRate ?? addItemDto.unitPrice ?? 0;
+    const openingQty =
+      addItemDto.openingStockQuantity ?? addItemDto.quantity ?? 0;
+    const unitPrice = addItemDto.unitPrice ?? 0;
     const purchaseRate =
       addItemDto.purchaseRate ?? addItemDto.purchasePrice ?? 0;
-    const mrp = addItemDto.mrp ?? saleRate ?? 0;
+    const mrp = addItemDto.mrp ?? unitPrice ?? 0;
 
+    // Master-only create — do not persist pricing/supplier/packing on Item
     const data = await this.itemModel.create({
-      ...addItemDto,
-      unitPrice: saleRate,
-      purchasePrice: purchaseRate,
-      mrp,
-      quantity: addItemDto.batchNumber ? 0 : openingQty, // incremented by addBatchItems
+      name: addItemDto.name,
+      generic: addItemDto.generic,
+      hsnCode: addItemDto.hsnCode,
+      sku: addItemDto.sku,
+      category: addItemDto.category,
+      manufacturer: addItemDto.manufacturer,
+      rackLocation: addItemDto.rackLocation,
+      status: addItemDto.status,
+      quantity: 0,
       pharmacy,
     });
 
@@ -266,14 +267,38 @@ export class ItemsService {
           : new Date(),
         purchaseRate,
         purchasePrice: purchaseRate,
-        saleRate,
+        unitPrice,
         mrp,
         quantity: openingQty,
         startingQuantity: openingQty,
         supplier: addItemDto.supplier || '-',
+        packing: addItemDto.packing,
+        stripCount: addItemDto.stripCount,
+        gst: addItemDto.gst,
       });
       return updatedItem;
     }
+
+    // Flat opening qty without batchNumber → synthesize LEGACY-OPENING batch
+    if (openingQty > 0) {
+      return this.addBatchItems(data._id, {
+        batchNumber: 'OPENING',
+        expiryDate: addItemDto?.expiryDate
+          ? new Date(addItemDto.expiryDate)
+          : new Date('2099-12-31'),
+        purchaseRate,
+        purchasePrice: purchaseRate,
+        unitPrice,
+        mrp,
+        quantity: openingQty,
+        startingQuantity: openingQty,
+        supplier: addItemDto.supplier || '-',
+        packing: addItemDto.packing,
+        stripCount: addItemDto.stripCount,
+        gst: addItemDto.gst,
+      });
+    }
+
     return data;
   }
 
@@ -298,7 +323,7 @@ export class ItemsService {
       quantity?: number | Record<string, number>;
       expiryDate?: Record<string, Date>;
       status?: Record<string, string>;
-      supplier?: string;
+      'batches.supplier'?: string;
     } = {};
 
     if (q) {
@@ -341,7 +366,7 @@ export class ItemsService {
     }
 
     if (query.supplier) {
-      filter.supplier = query.supplier;
+      filter['batches.supplier'] = query.supplier;
     }
 
     filter.status = { $ne: ItemStatus.Deleted };
@@ -651,15 +676,26 @@ export class ItemsService {
       throw new BadRequestException('Invalid item ID.');
     }
 
-    if (addItemDto.packing !== undefined && addItemDto.packing < 1) {
-      addItemDto.packing = 1;
-    }
-
-    // SKU is item identity — never rekey via update.
-    const { sku: _sku, ...updatePayload } = addItemDto;
+    // Master-only update — strip identity + batch-only fields
+    const {
+      sku: _sku,
+      unitPrice: _unitPrice,
+      mrp: _mrp,
+      purchaseRate: _purchaseRate,
+      purchasePrice: _purchasePrice,
+      openingStockQuantity: _opening,
+      quantity: _quantity,
+      expiryDate: _expiry,
+      batchNumber: _batch,
+      supplier: _supplier,
+      packing: _packing,
+      stripCount: _strip,
+      gst: _gst,
+      ...masterPayload
+    } = addItemDto;
 
     const data = await this.itemModel
-      .findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true })
+      .findByIdAndUpdate(id, masterPayload, { new: true, runValidators: true })
       .lean();
 
     if (!data) {
@@ -730,15 +766,15 @@ export class ItemsService {
 
     if (quantity > 0) {
       item.soldQuantity = (item.soldQuantity || 0) + quantity;
+      const rate = this.resolveItemUnitPrice(item);
       item.soldHistory.push({
         date: new Date(),
         quantity,
-        unitPrice: item.unitPrice,
-        total: item.unitPrice * quantity,
+        unitPrice: rate,
+        total: rate * quantity,
       });
     }
 
-    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -797,10 +833,7 @@ export class ItemsService {
 
     // Dual-read: seed a legacy batch in-memory for pickers (persist only when mutated)
     const seeded = this.ensureLegacyBatchFromFlatItem(item);
-    const packingWasInvalid =
-      !Number.isFinite(Number(item.packing)) || Number(item.packing) < 1;
-    this.ensureValidPacking(item);
-    if (seeded || packingWasInvalid) {
+    if (seeded) {
       await item.save();
     }
 
@@ -810,13 +843,14 @@ export class ItemsService {
     });
 
     const lean = item.toObject();
+    const itemUnitPrice = this.resolveItemUnitPrice(lean);
 
     return {
       itemId: lean._id,
       name: lean.name,
-      packing: lean.packing ?? 1,
-      unitPrice: lean.unitPrice,
-      mrp: lean.mrp,
+      packing: 1,
+      unitPrice: itemUnitPrice,
+      mrp: Number((lean as any).mrp) || 0,
       gst: 0,
       quantity: lean.quantity,
       batches: sorted.map((b: any) => {
@@ -832,8 +866,8 @@ export class ItemsService {
           : false;
         const status = this.resolveBatchStatus(b);
         const purchaseRate = this.resolvePurchaseRate(b);
-        const saleRate = this.resolveSaleRate(b, lean.unitPrice);
-        const mrp = this.resolveBatchMrp(b, lean.mrp);
+        const unitPrice = this.resolveUnitPrice(b, itemUnitPrice);
+        const mrp = this.resolveBatchMrp(b, Number((lean as any).mrp) || 0);
         const stock = Number(b.quantity) || 0;
         return {
           batchId: b._id?.toString?.() || b.batchNumber,
@@ -841,8 +875,9 @@ export class ItemsService {
           expiryDate: b.expiryDate,
           purchaseRate,
           purchasePrice: purchaseRate,
-          saleRate,
-          sellingPrice: saleRate,
+          unitPrice,
+          saleRate: unitPrice, // dual-read alias for older FE
+          sellingPrice: unitPrice,
           mrp,
           gst: Number(b.gst) || 0,
           stock,
@@ -850,7 +885,7 @@ export class ItemsService {
           startingQuantity: Number(b.startingQuantity) || stock,
           status,
           supplier: b.supplier,
-          packing: Number(b.packing) || lean.packing || 1,
+          packing: Number(b.packing) || 1,
           stripCount: Number(b.stripCount) || 0,
           createdAt: b.createdAt,
           expired,
@@ -937,16 +972,15 @@ export class ItemsService {
 
     this.recalculateItemStockFromBatches(item);
 
-    const saleRate = this.resolveSaleRate(batch, item.unitPrice);
+    const unitPrice = this.resolveUnitPrice(batch, this.resolveItemUnitPrice(item));
     item.soldQuantity = (item.soldQuantity || 0) + quantity;
     item.soldHistory.push({
       date: new Date(),
       quantity,
-      unitPrice: saleRate,
-      total: saleRate * quantity,
+      unitPrice,
+      total: unitPrice * quantity,
     });
 
-    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -960,7 +994,6 @@ export class ItemsService {
 
     if (newQuantity !== item.quantity) {
       item.quantity = newQuantity;
-      this.ensureValidPacking(item);
       await item.save();
     }
 
@@ -999,8 +1032,8 @@ export class ItemsService {
 
     const normalized = this.normalizeBatchInput({
       ...batchData,
+      unitPrice: batchData.unitPrice ?? batchData.saleRate ?? unitPrice,
       saleRate: batchData.saleRate ?? batchData.unitPrice ?? unitPrice,
-      unitPrice: batchData.unitPrice ?? unitPrice,
       mrp: batchData.mrp ?? mrp,
     });
 
@@ -1020,7 +1053,11 @@ export class ItemsService {
       existing.mrp = normalized.mrp;
       existing.purchaseRate = normalized.purchaseRate;
       existing.purchasePrice = normalized.purchaseRate;
-      existing.saleRate = normalized.saleRate;
+      existing.unitPrice = normalized.unitPrice;
+      // Clear legacy saleRate on write so unitPrice is canonical
+      if (existing.saleRate != null) {
+        existing.saleRate = undefined;
+      }
       existing.supplier = normalized.supplier || existing.supplier;
       if (normalized.packing != null) existing.packing = normalized.packing;
       if (normalized.stripCount != null) {
@@ -1038,7 +1075,6 @@ export class ItemsService {
 
     item.markModified('batches');
     this.recalculateItemStockFromBatches(item);
-    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -1050,8 +1086,8 @@ export class ItemsService {
       expiryDate: dto.expiryDate,
       purchaseRate: dto.purchaseRate,
       purchasePrice: dto.purchasePrice,
+      unitPrice: dto.unitPrice ?? dto.saleRate,
       saleRate: dto.saleRate,
-      unitPrice: dto.unitPrice,
       mrp: dto.mrp,
       startingQuantity: dto.startingQuantity,
       supplier: dto.supplier,
@@ -1089,8 +1125,10 @@ export class ItemsService {
       batch.purchaseRate = Number(rate);
       batch.purchasePrice = Number(rate);
     }
-    if (dto.saleRate != null || dto.unitPrice != null) {
-      batch.saleRate = Number(dto.saleRate ?? dto.unitPrice ?? 0);
+    if (dto.unitPrice != null || dto.saleRate != null) {
+      batch.unitPrice = Number(dto.unitPrice ?? dto.saleRate ?? 0);
+      // Prefer unitPrice — clear legacy saleRate on write
+      batch.saleRate = undefined;
     }
     if (dto.quantity != null) batch.quantity = Number(dto.quantity);
     if (dto.startingQuantity != null) {
@@ -1106,11 +1144,14 @@ export class ItemsService {
     if (batch.purchaseRate == null) {
       batch.purchaseRate = this.resolvePurchaseRate(batch);
     }
-    if (batch.saleRate == null) {
-      batch.saleRate = this.resolveSaleRate(batch, item.unitPrice);
+    if (batch.unitPrice == null) {
+      batch.unitPrice = this.resolveUnitPrice(
+        batch,
+        this.resolveItemUnitPrice(item),
+      );
     }
     if (batch.mrp == null) {
-      batch.mrp = this.resolveBatchMrp(batch, item.mrp);
+      batch.mrp = this.resolveBatchMrp(batch, 0);
     }
     if (batch.startingQuantity == null) {
       batch.startingQuantity = Number(batch.quantity) || 0;
@@ -1119,7 +1160,6 @@ export class ItemsService {
 
     item.markModified('batches');
     this.recalculateItemStockFromBatches(item);
-    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
@@ -1159,40 +1199,48 @@ export class ItemsService {
       this.recalculateItemStockFromBatches(item);
     }
 
-    this.ensureValidPacking(item);
     await item.save();
     return item;
   }
 
   async getSuppliers() {
-    const data = await this.itemModel.distinct('supplier').lean();
-    return data.filter((supplier) => supplier !== '' && supplier !== '-');
+    const rows = await this.itemModel.aggregate([
+      { $unwind: { path: '$batches', preserveNullAndEmptyArrays: false } },
+      { $group: { _id: '$batches.supplier' } },
+      { $match: { _id: { $nin: [null, '', '-'] } } },
+      { $sort: { _id: 1 } },
+    ]);
+    return rows.map((r) => r._id);
   }
 
   async addMRP() {
-    const cursor = this.itemModel
-      .find({ mrp: { $exists: false } })
-      .cursor();
+    const cursor = this.itemModel.find({}).cursor();
 
     for await (const item of cursor) {
-      const newMrp = item.unitPrice;
-      const newUnitPrice = item.unitPrice / (item.packing || 1);
-
-      await this.itemModel.updateOne(
-        { _id: item._id },
-        {
-          $set: {
-            mrp: newMrp,
-            unitPrice: newUnitPrice,
-          },
-        },
-      );
-
-      console.log(
-        `Drug: ${item.name} | MRP: ${newMrp} | Packing: ${item.packing} | UnitPrice: ${newUnitPrice.toFixed(2)}`,
-      );
-
-      await this.delay(20);
+      let changed = false;
+      for (const batch of item.batches || []) {
+        const b: any = batch;
+        if (b.mrp == null || b.mrp === undefined) {
+          const rate = this.resolveUnitPrice(b, 0);
+          b.mrp = rate;
+          changed = true;
+        }
+        // Migrate legacy saleRate → unitPrice on batch
+        if (
+          (b.unitPrice == null || b.unitPrice === 0) &&
+          Number(b.saleRate) > 0
+        ) {
+          b.unitPrice = Number(b.saleRate);
+          changed = true;
+        }
+      }
+      if (changed) {
+        item.markModified('batches');
+        this.recalculateItemStockFromBatches(item);
+        await item.save();
+        console.log(`Migrated rates for: ${item.name}`);
+        await this.delay(20);
+      }
     }
 
     console.log('✅ Completed updating all items');

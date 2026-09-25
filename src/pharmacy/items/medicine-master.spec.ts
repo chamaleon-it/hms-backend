@@ -4,20 +4,16 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
 describe('Medicine master vs batch DTO', () => {
-  it('accepts master create without batchNumber or expiryDate', async () => {
+  it('accepts master create without pricing or batch fields', async () => {
     const dto = plainToInstance(AddItemDto, {
       name: 'Amoxicillin',
       category: 'Medicine',
-      unitPrice: 10,
-      mrp: 12,
-      purchasePrice: 8,
-      openingStockQuantity: 0,
     });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
 
-  it('accepts optional batch fields for opening stock path', async () => {
+  it('accepts optional opening-batch fields', async () => {
     const dto = plainToInstance(AddItemDto, {
       name: 'Amoxicillin',
       category: 'Medicine',

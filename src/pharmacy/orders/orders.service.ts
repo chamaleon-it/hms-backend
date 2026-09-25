@@ -122,7 +122,7 @@ export class OrdersService {
             `Insufficient batch stock for ${batchInfo.name} (${batch.batchNumber}). Available: ${batch.stock}`,
           );
         }
-        // Freeze snapshot fields on the order line (prefer batch saleRate)
+        // Freeze snapshot fields on the order line (prefer batch unitPrice)
         item.batchNumber = item.batchNumber || batch.batchNumber;
         item.batchExpiryDate = item.batchExpiryDate || batch.expiryDate;
         item.batchMrp = item.batchMrp ?? batch.mrp;
@@ -132,6 +132,7 @@ export class OrdersService {
           batch.purchasePrice;
         item.batchSellingPrice =
           item.batchSellingPrice ??
+          batch.unitPrice ??
           batch.saleRate ??
           batch.sellingPrice;
         item.batchGst = item.batchGst ?? batch.gst;
@@ -148,10 +149,11 @@ export class OrdersService {
     if (autoGenerateBill) {
       const items = await Promise.all(
         order.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
+          const itemData = (await this.itemsService.getItem(item.name)) as any;
 
           const unitPrice =
-            item.batchSellingPrice ?? itemData.unitPrice;
+            item.batchSellingPrice ??
+            this.itemsService.resolveItemUnitPrice(itemData);
           const quantity = item.quantity;
 
           return {
@@ -731,9 +733,9 @@ export class OrdersService {
     if (true) {
       const items = await Promise.all(
         data.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
+          const itemData = (await this.itemsService.getItem(item.name)) as any;
 
-          const unitPrice = itemData.unitPrice;
+          const unitPrice = this.itemsService.resolveItemUnitPrice(itemData);
           const quantity = item.quantity;
 
           return {

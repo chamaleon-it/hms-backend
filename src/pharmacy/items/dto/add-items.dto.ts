@@ -16,6 +16,11 @@ import { ItemStatus } from '../schemas/item.schema';
 const trim = ({ value }: { value: string }) =>
   typeof value === 'string' ? value.trim() : value;
 
+/**
+ * Item master create/update DTO.
+ * Pricing / supplier / packing belong on batches — not accepted as Item fields.
+ * Optional opening-batch keys (batchNumber, expiryDate, qty) create the first batch.
+ */
 export class AddItemDto {
   @IsString({ message: 'Name must be a string.' })
   @MinLength(2, { message: 'Name must be at least 2 characters.' })
@@ -30,12 +35,11 @@ export class AddItemDto {
   @Transform(trim)
   generic?: string;
 
-  // India GST HSN code is typically 4–8 digits
   @IsOptional()
-  // @Matches(/^\d{4,8}$/, { message: 'HSN code must be 4–8 digits.' })
   @Transform(trim)
   hsnCode?: string;
 
+  /** Optional; auto-generated when omitted. Not user-facing on master forms. */
   @IsOptional()
   @IsString({ message: 'SKU must be a string.' })
   @MaxLength(64, { message: 'SKU must be at most 64 characters.' })
@@ -50,67 +54,21 @@ export class AddItemDto {
   category!: string;
 
   @IsOptional()
-  @IsString({ message: 'Supplier must be a string.' })
-  @Transform(trim)
-  supplier?: string;
-
-  @IsOptional()
-  @IsString({ message: 'Supplier must be a string.' })
+  @IsString({ message: 'Manufacturer must be a string.' })
   @Transform(trim)
   manufacturer?: string;
 
-  /** Denormalized; prefer initial batch saleRate. Optional for batch-first create. */
+  /** Opening batch qty when batchNumber is supplied (not stored as Item.openingStockQuantity). */
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'Unit price must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'Unit price cannot be negative.' })
-  unitPrice?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'MRP must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'MRP cannot be negative.' })
-  mrp?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'Unit price must be a number (max 2 decimals).' },
-  )
-  @Min(0, { message: 'Purchase price cannot be negative.' })
-  purchasePrice?: number;
-
-  /** Batch-level sale rate when creating with an opening batch. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  saleRate?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  purchaseRate?: number;
-
   @Type(() => Number)
   @IsInt({ message: 'Opening stock must be an integer.' })
   @Min(0, { message: 'Opening stock cannot be negative.' })
-  @IsOptional()
   openingStockQuantity?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Quantity must be an integer.' })
   @Min(0, { message: 'Quantity cannot be negative.' })
-  @IsOptional()
   quantity?: number;
 
   @IsOptional()
@@ -125,18 +83,58 @@ export class AddItemDto {
   @Transform(trim)
   batchNumber?: string;
 
+  /** Opening-batch rates (written to the batch only, not Item). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  mrp?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  purchaseRate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  purchasePrice?: number;
+
+  @IsOptional()
+  @IsString({ message: 'Supplier must be a string.' })
+  @Transform(trim)
+  supplier?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  packing?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  stripCount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  gst?: number;
+
   @IsOptional()
   @IsString({ message: 'Rack location must be a string.' })
   @Transform(trim)
   rackLocation?: string;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Packing must be a number.' })
-  @Min(1, { message: 'Packing must be at least 1.' })
-  packing?: number;
-
-  @IsOptional()
-  noOfpacking?: number;
 
   @IsOptional()
   @IsEnum(ItemStatus, {
