@@ -41,16 +41,15 @@ export class ItemsService {
   }
 
   /**
-   * Pack/strip purchase rate → stock purchase value.
-   * Prefer stripCount; else qty/packing; else qty.
+   * Pack/strip purchase rate → stock purchase value on current qty:
+   * (purchaseRate / packing) × quantity when packing > 0, else rate × qty.
+   * Must use current quantity so value falls as stock is sold (like selling value).
    */
   resolveBatchPurchaseValue(batch: any): number {
     const rate = this.resolvePurchaseRate(batch);
     const qty = Number(batch?.quantity) || 0;
     const packing = Number(batch?.packing) || 0;
-    const strips = Number(batch?.stripCount) || 0;
-    if (strips > 0) return rate * strips;
-    if (packing > 0 && qty > 0) return rate * (qty / packing);
+    if (packing > 0) return (rate / packing) * qty;
     return rate * qty;
   }
 
@@ -246,8 +245,8 @@ export class ItemsService {
 
   /**
    * Purchase rate is pack/strip-level (purchase entry: gross = strips × rate).
-   * Value = purchaseRate × stripCount, or purchaseRate × (qty/packing), else × qty.
-   * Example: P.Rate 110, pack 10, qty 100 / strips 10 → ₹1,100 (not 110×100).
+   * Value = (purchaseRate / packing) × current quantity so it tracks stock like selling value.
+   * Example: P.Rate 110, pack 10, qty 100 → (110/10)×100 = ₹1,100.
    */
   private batchPurchaseValueExpr() {
     return {
@@ -267,29 +266,17 @@ export class ItemsService {
                 rate: { $ifNull: ['$$ab.purchaseRate', 0] },
                 qty: { $ifNull: ['$$ab.quantity', 0] },
                 packing: { $ifNull: ['$$ab.packing', 0] },
-                strips: { $ifNull: ['$$ab.stripCount', 0] },
               },
               in: {
-                $multiply: [
-                  '$$rate',
+                $cond: [
+                  { $gt: ['$$packing', 0] },
                   {
-                    $cond: [
-                      { $gt: ['$$strips', 0] },
-                      '$$strips',
-                      {
-                        $cond: [
-                          {
-                            $and: [
-                              { $gt: ['$$packing', 0] },
-                              { $gt: ['$$qty', 0] },
-                            ],
-                          },
-                          { $divide: ['$$qty', '$$packing'] },
-                          '$$qty',
-                        ],
-                      },
+                    $multiply: [
+                      { $divide: ['$$rate', '$$packing'] },
+                      '$$qty',
                     ],
                   },
+                  { $multiply: ['$$rate', '$$qty'] },
                 ],
               },
             },

@@ -144,7 +144,7 @@ describe('ItemsService batch helpers', () => {
     expect(service.resolveUnitPrice({})).toBe(0);
   });
 
-  it('purchase stock value uses strip/pack rate not unit qty (110×10=1100)', () => {
+  it('purchase stock value = (purchaseRate/pack)×current qty; tracks stock like selling', () => {
     const batch = {
       purchaseRate: 110,
       packing: 10,
@@ -155,14 +155,19 @@ describe('ItemsService batch helpers', () => {
     };
     expect(service.resolveBatchPurchaseValue(batch)).toBe(1100);
     expect(service.resolveUnitPrice(batch) * batch.quantity).toBe(1200);
-    // stripCount missing → qty/packing
+    // After selling 40 units, both values shrink with remaining qty
+    const afterSale = { ...batch, quantity: 60 };
+    expect(service.resolveBatchPurchaseValue(afterSale)).toBe(660);
+    expect(service.resolveUnitPrice(afterSale) * afterSale.quantity).toBe(720);
+    // stripCount must NOT freeze purchase value after sales
     expect(
       service.resolveBatchPurchaseValue({
         purchaseRate: 110,
         packing: 10,
-        quantity: 100,
+        stripCount: 10,
+        quantity: 50,
       }),
-    ).toBe(1100);
+    ).toBe(550);
   });
 
   it('enrichItem adds computed display fields from latest active batch', () => {
