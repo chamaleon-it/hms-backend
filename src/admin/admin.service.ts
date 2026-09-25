@@ -20,6 +20,7 @@ import {
 import {
   PurchaseEntry,
 } from '../suppliers/purchase_entry/schemas/purchase-entry.schema';
+import { CreateDoctorDto, UpdateDoctorDto } from './dto/doctor.dto';
 
 @Injectable()
 export class AdminService {
@@ -209,7 +210,7 @@ export class AdminService {
     return doctor;
   }
 
-  async createDoctor(body: any) {
+  async createDoctor(body: CreateDoctorDto) {
     const existing = await this.userModel.findOne({
       email: body.email.toLowerCase().trim(),
     });
@@ -246,8 +247,8 @@ export class AdminService {
     return result;
   }
 
-  async updateDoctor(id: string, body: any) {
-    const updateData: any = {
+  async updateDoctor(id: string, body: UpdateDoctorDto) {
+    const updateData: Record<string, unknown> = {
       ...(body.name && { name: body.name }),
       ...(body.phoneNumber !== undefined && { phoneNumber: body.phoneNumber }),
       ...(body.address !== undefined && { address: body.address }),

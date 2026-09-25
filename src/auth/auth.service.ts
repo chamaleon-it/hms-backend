@@ -13,6 +13,10 @@ import configuration from 'src/config/configuration';
 import { GetRefreshTokenDto } from './dto/get-refresh-token.dto';
 import { sanitizeUser } from './sanitize-user';
 
+/** Uniform message — do not reveal whether email exists. */
+const INVALID_CREDENTIALS =
+  'Invalid email or password. Please try again.';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -25,20 +29,9 @@ export class AuthService {
       .findOne({ email: loginDto.email })
       .select('+password');
     if (!user) {
-      throw new BadRequestException(
-        'No user record found. Kindly register to proceed.',
-      );
+      throw new BadRequestException(INVALID_CREDENTIALS);
     }
-    // if ((user.status as UserStatus) === UserStatus.PENDING) {
-    //   throw new BadRequestException(
-    //     'Your profile is under review. The verification process usually takes up to 24 hours.',
-    //   );
-    // } else if ((user.status as UserStatus) === UserStatus.INACTIVE) {
-    //   throw new BadRequestException(
-    //     'This profile is inactive. Please contact the administrator for further assistance.',
-    //   );
-    // } else 
-      if ((user.status as UserStatus) === UserStatus.BLOCKED) {
+    if ((user.status as UserStatus) === UserStatus.BLOCKED) {
       throw new BadRequestException(
         'This profile is blocked. Please contact the administrator for further assistance.',
       );
@@ -48,7 +41,7 @@ export class AuthService {
       user.password,
     );
     if (!isPasswordMatched) {
-      throw new BadRequestException('Incorrect password. Please try again.');
+      throw new BadRequestException(INVALID_CREDENTIALS);
     }
 
     const accessToken = await this.jwtService.signAsync(
@@ -89,14 +82,12 @@ export class AuthService {
       const { id } = decoded;
       const user = await this.userModel.findById(id).select('+refreshToken');
       if (!user) {
-        throw new BadRequestException('User not found');
+        throw new UnauthorizedException('Refresh token is missing or expired.');
       }
 
-      // const isRefreshTokenMatching =
-      //   user?.refreshToken === getRefreshTokenDto.refreshToken;
-
-      // if (!isRefreshTokenMatching)
-      //   throw new UnauthorizedException('Refresh token is not matching.');
+      if (user.refreshToken !== getRefreshTokenDto.refreshToken) {
+        throw new UnauthorizedException('Refresh token is not matching.');
+      }
 
       const accessToken = await this.jwtService.signAsync(
         { id: user._id, email: user.email, role: user.role },

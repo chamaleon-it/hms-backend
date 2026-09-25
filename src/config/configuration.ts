@@ -46,4 +46,12 @@ export default () => ({
   in_doctor_id: (process.env.IN_DOCTOR_ID || '').trim(),
   /** Shared secret for LIS machine ingest (`POST /lab/report/lis-result`). */
   lisApiKey: (process.env.LIS_API_KEY || '').trim(),
+  /**
+   * Comma-separated CORS origins. Empty = reflect request Origin (dev).
+   * Production should set e.g. https://synapsehms.com,https://www.synapsehms.com
+   */
+  corsOrigins: (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
 });

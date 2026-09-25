@@ -102,10 +102,12 @@ export class AppointmentsController {
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateStatus(
       id,
       updateStatusDto,
+      user,
     );
     return {
       data,
@@ -160,10 +162,12 @@ export class AppointmentsController {
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
     @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateAppointment(
       createAppointmentDto,
       id,
+      user,
     );
     return {
       data,
@@ -173,8 +177,11 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async deleteAppointment(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.appointmentsService.deleteAppointment(id);
+  async deleteAppointment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.appointmentsService.deleteAppointment(id, user);
     return {
       data,
       message: 'Appointment deleted successfully.',
@@ -183,8 +190,11 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('recover/:id')
-  async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.appointmentsService.recoverAppointment(id);
+  async recoverAppointment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.appointmentsService.recoverAppointment(id, user);
     return {
       data,
       message: 'Appointment recovered successfully.',

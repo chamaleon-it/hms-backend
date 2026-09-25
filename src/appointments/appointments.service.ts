@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import {
   COUNTER_KEYS,
   CountersService,
 } from 'src/counters/counters.service';
+import { UserRole } from 'src/users/schemas/user.schema';
+import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 
 @Injectable()
 export class AppointmentsService {
@@ -243,12 +246,33 @@ export class AppointmentsService {
     return data;
   }
 
+  /** Doctors may only mutate their own appointments; staff roles may manage all. */
+  private assertDoctorOwnsAppointment(
+    user: JWTUserInterface | undefined,
+    appointment: { doctor?: mongoose.Types.ObjectId | string | null },
+  ) {
+    if (!user || user.role !== UserRole.DOCTOR) return;
+    const doctorId = appointment?.doctor?.toString?.() ?? String(appointment?.doctor ?? '');
+    if (!doctorId || doctorId !== String(user.id)) {
+      throw new ForbiddenException(
+        'You can only modify appointments assigned to you.',
+      );
+    }
+  }
+
   async updateStatus(
     id: mongoose.Types.ObjectId,
     updateStatusDto: UpdateStatusDto,
+    user?: JWTUserInterface,
   ) {
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('id not valid');
+
+    const existing = await this.appointmentModel.findById(id).lean();
+    if (!existing) {
+      throw new NotFoundException('Appointment not found');
+    }
+    this.assertDoctorOwnsAppointment(user, existing);
 
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
@@ -389,7 +413,14 @@ export class AppointmentsService {
   async updateAppointment(
     createAppointmentDto: CreateAppointmentDto,
     id: mongoose.Types.ObjectId,
+    user?: JWTUserInterface,
   ) {
+    const existing = await this.appointmentModel.findById(id).lean();
+    if (!existing) {
+      throw new BadRequestException('No appointment found');
+    }
+    this.assertDoctorOwnsAppointment(user, existing);
+
     // Appointment mrn is allocated once at create — never overwrite from client.
     const { mrn: _ignored, ...rest } = createAppointmentDto as CreateAppointmentDto & {
       mrn?: number;
@@ -403,7 +434,13 @@ export class AppointmentsService {
     return data;
   }
 
-  async deleteAppointment(id: mongoose.Types.ObjectId) {
+  async deleteAppointment(id: mongoose.Types.ObjectId, user?: JWTUserInterface) {
+    const existing = await this.appointmentModel.findById(id).lean();
+    if (!existing) {
+      throw new BadRequestException('No appointment found');
+    }
+    this.assertDoctorOwnsAppointment(user, existing);
+
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { isDeleted: true },
@@ -415,7 +452,13 @@ export class AppointmentsService {
     return data;
   }
 
-  async recoverAppointment(id: mongoose.Types.ObjectId) {
+  async recoverAppointment(id: mongoose.Types.ObjectId, user?: JWTUserInterface) {
+    const existing = await this.appointmentModel.findById(id).lean();
+    if (!existing) {
+      throw new BadRequestException('No appointment found');
+    }
+    this.assertDoctorOwnsAppointment(user, existing);
+
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       { isDeleted: false },

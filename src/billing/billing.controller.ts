@@ -23,13 +23,23 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('billing')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(
+  UserRole.PHARMACY,
+  UserRole.LAB,
+  UserRole.DOCTOR,
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+)
 export class BillingController {
   constructor(private readonly billingService: BillingService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   async generateBill(
     @Body() createBill: CreateBillingDto,
     @GetUser() user: JWTUserInterface,
@@ -44,7 +54,6 @@ export class BillingController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
   async getBills(
     @GetUser() user: JWTUserInterface,
     @Query() getBillisDto: GetBillisDto,
@@ -63,7 +72,6 @@ export class BillingController {
   }
 
   @Get('drop-down')
-  @UseGuards(JwtAuthGuard)
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
     const data = await this.billingService.getBillDropDown(getBillDropDownDto);
     return {
@@ -73,7 +81,6 @@ export class BillingController {
   }
 
   @Get('single')
-  @UseGuards(JwtAuthGuard)
   async getSingleCustomerBill(@Query('q') q: string) {
     const data = await this.billingService.getSingleCustomerBill(q);
     return {
@@ -82,7 +89,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('billing_item')
   async addBillingItem(
     @Body() addBillingItemDto: AddBillingItemDto,
@@ -98,7 +104,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('billing_items')
   async getBillingItems(
     @Query() getBillingItemDto: GetBillingItemDto,
@@ -114,7 +119,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch('billing_item/:id')
   async updateBillingItem(
     @Param('id') id: mongoose.Types.ObjectId,
@@ -132,7 +136,6 @@ export class BillingController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete('billing_item')
   async deleteBillingItem(
     @Query('item') item: string,
@@ -146,7 +149,6 @@ export class BillingController {
   }
 
   @Get('report/:reportId')
-  @UseGuards(JwtAuthGuard)
   async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId) {
     const data = await this.billingService.getBillByReportId(reportId);
     return {
@@ -156,7 +158,6 @@ export class BillingController {
   }
 
   @Get('reconsult_eligibility')
-  @UseGuards(JwtAuthGuard)
   async getReconsultEligibility(
     @Query('patientId') patientId: string,
     @Query('doctorId') doctorId: string | undefined,
@@ -174,7 +175,6 @@ export class BillingController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   async getBill(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.billingService.getBill(id);
     return {
@@ -184,7 +184,6 @@ export class BillingController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
   async updateBill(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateBillDto: UpdateBillingDto,
@@ -197,7 +196,6 @@ export class BillingController {
   }
 
   @Patch('add_payment/:id')
-  @UseGuards(JwtAuthGuard)
   async addPayment(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() addPaymentDto: AddPaymentDto,
@@ -215,7 +213,6 @@ export class BillingController {
   }
 
   @Patch('mark_as_paid/:id')
-  @UseGuards(JwtAuthGuard)
   async markAsPaid(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() markAsPaidDto: MarkAsPaidDto,

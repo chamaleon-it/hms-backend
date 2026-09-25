@@ -14,6 +14,11 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
+import {
+  CreateDoctorDto,
+  UpdateDoctorAvailabilityBodyDto,
+  UpdateDoctorDto,
+} from './dto/doctor.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -62,7 +67,7 @@ export class AdminController {
   }
 
   @Post('doctors')
-  async createDoctor(@Body() body: any) {
+  async createDoctor(@Body() body: CreateDoctorDto) {
     const data = await this.adminService.createDoctor(body);
     return {
       data,
@@ -71,7 +76,7 @@ export class AdminController {
   }
 
   @Patch('doctors/:id')
-  async updateDoctor(@Param('id') id: string, @Body() body: any) {
+  async updateDoctor(@Param('id') id: string, @Body() body: UpdateDoctorDto) {
     const data = await this.adminService.updateDoctor(id, body);
     return {
       data,
@@ -91,11 +96,11 @@ export class AdminController {
   @Patch('doctors/:id/availability')
   async updateDoctorAvailability(
     @Param('id') id: string,
-    @Body() body: { availability: any },
+    @Body() body: UpdateDoctorAvailabilityBodyDto,
   ) {
     const data = await this.adminService.updateDoctorAvailability(
       id,
-      body?.availability ?? body,
+      body?.availability ?? null,
     );
     return {
       data,

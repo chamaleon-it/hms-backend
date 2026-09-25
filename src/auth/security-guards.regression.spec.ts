@@ -127,6 +127,13 @@ describe('Production security guards regression (C2–C7, H3, H6, step 13)', () 
     );
   });
 
+  it('billing controller requires JWT + RolesGuard on class', () => {
+    const { BillingController } = require('../billing/billing.controller');
+    expect(guardsOf(BillingController)).toEqual(
+      expect.arrayContaining([JwtAuthGuard, RolesGuard]),
+    );
+  });
+
   it('HIGH-2: panel add/remove/groups require JWT', () => {
     expect(guardsOf(PanelsController.prototype, 'addTestToPanel')).toEqual(
       expect.arrayContaining([JwtAuthGuard]),
