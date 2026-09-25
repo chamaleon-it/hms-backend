@@ -136,34 +136,28 @@ export class BillingService {
           (createBill.cash ?? 0) +
           (createBill.online ?? 0) +
           (createBill.discount ?? 0);
-        order.paidAmount =
-          paidAmount >=
-            order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            ? order.items.reduce(
-              (total, item) => total + item.quantity * item.name.unitPrice,
-              0,
-            )
-            : paidAmount;
+        // Prefer bill line totals; fall back to order batch snapshot (Item has no unitPrice)
+        const orderTotal =
+          (createBill.items ?? []).reduce(
+            (total, item) =>
+              total +
+              (Number(item.total) ||
+                (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)),
+            0,
+          ) ||
+          (order.items ?? []).reduce((total, item) => {
+            const unit =
+              item.batchSellingPrice ??
+              item.name?.unitPrice ??
+              0;
+            return total + (Number(item.quantity) || 0) * (Number(unit) || 0);
+          }, 0);
+        order.paidAmount = paidAmount >= orderTotal ? orderTotal : paidAmount;
         if (paidAmount === 0) {
           order.paymentStatus = PaymentStatus.Pending;
-        } else if (
-          paidAmount <
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else if (paidAmount < orderTotal) {
           order.paymentStatus = PaymentStatus.Partial;
-        } else if (
-          paidAmount >=
-          order.items.reduce(
-            (total, item) => total + item.quantity * item.name.unitPrice,
-            0,
-          )
-        ) {
+        } else {
           order.paymentStatus = PaymentStatus.Paid;
         }
         await order.save();

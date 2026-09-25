@@ -272,6 +272,14 @@ export class OrdersService {
       throw new NotFoundException('Order not found.');
     }
 
+    // Item master no longer stores unitPrice/qty — attach batch-derived display fields
+    if (Array.isArray(data.items)) {
+      data.items = data.items.map((line: any) => ({
+        ...line,
+        name: line?.name ? this.itemsService.enrichItem(line.name) : line?.name,
+      }));
+    }
+
     return data;
   }
 
