@@ -70,6 +70,46 @@ export class UpdateOrderItemDto {
   @IsBoolean()
   @IsOptional()
   isPacked?: boolean;
+
+  /** Selected inventory batch subdocument id */
+  @IsOptional()
+  @IsString()
+  batchId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  batchNumber?: string | null;
+
+  @IsOptional()
+  batchExpiryDate?: Date | string | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchMrp?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchPurchasePrice?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchSellingPrice?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchGst?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchStock?: number | null;
+
+  @IsOptional()
+  @IsString()
+  batchSupplier?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  batchPacking?: number | null;
 }
 
 export class UpdateOrderDto {
