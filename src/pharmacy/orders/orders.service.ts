@@ -311,12 +311,22 @@ export class OrdersService {
     const qty =
       order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
     const line = order.items.find((e) => String(e.name) === String(item));
+    const resolved = await this.itemsService.resolveBatchForSale(
+      item,
+      (line as any)?.batchId || null,
+      (line as any)?.batchNumber || null,
+    );
+    if (resolved && line) {
+      (line as any).batchId = resolved.batchId;
+      (line as any).batchNumber = resolved.batchNumber;
+      await order.save();
+    }
     await this.itemsService.decreaseItem(
       item,
       qty,
       user,
-      (line as any)?.batchId || null,
-      (line as any)?.batchNumber || null,
+      resolved?.batchId || (line as any)?.batchId || null,
+      resolved?.batchNumber || (line as any)?.batchNumber || null,
     );
   }
 
@@ -335,15 +345,20 @@ export class OrdersService {
 
     if (unpacked.length > 0) {
       await Promise.all(
-        unpacked.map((it) =>
-          this.itemsService.decreaseItem(
+        unpacked.map(async (it) => {
+          const resolved = await this.itemsService.resolveBatchForSale(
+            it.name,
+            (it as any).batchId || null,
+            (it as any).batchNumber || null,
+          );
+          return this.itemsService.decreaseItem(
             it.name,
             it.quantity,
             user,
-            (it as any).batchId || null,
-            (it as any).batchNumber || null,
-          ),
-        ),
+            resolved?.batchId || (it as any).batchId || null,
+            resolved?.batchNumber || (it as any).batchNumber || null,
+          );
+        }),
       );
     }
 
@@ -747,12 +762,40 @@ export class OrdersService {
       const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
       if (unpacked.length > 0) {
         for (const it of unpacked) {
-          await this.itemsService.decreaseItem(
-            it.name,
-            it.quantity,
-            userId,
+          const itemId = it.name as any;
+          const resolved = await this.itemsService.resolveBatchForSale(
+            itemId,
             (it as any).batchId || null,
             (it as any).batchNumber || null,
+          );
+          if (!resolved) {
+            // No sellable batch and no match — still try FEFO decrease (no batch id)
+            // only when the line had no batch selection at all.
+            if (!(it as any).batchId && !(it as any).batchNumber) {
+              await this.itemsService.decreaseItem(
+                itemId,
+                it.quantity,
+                userId,
+                null,
+                null,
+              );
+              continue;
+            }
+            throw new BadRequestException(
+              `Selected batch not found for item on order ${order.mrn}`,
+            );
+          }
+
+          // Persist stable refs on the order line so receipts/history stay correct
+          (it as any).batchId = resolved.batchId;
+          (it as any).batchNumber = resolved.batchNumber;
+
+          await this.itemsService.decreaseItem(
+            itemId,
+            it.quantity,
+            userId,
+            resolved.batchId,
+            resolved.batchNumber,
           );
         }
       }
@@ -761,6 +804,7 @@ export class OrdersService {
         ...item,
         isPacked: true,
       })) as any;
+      order.markModified('items');
       order.status = OrderStatus.Completed;
       await order.save();
     }

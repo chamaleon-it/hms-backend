@@ -262,7 +262,23 @@ describe('ItemsService batch helpers', () => {
       recalculateItemStockFromBatches:
         service.recalculateItemStockFromBatches.bind(service),
       findBatchIndex: service.findBatchIndex.bind(service),
+      sortBatches: service.sortBatches.bind(service),
       ensurePersistedBatchIds: jest.fn().mockResolvedValue(false),
+      resolveBatchForSale: async function (
+        this: any,
+        _itemId: string,
+        batchId?: string | null,
+        batchNumber?: string | null,
+      ) {
+        const idx = this.findBatchIndex(item.batches, batchId, batchNumber);
+        if (idx < 0) return null;
+        const b = item.batches[idx];
+        return {
+          batchId: b._id?.toString?.() || String(b._id),
+          batchNumber: b.batchNumber,
+          index: idx,
+        };
+      },
     });
     svc.itemModel = {
       findById: jest.fn().mockResolvedValue(item),
@@ -304,5 +320,41 @@ describe('ItemsService batch helpers', () => {
     expect(service.findBatchIndex(list, 'stale-oid', 'B0')).toBe(0);
     expect(service.findBatchIndex(list, 'missing', 'new')).toBe(1);
     expect(service.findBatchIndex(list, 'nope', 'nope')).toBe(-1);
+  });
+
+  it('resolveBatchForSale falls back to B0 when batchId is stale', async () => {
+    const item: any = {
+      batches: [
+        {
+          _id: { toString: () => 'new-oid' },
+          batchNumber: 'B0',
+          quantity: 10,
+          expiryDate: new Date('2030-01-01'),
+          status: BatchStatus.Active,
+        },
+      ],
+    };
+    const svc: any = Object.create(ItemsService.prototype);
+    Object.assign(svc, {
+      findBatchIndex: service.findBatchIndex.bind(service),
+      isBatchActive: service.isBatchActive.bind(service),
+      resolveBatchStatus: service.resolveBatchStatus.bind(service),
+      sortBatches: service.sortBatches.bind(service),
+      ensurePersistedBatchIds: jest.fn().mockResolvedValue(false),
+    });
+    svc.itemModel = {
+      findById: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(item) }),
+    };
+
+    const resolved = await svc.resolveBatchForSale(
+      'item1',
+      'stale-ephemeral-id',
+      null,
+    );
+    expect(resolved).toEqual({
+      batchId: 'new-oid',
+      batchNumber: 'B0',
+      index: 0,
+    });
   });
 });
