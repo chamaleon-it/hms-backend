@@ -394,10 +394,35 @@ function summarize(mapped: MappedItem[]): void {
   }
 }
 
+/** Indexes left over from deleted Item fields — block imports when unique. */
+const OBSOLETE_ITEM_INDEXES = ['sku_1'] as const;
+
+async function dropObsoleteIndexes(collectionName: string): Promise<void> {
+  const col = mongoose.connection.collection(collectionName);
+  const existing = await col.indexes();
+  const names = new Set(existing.map((idx) => idx.name).filter(Boolean));
+
+  console.log('\n--- Indexes ---');
+  for (const idx of existing) {
+    console.log(`  ${idx.name}: ${JSON.stringify(idx.key)}`);
+  }
+
+  for (const name of OBSOLETE_ITEM_INDEXES) {
+    if (!names.has(name)) {
+      console.log(`obsolete index ${name}: not present (ok)`);
+      continue;
+    }
+    await col.dropIndex(name);
+    console.log(`dropped obsolete index: ${name}`);
+  }
+}
+
 async function applyUpserts(
   mapped: MappedItem[],
   collectionName: string,
 ): Promise<void> {
+  await dropObsoleteIndexes(collectionName);
+
   const col = mongoose.connection.collection(collectionName);
   let upserted = 0;
   let modified = 0;
@@ -411,6 +436,7 @@ async function applyUpserts(
     };
     if (createdAt) setDoc.createdAt = createdAt;
 
+    // Full replace without sku / flat pricing — matches post-cleanup Item schema.
     const result = await col.replaceOne(
       { _id },
       { _id, ...setDoc },
