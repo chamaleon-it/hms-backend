@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "pack": "pkg dist/main.js --config package.json --out-path ./release"
+    "pack": "pkg dist/main.js --config package.json --out-path ./release",
+    "import:items": "npx tsx scripts/import-item.ts",
+    "import:items:apply": "npx tsx scripts/import-item.ts --apply"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
