@@ -15,6 +15,7 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
+import { Throttle } from '@nestjs/throttler';
 import mongoose from 'mongoose';
 
 @Controller('users')
@@ -22,6 +23,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   //create
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post()
   async createUser(@Body() createUserDto: CreateUserDto) {
     const data = await this.usersService.createUser(createUserDto);
@@ -43,6 +45,7 @@ export class UsersController {
     };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('forgot_password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     const data = await this.usersService.forgotPassword(forgotPasswordDto);

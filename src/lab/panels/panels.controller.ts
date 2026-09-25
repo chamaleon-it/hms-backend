@@ -19,7 +19,7 @@ import { AddTestDto } from './dto/add-test.dto';
 import { CreateGroupDto } from './dto/create-group.dto';
 @Controller('lab/panels')
 export class PanelsController {
-  constructor(private readonly panelsService: PanelsService) { }
+  constructor(private readonly panelsService: PanelsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -107,6 +107,7 @@ export class PanelsController {
   }
 
   @Post('add_test')
+  @UseGuards(JwtAuthGuard)
   async addTestToPanel(@Body() addTestDto: AddTestDto) {
     const data = await this.panelsService.addTestToPanel(addTestDto);
     return {
@@ -116,6 +117,7 @@ export class PanelsController {
   }
 
   @Post('remove_test')
+  @UseGuards(JwtAuthGuard)
   async removeTestFromPanel(@Body() addTestDto: AddTestDto) {
     const data = await this.panelsService.removeTestFromPanel(addTestDto);
     return {
@@ -146,6 +148,7 @@ export class PanelsController {
   }
 
   @Get('groups')
+  @UseGuards(JwtAuthGuard)
   async getGroups() {
     const data = await this.panelsService.getGroups();
     return { message: 'Groups fetched successfully', data };
@@ -153,10 +156,7 @@ export class PanelsController {
 
   @Patch('groups/:name')
   @UseGuards(JwtAuthGuard)
-  async updateGroup(
-    @Param('name') name: string,
-    @Body() dto: CreateGroupDto,
-  ) {
+  async updateGroup(@Param('name') name: string, @Body() dto: CreateGroupDto) {
     const data = await this.panelsService.updateGroup(name, dto);
     return { message: 'Group updated successfully', data };
   }

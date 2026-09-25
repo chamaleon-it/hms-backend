@@ -15,6 +15,7 @@ import {
 } from './dto/batch.dto';
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
+import configuration from 'src/config/configuration';
 
 /** Active-batch filter for aggregation pipelines. */
 const ACTIVE_BATCH_COND = {
@@ -34,6 +35,18 @@ export class ItemsService {
   /** Escape user search input so regex metacharacters cannot break queries. */
   private sanitizeSearchRegex(q: string): string {
     return String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Soft pharmacy scope: when IN_HOUSE_PHARMACY_ID is set, constrain queries.
+   * Unset in local/test → no filter (preserves existing behavior).
+   */
+  private pharmacyScopeFilter(): Record<string, unknown> {
+    const raw = (configuration().in_house_pharmacy_id || '').trim();
+    if (raw && mongoose.isValidObjectId(raw)) {
+      return { pharmacy: new mongoose.Types.ObjectId(raw) };
+    }
+    return {};
   }
 
   resolvePurchaseRate(batch: any): number {
@@ -271,10 +284,7 @@ export class ItemsService {
                 $cond: [
                   { $gt: ['$$packing', 0] },
                   {
-                    $multiply: [
-                      { $divide: ['$$rate', '$$packing'] },
-                      '$$qty',
-                    ],
+                    $multiply: [{ $divide: ['$$rate', '$$packing'] }, '$$qty'],
                   },
                   { $multiply: ['$$rate', '$$qty'] },
                 ],
@@ -377,6 +387,7 @@ export class ItemsService {
 
     const match: Record<string, unknown> = {
       status: { $ne: ItemStatus.Deleted },
+      ...this.pharmacyScopeFilter(),
     };
 
     if (q) {
@@ -462,7 +473,10 @@ export class ItemsService {
 
   async getInventoryStats(lowStockThreshold = 20) {
     const threshold = Number(lowStockThreshold) || 20;
-    const baseFilter = { status: { $ne: ItemStatus.Deleted } };
+    const baseFilter = {
+      status: { $ne: ItemStatus.Deleted },
+      ...this.pharmacyScopeFilter(),
+    };
 
     const [statsResult, highestMoving, lowestMoving] = await Promise.all([
       this.itemModel.aggregate([
@@ -567,7 +581,10 @@ export class ItemsService {
   }
 
   async getInventoryValueBreakdown() {
-    const baseFilter = { status: { $ne: ItemStatus.Deleted } };
+    const baseFilter = {
+      status: { $ne: ItemStatus.Deleted },
+      ...this.pharmacyScopeFilter(),
+    };
 
     const addValues = {
       $addFields: {
@@ -662,7 +679,9 @@ export class ItemsService {
       throw new BadRequestException('Invalid item ID.');
     }
 
-    const data = await this.itemModel.findById(id).lean();
+    const data = await this.itemModel
+      .findOne({ _id: id, ...this.pharmacyScopeFilter() })
+      .lean();
 
     if (!data) {
       throw new NotFoundException('Item not found.');
@@ -693,7 +712,11 @@ export class ItemsService {
     } = addItemDto;
 
     const data = await this.itemModel
-      .findByIdAndUpdate(id, masterPayload, { new: true, runValidators: true })
+      .findOneAndUpdate(
+        { _id: id, ...this.pharmacyScopeFilter() },
+        masterPayload,
+        { new: true, runValidators: true },
+      )
       .lean();
 
     if (!data) {
@@ -709,8 +732,8 @@ export class ItemsService {
     }
 
     const data = await this.itemModel
-      .findByIdAndUpdate(
-        id,
+      .findOneAndUpdate(
+        { _id: id, ...this.pharmacyScopeFilter() },
         { status: ItemStatus.Deleted },
         { new: true, runValidators: true },
       )
@@ -724,7 +747,10 @@ export class ItemsService {
   }
 
   async exportCsv() {
-    const items = await this.itemModel.find().lean().exec();
+    const items = await this.itemModel
+      .find({ ...this.pharmacyScopeFilter() })
+      .lean()
+      .exec();
     const csv = parse(items.map((i) => this.enrichItem(i)));
     const filename = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
     return { csv, filename };
@@ -762,7 +788,7 @@ export class ItemsService {
       const q = Number(batch.quantity) || 0;
       if (q <= 0) continue;
       const take = Math.min(q, remaining);
-      (batch as any).quantity = q - take;
+      batch.quantity = q - take;
       remaining -= take;
     }
 
@@ -896,8 +922,7 @@ export class ItemsService {
           stripCount: Number(b.stripCount) || 0,
           createdAt: b.createdAt,
           expired,
-          available:
-            !expired && status === BatchStatus.Active && stock > 0,
+          available: !expired && status === BatchStatus.Active && stock > 0,
         };
       }),
     };
@@ -932,8 +957,7 @@ export class ItemsService {
 
     const batchIndex = (item.batches || []).findIndex(
       (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
+        b._id?.toString() === batchId.toString() || b.batchNumber === batchId,
     );
     if (batchIndex === -1) {
       throw new BadRequestException('Selected batch not found');
@@ -1189,8 +1213,7 @@ export class ItemsService {
 
     const batchIndex = item.batches.findIndex(
       (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
+        b._id?.toString() === batchId.toString() || b.batchNumber === batchId,
     );
 
     if (batchIndex === -1) {
@@ -1216,9 +1239,5 @@ export class ItemsService {
       { $sort: { _id: 1 } },
     ]);
     return rows.map((r) => r._id);
-  }
-
-  async addMRP() {
-    return { message: 'noop' };
   }
 }

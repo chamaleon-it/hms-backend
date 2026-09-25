@@ -11,10 +11,7 @@ import { GetPatientsDto } from './dto/get-patients.dto';
 import { DeleteBulkPatientDto } from './dto/delete-bulk-patient.dto';
 import { UpdateRemarksDto } from './dto/update-remarks.dto';
 import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists.dto';
-import {
-  COUNTER_KEYS,
-  CountersService,
-} from 'src/counters/counters.service';
+import { COUNTER_KEYS, CountersService } from 'src/counters/counters.service';
 
 @Injectable()
 export class PatientsService {
@@ -26,6 +23,10 @@ export class PatientsService {
     this.countersService.registerBootSeed(COUNTER_KEYS.PATIENT_PID, () =>
       this.maxNumericMrn(),
     );
+  }
+
+  private sanitizeSearchRegex(q: string): string {
+    return String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private async maxNumericMrn(): Promise<number> {
@@ -92,154 +93,153 @@ export class PatientsService {
     return patient;
   }
 
-async getPatient(getPatientsDto: GetPatientsDto) {
-  const {
-    limit = 100,
-    page = 1,
-    query = '',
-    gender,
-    conditions,
-    minAge,
-    maxAge,
-    doctor,
-    status,
-    from,
-    to,
-  } = getPatientsDto;
+  async getPatient(getPatientsDto: GetPatientsDto) {
+    const {
+      limit = 100,
+      page = 1,
+      query = '',
+      gender,
+      conditions,
+      minAge,
+      maxAge,
+      doctor,
+      status,
+      from,
+      to,
+    } = getPatientsDto;
 
-  const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-  const filter: any = {};
+    const filter: any = {};
 
-  if (gender) {
-    filter.gender = gender;
-  }
-
-  const ageFilter: Record<string, Date> = {};
-  const now = new Date();
-
-  if (Number.isFinite(Number(minAge))) {
-    ageFilter.$lte = new Date(
-      now.getFullYear() - Number(minAge),
-      now.getMonth(),
-      now.getDate(),
-    );
-  }
-
-  if (Number.isFinite(Number(maxAge))) {
-    ageFilter.$gte = new Date(
-      now.getFullYear() - Number(maxAge) - 1,
-      now.getMonth(),
-      now.getDate() + 1,
-    );
-  }
-
-  if (Object.keys(ageFilter).length > 0) {
-    filter.dateOfBirth = ageFilter;
-  }
-
-  if (doctor) {
-    filter.doctor = new mongoose.Types.ObjectId(doctor);
-  }
-
-  if (conditions) {
-    const parsedConditions: string[] =
-      typeof conditions === 'string'
-        ? JSON.parse(conditions)
-        : conditions;
-
-    if (parsedConditions.length > 0) {
-      filter.conditions = { $in: parsedConditions };
+    if (gender) {
+      filter.gender = gender;
     }
-  }
 
-  if (from && to) {
-    filter.createdAt = {
-      $gte: new Date(from),
-      $lt: new Date(to),
-    };
-  }
+    const ageFilter: Record<string, Date> = {};
+    const now = new Date();
 
-  filter.status = status || { $ne: PatientStatus.DELETED };
+    if (Number.isFinite(Number(minAge))) {
+      ageFilter.$lte = new Date(
+        now.getFullYear() - Number(minAge),
+        now.getMonth(),
+        now.getDate(),
+      );
+    }
 
-  if (!query?.trim()) {
-    return this.patientModel
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
+    if (Number.isFinite(Number(maxAge))) {
+      ageFilter.$gte = new Date(
+        now.getFullYear() - Number(maxAge) - 1,
+        now.getMonth(),
+        now.getDate() + 1,
+      );
+    }
+
+    if (Object.keys(ageFilter).length > 0) {
+      filter.dateOfBirth = ageFilter;
+    }
+
+    if (doctor) {
+      filter.doctor = new mongoose.Types.ObjectId(doctor);
+    }
+
+    if (conditions) {
+      const parsedConditions: string[] =
+        typeof conditions === 'string' ? JSON.parse(conditions) : conditions;
+
+      if (parsedConditions.length > 0) {
+        filter.conditions = { $in: parsedConditions };
+      }
+    }
+
+    if (from && to) {
+      filter.createdAt = {
+        $gte: new Date(from),
+        $lt: new Date(to),
+      };
+    }
+
+    filter.status = status || { $ne: PatientStatus.DELETED };
+
+    if (!query?.trim()) {
+      return this.patientModel
+        .find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate('doctor')
+        .sort({ createdAt: -1 });
+    }
+
+    const searchTerm = query.trim().toLowerCase();
+    const escapedSearch = this.sanitizeSearchRegex(searchTerm);
+
+    const patients = await this.patientModel
+      .find({
+        ...filter,
+        $or: [
+          { name: { $regex: escapedSearch, $options: 'i' } },
+          { mrn: { $regex: escapedSearch, $options: 'i' } },
+          { phoneNumber: { $regex: escapedSearch, $options: 'i' } },
+          { address: { $regex: escapedSearch, $options: 'i' } },
+        ],
+      })
       .populate('doctor')
-      .sort({ createdAt: -1 });
-  }
+      .lean();
 
-  const searchTerm = query.trim().toLowerCase();
+    const getPriority = (patient: any): number => {
+      const name = (patient.name || '').toLowerCase().trim();
+      const mrn = (patient.mrn || '').toLowerCase();
+      const phone = (patient.phoneNumber || '').toLowerCase();
+      const address = (patient.address || '').toLowerCase();
 
-  const patients = await this.patientModel
-    .find({
-      ...filter,
-      $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { mrn: { $regex: searchTerm, $options: 'i' } },
-        { phoneNumber: { $regex: searchTerm, $options: 'i' } },
-        { address: { $regex: searchTerm, $options: 'i' } },
-      ],
-    })
-    .populate('doctor')
-    .lean();
+      const words = name.split(/\s+/);
 
-  const getPriority = (patient: any): number => {
-    const name = (patient.name || '').toLowerCase().trim();
-    const mrn = (patient.mrn || '').toLowerCase();
-    const phone = (patient.phoneNumber || '').toLowerCase();
-    const address = (patient.address || '').toLowerCase();
-
-    const words = name.split(/\s+/);
-
-    if (name.startsWith(searchTerm)) {
-      return 1;
-    }
-
-    if (words.some((word) => word.startsWith(searchTerm))) {
-      return 2;
-    }
-
-    if (words.some((word) => word.endsWith(searchTerm))) {
-      return 3;
-    }
-
-    if (mrn.includes(searchTerm)) {
-      return 4;
-    }
-
-    if (phone.includes(searchTerm)) {
-      return 5;
-    }
-
-    if (address.includes(searchTerm)) {
-      return 6;
-    }
-
-    return 999;
-  };
-
-  const sortedPatients = patients
-    .map((patient) => ({
-      ...patient,
-      _searchPriority: getPriority(patient),
-    }))
-    .filter((patient) => patient._searchPriority !== 999)
-    .sort((a, b) => {
-      if (a._searchPriority !== b._searchPriority) {
-        return a._searchPriority - b._searchPriority;
+      if (name.startsWith(searchTerm)) {
+        return 1;
       }
 
-      return (a.name || '').localeCompare(b.name || '', undefined, {
-        sensitivity: 'base',
-      });
-    })
-    .map(({ _searchPriority, ...patient }) => patient);
+      if (words.some((word) => word.startsWith(searchTerm))) {
+        return 2;
+      }
 
-  return sortedPatients.slice(skip, skip + Number(limit));
-}
+      if (words.some((word) => word.endsWith(searchTerm))) {
+        return 3;
+      }
+
+      if (mrn.includes(searchTerm)) {
+        return 4;
+      }
+
+      if (phone.includes(searchTerm)) {
+        return 5;
+      }
+
+      if (address.includes(searchTerm)) {
+        return 6;
+      }
+
+      return 999;
+    };
+
+    const sortedPatients = patients
+      .map((patient) => ({
+        ...patient,
+        _searchPriority: getPriority(patient),
+      }))
+      .filter((patient) => patient._searchPriority !== 999)
+      .sort((a, b) => {
+        if (a._searchPriority !== b._searchPriority) {
+          return a._searchPriority - b._searchPriority;
+        }
+
+        return (a.name || '').localeCompare(b.name || '', undefined, {
+          sensitivity: 'base',
+        });
+      })
+      .map(({ _searchPriority, ...patient }) => patient);
+
+    return sortedPatients.slice(skip, skip + Number(limit));
+  }
 
   async getSinglePatient(id: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id)) {
@@ -398,9 +398,12 @@ async getPatient(getPatientsDto: GetPatientsDto) {
     const orConditions: any[] = [];
 
     if (checkPatientAlreadyExistsDto?.name) {
+      const escapedName = this.sanitizeSearchRegex(
+        checkPatientAlreadyExistsDto.name,
+      );
       orConditions.push({
         name: {
-          $regex: `^${checkPatientAlreadyExistsDto.name}$`,
+          $regex: `^${escapedName}$`,
           $options: 'i',
         },
       });

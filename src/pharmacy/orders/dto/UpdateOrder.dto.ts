@@ -23,10 +23,6 @@ export class UpdateOrderItemNameDto {
 
   @IsString()
   @IsOptional()
-  sku?: string;
-
-  @IsString()
-  @IsOptional()
   generic?: string;
 
   @IsNumber()

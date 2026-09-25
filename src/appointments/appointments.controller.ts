@@ -102,10 +102,12 @@ export class AppointmentsController {
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateStatus(
       id,
       updateStatusDto,
+      user,
     );
     return {
       data,
@@ -129,6 +131,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('patient/:id')
   async getPatientAppointment(@Param('id') patient: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getPatientAppointment(patient);
@@ -138,6 +141,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('walk-in/:doctor')
   async getWalkInAppointment(
     @Param('doctor') doctor: mongoose.Types.ObjectId,
@@ -153,14 +157,17 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
     @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateAppointment(
       createAppointmentDto,
       id,
+      user,
     );
     return {
       data,
@@ -168,18 +175,26 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  async deleteAppointment(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.appointmentsService.deleteAppointment(id);
+  async deleteAppointment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.appointmentsService.deleteAppointment(id, user);
     return {
       data,
       message: 'Appointment deleted successfully.',
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('recover/:id')
-  async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.appointmentsService.recoverAppointment(id);
+  async recoverAppointment(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.appointmentsService.recoverAppointment(id, user);
     return {
       data,
       message: 'Appointment recovered successfully.',
