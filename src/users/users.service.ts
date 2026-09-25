@@ -133,19 +133,19 @@ export class UsersService implements OnModuleInit {
     const user = await this.userModel.findOne({
       email: forgotPasswordDto.email,
     });
+    // Opaque response — do not reveal whether the email exists or return the token.
     if (!user) {
-      throw new BadRequestException('Sorry, User not exist.');
+      return { sent: true };
     }
-    const token = await this.jwtService.signAsync(
+    await this.jwtService.signAsync(
       { id: user._id },
       {
         secret: configuration().secret.forgotPassword,
         expiresIn: '7d',
       },
     );
-    console.log(`${forgotPasswordDto.email} is requaest for reset link.`);
-    console.log(`https://hms.com/reset-passsword?token=${token}`);
-    return token;
+    // Token is generated for future email delivery; never log or return it.
+    return { sent: true };
   }
 
   async getAllDoctors() {

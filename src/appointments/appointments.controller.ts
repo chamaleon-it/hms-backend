@@ -129,6 +129,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('patient/:id')
   async getPatientAppointment(@Param('id') patient: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.getPatientAppointment(patient);
@@ -138,6 +139,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('walk-in/:doctor')
   async getWalkInAppointment(
     @Param('doctor') doctor: mongoose.Types.ObjectId,
@@ -153,6 +155,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
@@ -168,6 +171,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async deleteAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.deleteAppointment(id);
@@ -177,6 +181,7 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('recover/:id')
   async recoverAppointment(@Param('id') id: mongoose.Types.ObjectId) {
     const data = await this.appointmentsService.recoverAppointment(id);

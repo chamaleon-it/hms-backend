@@ -7,7 +7,16 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
+  IsIn,
 } from 'class-validator';
+import { UserRole } from '../schemas/user.schema';
+
+/** Roles allowed on public self-registration (Admin/Super Admin must be provisioned separately). */
+export const PUBLIC_REGISTER_ROLES = [
+  UserRole.DOCTOR,
+  UserRole.PHARMACY,
+  UserRole.LAB,
+] as const;
 
 @ValidatorConstraint({ name: 'MatchPassword', async: false })
 export class MatchPasswordConstraint implements ValidatorConstraintInterface {
@@ -26,7 +35,9 @@ export class CreateUserDto {
   @Transform(({ value }: { value: string }) => value.trim())
   name: string;
 
-  @IsString({ message: 'Role must be a string.' })
+  @IsIn(PUBLIC_REGISTER_ROLES, {
+    message: 'Role must be Doctor, Pharmacy, or Lab.',
+  })
   @Transform(({ value }: { value: string }) => value.trim())
   role: string;
 

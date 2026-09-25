@@ -82,9 +82,8 @@ export class UpdateUserDto {
   @IsOptional()
   designation?: string | null;
 
-  @IsString({ message: 'Status must be a string' })
-  @IsOptional()
-  status?: string;
+  // status is intentionally omitted — self-service PATCH must not activate/block accounts.
+  // Admins change status via admin doctor endpoints.
 
   @IsString({ message: 'Profile picture must be a string' })
   @IsOptional()

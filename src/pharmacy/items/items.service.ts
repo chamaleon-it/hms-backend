@@ -271,10 +271,7 @@ export class ItemsService {
                 $cond: [
                   { $gt: ['$$packing', 0] },
                   {
-                    $multiply: [
-                      { $divide: ['$$rate', '$$packing'] },
-                      '$$qty',
-                    ],
+                    $multiply: [{ $divide: ['$$rate', '$$packing'] }, '$$qty'],
                   },
                   { $multiply: ['$$rate', '$$qty'] },
                 ],
@@ -762,7 +759,7 @@ export class ItemsService {
       const q = Number(batch.quantity) || 0;
       if (q <= 0) continue;
       const take = Math.min(q, remaining);
-      (batch as any).quantity = q - take;
+      batch.quantity = q - take;
       remaining -= take;
     }
 
@@ -896,8 +893,7 @@ export class ItemsService {
           stripCount: Number(b.stripCount) || 0,
           createdAt: b.createdAt,
           expired,
-          available:
-            !expired && status === BatchStatus.Active && stock > 0,
+          available: !expired && status === BatchStatus.Active && stock > 0,
         };
       }),
     };
@@ -932,8 +928,7 @@ export class ItemsService {
 
     const batchIndex = (item.batches || []).findIndex(
       (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
+        b._id?.toString() === batchId.toString() || b.batchNumber === batchId,
     );
     if (batchIndex === -1) {
       throw new BadRequestException('Selected batch not found');
@@ -1189,8 +1184,7 @@ export class ItemsService {
 
     const batchIndex = item.batches.findIndex(
       (b: any) =>
-        b._id?.toString() === batchId.toString() ||
-        b.batchNumber === batchId,
+        b._id?.toString() === batchId.toString() || b.batchNumber === batchId,
     );
 
     if (batchIndex === -1) {
@@ -1216,9 +1210,5 @@ export class ItemsService {
       { $sort: { _id: 1 } },
     ]);
     return rows.map((r) => r._id);
-  }
-
-  async addMRP() {
-    return { message: 'noop' };
   }
 }

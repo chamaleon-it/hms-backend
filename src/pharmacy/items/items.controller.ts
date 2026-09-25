@@ -94,6 +94,20 @@ export class ItemsController {
     };
   }
 
+  // Static paths must be declared before parameterized `:id` routes.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Get('export-csv')
+  async exportCsv(@Res() res: Response) {
+    const { csv, filename } = await this.itemsService.exportCsv();
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    res.status(200).send(csv);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get(':id/batches')
   async getItemBatches(
@@ -245,19 +259,6 @@ export class ItemsController {
     };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @Get('export-csv')
-  async exportCsv(@Res() res: Response) {
-    const { csv, filename } = await this.itemsService.exportCsv();
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    res.status(200).send(csv);
-  }
-
   /** Legacy alias — prefer POST :id/batches */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -270,17 +271,6 @@ export class ItemsController {
     return {
       data,
       message: 'Batch items added successfully',
-    };
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @Get('addmrp')
-  async addMrp() {
-    const data = await this.itemsService.addMRP();
-    return {
-      data,
-      message: 'Mrp added successfully',
     };
   }
 }
