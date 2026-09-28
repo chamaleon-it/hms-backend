@@ -291,6 +291,7 @@ export class BillingService {
       activeDate,
       userRole,
       billType,
+      patientVisitor,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
@@ -380,6 +381,48 @@ export class BillingService {
     }
 
     pipeline.push({ $match: match });
+
+    // Classify first-time vs repeat: New = no earlier Sale bill for this patient
+    if (patientVisitor === 'new' || patientVisitor === 'existing') {
+      pipeline.push({
+        $lookup: {
+          from: 'billings',
+          let: {
+            pid: '$patient._id',
+            billDate: '$createdAt',
+            billId: '$_id',
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$patient', '$$pid'] },
+                    { $eq: ['$transactionType', 'Sale'] },
+                    { $ne: ['$_id', '$$billId'] },
+                    { $lt: ['$createdAt', '$$billDate'] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 },
+            { $project: { _id: 1 } },
+          ],
+          as: 'priorSales',
+        },
+      });
+      pipeline.push({
+        $addFields: {
+          priorSaleCount: { $size: '$priorSales' },
+        },
+      });
+      if (patientVisitor === 'new') {
+        pipeline.push({ $match: { priorSaleCount: 0 } });
+      } else {
+        pipeline.push({ $match: { priorSaleCount: { $gt: 0 } } });
+      }
+      pipeline.push({ $project: { priorSales: 0, priorSaleCount: 0 } });
+    }
 
     pipeline.push({
       $lookup: {

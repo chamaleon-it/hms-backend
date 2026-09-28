@@ -65,4 +65,10 @@ export class GetBillisDto {
   @IsOptional()
   @IsString()
   billType?: string;
+
+  /** Filter by first-time vs repeat patient (first Sale bill = new). */
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsEnum(['new', 'existing', 'all'])
+  patientVisitor?: 'new' | 'existing' | 'all';
 }
