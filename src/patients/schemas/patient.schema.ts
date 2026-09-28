@@ -81,9 +81,6 @@ export class Patient {
   country: string;
 
   @Prop()
-  address: string;
-
-  @Prop()
   notes: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })

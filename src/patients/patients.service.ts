@@ -212,7 +212,11 @@ export class PatientsService {
         $or: [
           { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
           { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-          { address: { $regex: addressSearchTerm, $options: 'i' } },
+          { city: { $regex: addressSearchTerm, $options: 'i' } },
+          { district: { $regex: addressSearchTerm, $options: 'i' } },
+          { state: { $regex: addressSearchTerm, $options: 'i' } },
+          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
+          { country: { $regex: addressSearchTerm, $options: 'i' } },
         ],
       });
     }
@@ -272,13 +276,13 @@ export class PatientsService {
           { name: searchRegex },
           { mrn: searchRegex },
           { phoneNumber: searchRegex },
-          { address: searchRegex },
           { addressLine1: searchRegex },
           { addressLine2: searchRegex },
           { city: searchRegex },
           { district: searchRegex },
           { state: searchRegex },
           { pinCode: searchRegex },
+          { country: searchRegex },
           { uhid: searchRegex },
         ],
       })
@@ -290,11 +294,13 @@ export class PatientsService {
       const mrn = (patient.mrn || '').toLowerCase();
       const phone = (patient.phoneNumber || '').toLowerCase();
       const address = [
-        patient.address,
         patient.addressLine1,
         patient.addressLine2,
         patient.city,
         patient.district,
+        patient.state,
+        patient.pinCode,
+        patient.country,
       ]
         .filter(Boolean)
         .join(' ')
@@ -496,9 +502,11 @@ export class PatientsService {
       rest.dateOfBirth = dob.toISOString();
     }
 
-    const data = await this.patientModel.findByIdAndUpdate(patient, rest, {
-      new: true,
-    });
+    const data = await this.patientModel.findByIdAndUpdate(
+      patient,
+      { $set: rest, $unset: { address: 1 } },
+      { new: true },
+    );
     if (!data) {
       throw new BadRequestException('Patient not found.');
     }
@@ -563,7 +571,9 @@ export class PatientsService {
       .findOne({
         $or: orConditions,
       })
-      .select('name phoneNumber email gender dateOfBirth blood mrn address')
+      .select(
+        'name phoneNumber email gender dateOfBirth blood mrn addressLine1 addressLine2 city district state pinCode country',
+      )
       .lean()
       .exec();
     return data;

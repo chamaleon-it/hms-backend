@@ -152,11 +152,6 @@ export class PatientRegisterDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
-  address?: string;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
   notes?: string;
 
   @IsOptional()
