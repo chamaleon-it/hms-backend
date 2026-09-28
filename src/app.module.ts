@@ -34,6 +34,7 @@ import { EmployeeLeaveModule } from './employee/leave/employee-leave.module';
 import { EmployeeSalaryModule } from './employee/salary/employee-salary.module';
 import { TreatmentModule } from './treatment/treatment.module';
 import { SyncModule } from './sync/sync.module';
+import { TallyModule } from './tally/tally.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { SyncModule } from './sync/sync.module';
     EmployeeSalaryModule,
     TreatmentModule,
     SyncModule,
+    TallyModule,
   ],
   controllers: [AppController],
   providers: [
