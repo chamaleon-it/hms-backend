@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,39 @@ import { Item, ItemStatus } from './schemas/item.schema';
 import { GetItemsDto } from './dto/get-items.dto';
 import { parse } from 'json2csv';
 import { UsersService } from 'src/users/users.service';
+import { JWTUserInterface } from 'src/interface/jwt-user.interface';
+import { UserRole } from 'src/users/schemas/user.schema';
+import configuration from 'src/config/configuration';
+import { AddBatchDto } from './dto/add-batch.dto';
+import { UpdateBatchDto } from './dto/update-batch.dto';
+
+/** Mongo $expr: sum quantity of batches where isActive !== false */
+const ACTIVE_STOCK_SUM = {
+  $sum: {
+    $map: {
+      input: {
+        $filter: {
+          input: { $ifNull: ['$batches', []] },
+          as: 'b',
+          cond: { $ne: ['$$b.isActive', false] },
+        },
+      },
+      as: 'ab',
+      in: { $ifNull: ['$$ab.quantity', 0] },
+    },
+  },
+};
+
+function isBatchActive(batch: any): boolean {
+  return batch?.isActive !== false;
+}
+
+function sumActiveQuantity(batches: any[] | undefined): number {
+  return (batches || []).reduce((sum: number, b: any) => {
+    if (!isBatchActive(b)) return sum;
+    return sum + (Number(b.quantity) || 0);
+  }, 0);
+}
 
 @Injectable()
 export class ItemsService {
@@ -17,6 +51,59 @@ export class ItemsService {
     @InjectModel(Item.name) private itemModel: Model<Item>,
     private readonly usersService: UsersService,
   ) { }
+
+  /**
+   * Resolve which pharmacy ObjectId scopes inventory for this actor.
+   * Admin → null (unscoped). Pharmacy roles → own id.
+   * Others → IN_HOUSE_PHARMACY_ID when set, else own id.
+   */
+  private resolvePharmacyScope(
+    user: JWTUserInterface,
+  ): mongoose.Types.ObjectId | null {
+    if (user.role === UserRole.ADMIN) {
+      return null;
+    }
+    if (
+      user.role === UserRole.PHARMACY ||
+      user.role === UserRole.PHARMACY_WHOLESALER
+    ) {
+      return user.id;
+    }
+    const inHouse = configuration().in_house_pharmacy_id;
+    if (inHouse && mongoose.isValidObjectId(inHouse)) {
+      return new mongoose.Types.ObjectId(inHouse);
+    }
+    return user.id;
+  }
+
+  private pharmacyFilter(
+    user: JWTUserInterface,
+  ): { pharmacy?: mongoose.Types.ObjectId } {
+    const pharmacyId = this.resolvePharmacyScope(user);
+    return pharmacyId ? { pharmacy: pharmacyId } : {};
+  }
+
+  private async assertItemAccess(
+    id: mongoose.Types.ObjectId,
+    user: JWTUserInterface,
+  ) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid item ID.');
+    }
+    const item = await this.itemModel.findById(id).select('pharmacy').lean();
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+    const scope = this.resolvePharmacyScope(user);
+    if (
+      scope &&
+      item.pharmacy &&
+      item.pharmacy.toString() !== scope.toString()
+    ) {
+      throw new ForbiddenException('You do not have access to this item.');
+    }
+    return item;
+  }
 
   private async generateUniqueSKU(): Promise<string> {
     const prefix = 'ITM-';
@@ -100,29 +187,27 @@ export class ItemsService {
     });
 
     if (batchNumber) {
-      const updatedItem = await this.addBatchItems(
-        data._id,
-        {
-          batchNumber,
-          expiryDate: addItemDto.expiryDate
-            ? new Date(addItemDto.expiryDate)
-            : new Date(),
-          purchasePrice: addItemDto.purchasePrice || 0,
-          quantity: openingQty,
-          supplier: (addItemDto as any).supplier || '-',
-          packing: (addItemDto as any).packing || 0,
-          stripCount: (addItemDto as any).stripCount || (addItemDto as any).noOfpacking || 0,
-          mrp: addItemDto.mrp || 0,
-          unitPrice: addItemDto.unitPrice || 0,
-          gst: (addItemDto as any).gst || 0,
-        },
-      );
+      const updatedItem = await this.addBatchItems(data._id, {
+        batchNumber,
+        expiryDate: addItemDto.expiryDate
+          ? new Date(addItemDto.expiryDate).toISOString()
+          : new Date().toISOString(),
+        purchasePrice: addItemDto.purchasePrice || 0,
+        quantity: openingQty,
+        supplier: (addItemDto as any).supplier || '-',
+        packing: (addItemDto as any).packing || 0,
+        stripCount:
+          (addItemDto as any).stripCount || (addItemDto as any).noOfpacking || 0,
+        mrp: addItemDto.mrp || 0,
+        unitPrice: addItemDto.unitPrice || 0,
+        gst: (addItemDto as any).gst || 0,
+      });
       return updatedItem;
     }
     return data;
   }
 
-  async getItems(query: GetItemsDto) {
+  async getItems(query: GetItemsDto, user: JWTUserInterface) {
     const {
       page = 1,
       limit = 10,
@@ -137,6 +222,7 @@ export class ItemsService {
     } = query;
 
     const skip = (page - 1) * limit;
+    const scopeFilter = this.pharmacyFilter(user);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -153,25 +239,16 @@ export class ItemsService {
       }, 0);
     };
 
-    let filter: {
-      $or?: Array<Record<string, Record<string, string>>>;
-      category?: string;
-      quantity?: number | Record<string, number>;
-      expiryDate?: Record<string, Date>;
-      status?: Record<string, string>;
-      supplier?: string;
-    } = {};
+    let filter: Record<string, any> = { ...scopeFilter };
 
     if (q) {
       const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = { $regex: escaped, $options: 'i' };
-      filter = {
-        $or: [
-          { name: searchRegex },
-          { sku: searchRegex },
-          { generic: searchRegex },
-        ],
-      };
+      filter.$or = [
+        { name: searchRegex },
+        { sku: searchRegex },
+        { generic: searchRegex },
+      ];
     }
 
     if (category) {
@@ -179,23 +256,23 @@ export class ItemsService {
     }
 
     if (stock && !lowStockItemsView && !slowMovingItemsView) {
-      (filter as any).$and = (filter as any).$and || [];
+      filter.$and = filter.$and || [];
       if (stock === 'Instock') {
-        (filter as any).$and.push({
-          $expr: { $gte: [{ $sum: '$batches.quantity' }, 20] },
+        filter.$and.push({
+          $expr: { $gte: [ACTIVE_STOCK_SUM, 20] },
         });
       } else if (stock === 'Low') {
-        (filter as any).$and.push({
+        filter.$and.push({
           $expr: {
             $and: [
-              { $gt: [{ $sum: '$batches.quantity' }, 0] },
-              { $lt: [{ $sum: '$batches.quantity' }, 20] },
+              { $gt: [ACTIVE_STOCK_SUM, 0] },
+              { $lt: [ACTIVE_STOCK_SUM, 20] },
             ],
           },
         });
       } else if (stock === 'Out') {
-        (filter as any).$and.push({
-          $expr: { $lte: [{ $sum: '$batches.quantity' }, 0] },
+        filter.$and.push({
+          $expr: { $lte: [ACTIVE_STOCK_SUM, 0] },
         });
       }
     }
@@ -205,10 +282,10 @@ export class ItemsService {
       !slowMovingItemsView &&
       (stock === 'Low' || stock === 'Out' || !stock)
     ) {
-      (filter as any).$and = (filter as any).$and || [];
-      (filter as any).$and.push({
+      filter.$and = filter.$and || [];
+      filter.$and.push({
         $expr: {
-          $lte: [{ $sum: '$batches.quantity' }, Number(lowStockThreshold ?? 20)],
+          $lte: [ACTIVE_STOCK_SUM, Number(lowStockThreshold ?? 20)],
         },
       });
     }
@@ -233,15 +310,15 @@ export class ItemsService {
     const lowStockFilter = {
       ...filter,
       $expr: {
-        $lte: [{ $sum: '$batches.quantity' }, Number(lowStockThreshold ?? 20)],
+        $lte: [ACTIVE_STOCK_SUM, Number(lowStockThreshold ?? 20)],
       },
     };
 
-    // Calculate slowMovingCount (items with batch quantity > 0 and soldInLast30Days <= 10)
     const activeItemsForCount = await this.itemModel
       .find({
+        ...scopeFilter,
         status: { $ne: ItemStatus.Deleted },
-        $expr: { $gt: [{ $sum: '$batches.quantity' }, 0] },
+        $expr: { $gt: [ACTIVE_STOCK_SUM, 0] },
       })
       .lean();
     const slowMovingCount = activeItemsForCount.filter(
@@ -252,28 +329,20 @@ export class ItemsService {
     let total = 0;
 
     if (slowMovingItemsView) {
-      // Find all in-stock items matching filters
       const candidateFilter = {
         ...filter,
-        $expr: { $gt: [{ $sum: '$batches.quantity' }, 0] },
+        $expr: { $gt: [ACTIVE_STOCK_SUM, 0] },
       };
       const candidateItems = await this.itemModel.find(candidateFilter).lean();
 
       const mappedCandidates = candidateItems
-        .map((it) => {
-          const totalQty = (it.batches || []).reduce(
-            (sum: number, b: any) => sum + (Number(b.quantity) || 0),
-            0,
-          );
-          return {
-            ...it,
-            quantity: totalQty,
-            soldInLast30Days: computeSoldInLast30Days(it),
-          };
-        })
+        .map((it) => ({
+          ...it,
+          quantity: sumActiveQuantity(it.batches as any[]),
+          soldInLast30Days: computeSoldInLast30Days(it),
+        }))
         .filter((it) => it.soldInLast30Days <= 10);
 
-      // Sort by soldInLast30Days asc, then quantity desc
       mappedCandidates.sort((a, b) => {
         if (a.soldInLast30Days !== b.soldInLast30Days) {
           return a.soldInLast30Days - b.soldInLast30Days;
@@ -299,17 +368,11 @@ export class ItemsService {
       ]);
 
       total = count;
-      items = rawItems.map((it) => {
-        const totalQty = (it.batches || []).reduce(
-          (sum: number, b: any) => sum + (Number(b.quantity) || 0),
-          0,
-        );
-        return {
-          ...it,
-          quantity: totalQty,
-          soldInLast30Days: computeSoldInLast30Days(it),
-        };
-      });
+      items = rawItems.map((it) => ({
+        ...it,
+        quantity: sumActiveQuantity(it.batches as any[]),
+        soldInLast30Days: computeSoldInLast30Days(it),
+      }));
     }
 
     const lowStockCount = shouldCountLowStock
@@ -319,8 +382,10 @@ export class ItemsService {
     return { items, data: items, total, lowStockCount, slowMovingCount };
   }
 
-  async getItem(id: mongoose.Types.ObjectId) {
-    if (!mongoose.isValidObjectId(id)) {
+  async getItem(id: mongoose.Types.ObjectId, user?: JWTUserInterface) {
+    if (user) {
+      await this.assertItemAccess(id, user);
+    } else if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('Invalid item ID.');
     }
 
@@ -330,21 +395,18 @@ export class ItemsService {
       throw new NotFoundException('Item not found.');
     }
 
-    const totalQty = (data.batches || []).reduce(
-      (sum: number, b: any) => sum + (Number(b.quantity) || 0),
-      0,
-    );
-
     return {
       ...data,
-      quantity: totalQty,
+      quantity: sumActiveQuantity(data.batches as any[]),
     };
   }
 
-  async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
-    if (!mongoose.isValidObjectId(id)) {
-      throw new BadRequestException('Invalid item ID.');
-    }
+  async updateItem(
+    id: mongoose.Types.ObjectId,
+    addItemDto: AddItemDto,
+    user: JWTUserInterface,
+  ) {
+    await this.assertItemAccess(id, user);
 
     const data = await this.itemModel
       .findByIdAndUpdate(id, addItemDto, { new: true, runValidators: true })
@@ -357,10 +419,8 @@ export class ItemsService {
     return data;
   }
 
-  async deleteItem(id: mongoose.Types.ObjectId) {
-    if (!mongoose.isValidObjectId(id)) {
-      throw new BadRequestException('Invalid item ID.');
-    }
+  async deleteItem(id: mongoose.Types.ObjectId, user: JWTUserInterface) {
+    await this.assertItemAccess(id, user);
 
     const data = await this.itemModel
       .findByIdAndUpdate(
@@ -377,8 +437,11 @@ export class ItemsService {
     return data;
   }
 
-  async exportCsv() {
-    const items = await this.itemModel.find().lean().exec();
+  async exportCsv(user: JWTUserInterface) {
+    const items = await this.itemModel
+      .find({ ...this.pharmacyFilter(user), status: { $ne: ItemStatus.Deleted } })
+      .lean()
+      .exec();
     const csv = parse(items);
     const filename = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
     return { csv, filename };
@@ -403,22 +466,33 @@ export class ItemsService {
       throw new BadRequestException('Item is not available');
     }
 
-    // If batch specified, deduct from that batch
     let effectiveUnitPrice = 0;
     if (batchNumber && item.batches && item.batches.length > 0) {
       const batch = item.batches.find(
-        (b) => b.batchNumber && b.batchNumber.toLowerCase() === batchNumber.trim().toLowerCase(),
+        (b) =>
+          b.batchNumber &&
+          b.batchNumber.toLowerCase() === batchNumber.trim().toLowerCase(),
       );
-      if (batch) {
-        batch.quantity = allowNegativeStock
-          ? (batch.quantity || 0) - quantity
-          : Math.max((batch.quantity || 0) - quantity, 0);
-        if (batch.unitPrice) {
-          effectiveUnitPrice = batch.unitPrice;
-        }
+      if (!batch) {
+        throw new BadRequestException('Batch not found.');
+      }
+      if (!isBatchActive(batch)) {
+        throw new BadRequestException('Batch is inactive and cannot be sold.');
+      }
+      batch.quantity = allowNegativeStock
+        ? (batch.quantity || 0) - quantity
+        : Math.max((batch.quantity || 0) - quantity, 0);
+      if (batch.unitPrice) {
+        effectiveUnitPrice = batch.unitPrice;
       }
     } else if (item.batches && item.batches.length > 0) {
-      const batch = item.batches[0];
+      const batch =
+        item.batches.find(
+          (b) => isBatchActive(b) && (Number(b.quantity) || 0) > 0,
+        ) || item.batches.find((b) => isBatchActive(b));
+      if (!batch) {
+        throw new BadRequestException('No active batch available for sale.');
+      }
       if (batch?.unitPrice) {
         effectiveUnitPrice = batch.unitPrice;
       }
@@ -454,7 +528,9 @@ export class ItemsService {
     }
 
     if (item.batches && item.batches.length > 0) {
-      item.batches[0].quantity = (Number(item.batches[0].quantity) || 0) + quantity;
+      const batch =
+        item.batches.find((b) => isBatchActive(b)) || item.batches[0];
+      batch.quantity = (Number(batch.quantity) || 0) + quantity;
       await item.save();
     }
 
@@ -463,7 +539,7 @@ export class ItemsService {
 
   async addBatchItems(
     id: mongoose.Types.ObjectId,
-    batchData: {
+    batchData: AddBatchDto | {
       batchNumber: string;
       quantity: number;
       expiryDate: Date | string;
@@ -475,7 +551,12 @@ export class ItemsService {
       unitPrice?: number;
       gst?: number;
     },
+    user?: JWTUserInterface,
   ) {
+    if (user) {
+      await this.assertItemAccess(id, user);
+    }
+
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
@@ -488,14 +569,18 @@ export class ItemsService {
     const stripCount = Number(batchData.stripCount ?? 0);
     const gst = Number(batchData.gst ?? 0);
     const quantity = Number(batchData.quantity ?? 0);
-    const expiryDate = batchData.expiryDate ? new Date(batchData.expiryDate) : new Date();
+    const expiryDate = batchData.expiryDate
+      ? new Date(batchData.expiryDate)
+      : new Date();
 
     if (!item.batches) {
       item.batches = [];
     }
 
     const existingBatchIndex = item.batches.findIndex(
-      (b) => b.batchNumber && b.batchNumber.toLowerCase() === batchData.batchNumber.trim().toLowerCase(),
+      (b) =>
+        b.batchNumber &&
+        b.batchNumber.toLowerCase() === batchData.batchNumber.trim().toLowerCase(),
     );
 
     if (existingBatchIndex >= 0) {
@@ -508,7 +593,8 @@ export class ItemsService {
       if (packing > 0) b.packing = packing;
       if (stripCount > 0) b.stripCount = stripCount;
       if (gst >= 0) b.gst = gst;
-      if (batchData.supplier && batchData.supplier !== '-') b.supplier = batchData.supplier;
+      if (batchData.supplier && batchData.supplier !== '-')
+        b.supplier = batchData.supplier;
     } else {
       item.batches.push({
         batchNumber: batchData.batchNumber.trim(),
@@ -532,27 +618,23 @@ export class ItemsService {
     return item;
   }
 
-  async getSuppliers() {
-    const batchSuppliers = await this.itemModel.distinct('batches.supplier').lean();
-    return batchSuppliers.filter((supplier) => supplier && supplier !== '' && supplier !== '-');
+  async getSuppliers(user: JWTUserInterface) {
+    const batchSuppliers = await this.itemModel
+      .distinct('batches.supplier', this.pharmacyFilter(user))
+      .lean();
+    return batchSuppliers.filter(
+      (supplier) => supplier && supplier !== '' && supplier !== '-',
+    );
   }
 
   async updateBatch(
     itemId: mongoose.Types.ObjectId,
     batchId: string,
-    data: {
-      batchNumber?: string;
-      expiryDate?: Date | string;
-      quantity?: number;
-      packing?: number;
-      stripCount?: number;
-      mrp?: number;
-      unitPrice?: number;
-      purchasePrice?: number;
-      gst?: number;
-      supplier?: string;
-    },
+    data: UpdateBatchDto,
+    user: JWTUserInterface,
   ) {
+    await this.assertItemAccess(itemId, user);
+
     const item = await this.itemModel.findById(itemId);
     if (!item) throw new BadRequestException('Item not found');
 
@@ -560,13 +642,16 @@ export class ItemsService {
     if (!batch) throw new BadRequestException('Batch not found');
 
     if (data.batchNumber !== undefined) batch.batchNumber = data.batchNumber;
-    if (data.expiryDate !== undefined) (batch as any).expiryDate = new Date(data.expiryDate);
+    if (data.expiryDate !== undefined)
+      (batch as any).expiryDate = new Date(data.expiryDate);
     if (data.quantity !== undefined) batch.quantity = Number(data.quantity);
     if (data.packing !== undefined) batch.packing = Number(data.packing);
-    if (data.stripCount !== undefined) batch.stripCount = Number(data.stripCount);
+    if (data.stripCount !== undefined)
+      batch.stripCount = Number(data.stripCount);
     if (data.mrp !== undefined) batch.mrp = Number(data.mrp);
     if (data.unitPrice !== undefined) batch.unitPrice = Number(data.unitPrice);
-    if (data.purchasePrice !== undefined) batch.purchasePrice = Number(data.purchasePrice);
+    if (data.purchasePrice !== undefined)
+      batch.purchasePrice = Number(data.purchasePrice);
     if (data.gst !== undefined) batch.gst = Number(data.gst);
     if (data.supplier !== undefined) batch.supplier = data.supplier;
 
@@ -574,7 +659,13 @@ export class ItemsService {
     return item;
   }
 
-  async toggleBatchStatus(itemId: mongoose.Types.ObjectId, batchId: string) {
+  async toggleBatchStatus(
+    itemId: mongoose.Types.ObjectId,
+    batchId: string,
+    user: JWTUserInterface,
+  ) {
+    await this.assertItemAccess(itemId, user);
+
     const item = await this.itemModel.findById(itemId);
     if (!item) throw new BadRequestException('Item not found');
 
@@ -584,9 +675,5 @@ export class ItemsService {
     (batch as any).isActive = !(batch as any).isActive;
     await item.save();
     return item;
-  }
-
-  private delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

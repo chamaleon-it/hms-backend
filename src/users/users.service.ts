@@ -121,6 +121,13 @@ export class UsersService {
     return data;
   }
 
+  async findUserRoleById(
+    id: mongoose.Types.ObjectId,
+  ): Promise<UserRole | null> {
+    const user = await this.userModel.findById(id).select('role').lean();
+    return (user?.role as UserRole) ?? null;
+  }
+
   async softDeleteUser(id: mongoose.Types.ObjectId) {
     const user = await this.userModel.findByIdAndUpdate(
       id,

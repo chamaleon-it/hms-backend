@@ -4,6 +4,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+/**
+ * E2E smoke — requires DATABASE_URL (and JWT secrets) in the environment.
+ * Without Mongo, this suite is BLOCKED at AppModule bootstrap.
+ */
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
@@ -16,10 +20,17 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+  afterEach(async () => {
+    await app?.close();
+  });
+
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(typeof res.body.message).toBe('string');
+      });
   });
 });

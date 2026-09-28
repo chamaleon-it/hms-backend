@@ -3,8 +3,10 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { GetRefreshTokenDto } from './dto/get-refresh-token.dto';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { Public } from './decorators/public.decorator';
 
 @Controller('auth')
+@Public()
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

@@ -16,6 +16,8 @@ import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { AddItemDto } from './dto/add-items.dto';
 import { GetItemsDto } from './dto/get-items.dto';
+import { AddBatchDto } from './dto/add-batch.dto';
+import { UpdateBatchDto } from './dto/update-batch.dto';
 import mongoose from 'mongoose';
 import type { Response } from 'express';
 
@@ -37,8 +39,11 @@ export class ItemsController {
   }
 
   @Get()
-  async getItems(@Query() query: GetItemsDto) {
-    const data = await this.itemsService.getItems(query);
+  async getItems(
+    @GetUser() user: JWTUserInterface,
+    @Query() query: GetItemsDto,
+  ) {
+    const data = await this.itemsService.getItems(query, user);
     return {
       data: data.items,
       total: data.total,
@@ -51,8 +56,8 @@ export class ItemsController {
   }
 
   @Get('suppliers')
-  async getSuppliers() {
-    const data = await this.itemsService.getSuppliers();
+  async getSuppliers(@GetUser() user: JWTUserInterface) {
+    const data = await this.itemsService.getSuppliers(user);
     return {
       data,
       message: 'All suppliers were retrieved successfully',
@@ -61,10 +66,11 @@ export class ItemsController {
 
   @Patch(':id')
   async updateItem(
+    @GetUser() user: JWTUserInterface,
     @Body() addItemDto: AddItemDto,
     @Param('id') id: mongoose.Types.ObjectId,
   ) {
-    const data = await this.itemsService.updateItem(id, addItemDto);
+    const data = await this.itemsService.updateItem(id, addItemDto, user);
     return {
       data,
       message: 'Item updated successfully.',
@@ -72,8 +78,11 @@ export class ItemsController {
   }
 
   @Delete(':id')
-  async deleteItem(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.itemsService.deleteItem(id);
+  async deleteItem(
+    @GetUser() user: JWTUserInterface,
+    @Param('id') id: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.itemsService.deleteItem(id, user);
     return {
       data,
       message: 'Item deleted successfully',
@@ -81,8 +90,11 @@ export class ItemsController {
   }
 
   @Get('export-csv')
-  async exportCsv(@Res() res: Response) {
-    const { csv, filename } = await this.itemsService.exportCsv();
+  async exportCsv(
+    @GetUser() user: JWTUserInterface,
+    @Res() res: Response,
+  ) {
+    const { csv, filename } = await this.itemsService.exportCsv(user);
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
 
@@ -92,8 +104,11 @@ export class ItemsController {
   }
 
   @Get(':id')
-  async getItem(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.itemsService.getItem(id);
+  async getItem(
+    @GetUser() user: JWTUserInterface,
+    @Param('id') id: mongoose.Types.ObjectId,
+  ) {
+    const data = await this.itemsService.getItem(id, user);
     return {
       data,
       message: 'Item retrieved successfully',
@@ -102,22 +117,11 @@ export class ItemsController {
 
   @Post('add_batch/:id')
   async addBatchItems(
+    @GetUser() user: JWTUserInterface,
     @Param('id') id: mongoose.Types.ObjectId,
-    @Body()
-    batchData: {
-      batchNumber: string;
-      quantity: number;
-      expiryDate: Date;
-      purchasePrice?: number;
-      supplier?: string;
-      packing?: number;
-      stripCount?: number;
-      mrp?: number;
-      unitPrice?: number;
-      gst?: number;
-    },
+    @Body() batchData: AddBatchDto,
   ) {
-    const data = await this.itemsService.addBatchItems(id, batchData);
+    const data = await this.itemsService.addBatchItems(id, batchData, user);
     return {
       data,
       message: 'Batch items added successfully',
@@ -126,22 +130,12 @@ export class ItemsController {
 
   @Patch(':id/batch/:batchId')
   async updateBatch(
+    @GetUser() user: JWTUserInterface,
     @Param('id') id: mongoose.Types.ObjectId,
     @Param('batchId') batchId: string,
-    @Body() body: {
-      batchNumber?: string;
-      expiryDate?: string;
-      quantity?: number;
-      packing?: number;
-      stripCount?: number;
-      mrp?: number;
-      unitPrice?: number;
-      purchasePrice?: number;
-      gst?: number;
-      supplier?: string;
-    },
+    @Body() body: UpdateBatchDto,
   ) {
-    const data = await this.itemsService.updateBatch(id, batchId, body);
+    const data = await this.itemsService.updateBatch(id, batchId, body, user);
     return {
       data,
       message: 'Batch updated successfully',
@@ -150,14 +144,14 @@ export class ItemsController {
 
   @Patch(':id/batch/:batchId/toggle')
   async toggleBatchStatus(
+    @GetUser() user: JWTUserInterface,
     @Param('id') id: mongoose.Types.ObjectId,
     @Param('batchId') batchId: string,
   ) {
-    const data = await this.itemsService.toggleBatchStatus(id, batchId);
+    const data = await this.itemsService.toggleBatchStatus(id, batchId, user);
     return {
       data,
       message: 'Batch status toggled successfully',
     };
   }
-
 }
