@@ -36,11 +36,15 @@ export class PurchaseEntry {
         required: true,
       },
       batch: { type: String, required: true },
+      /** Paid pack count (form Qty). Stock units = (quantity + free) × pack. */
       quantity: { type: Number, required: true },
       pack: { type: Number, required: true },
+      /** Explicit paid-pack alias; kept for display/compat with create DTO. */
+      noOfPack: { type: Number, required: false },
       unitPrice: { type: Number, required: true },
       expiryDate: { type: Date, required: true },
       purchasePrice: { type: Number, required: true },
+      /** GST rate percent (e.g. 5), not tax amount. */
       gst: { type: Number, required: true },
       discount: { type: Number, required: true },
       free: { type: Number, required: true },
@@ -51,6 +55,7 @@ export class PurchaseEntry {
     batch: string;
     quantity: number;
     pack: number;
+    noOfPack?: number;
     unitPrice: number;
     expiryDate: Date;
     purchasePrice: number;

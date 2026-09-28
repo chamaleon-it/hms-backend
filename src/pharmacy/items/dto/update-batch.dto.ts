@@ -7,10 +7,15 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 const trim = ({ value }: { value: string }) =>
   typeof value === 'string' ? value.trim() : value;
+
+/** Treat empty string as absent so optional date/number fields from HTML inputs pass. */
+const emptyToUndefined = ({ value }: { value: unknown }) =>
+  value === '' || value === null ? undefined : value;
 
 export class UpdateBatchDto {
   @IsOptional()
@@ -21,6 +26,8 @@ export class UpdateBatchDto {
   batchNumber?: string;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
+  @ValidateIf((_, v) => v !== undefined)
   @IsDateString()
   expiryDate?: string;
 
@@ -54,11 +61,25 @@ export class UpdateBatchDto {
   @Min(0)
   unitPrice?: number;
 
+  /** Legacy import alias for unitPrice (saleRate). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  saleRate?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   purchasePrice?: number;
+
+  /** Import / older FE alias — dual-written with purchasePrice. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  purchaseRate?: number;
 
   @IsOptional()
   @Type(() => Number)

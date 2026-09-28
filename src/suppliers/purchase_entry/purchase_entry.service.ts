@@ -41,18 +41,28 @@ export class PurchaseEntryService {
         .findById(createPurchaseEntryDto.supplier)
         .exec();
 
+      // Purchase line quantity = paid packs; inventory needs total units
+      // including free/schema packs: (paidPacks + freePacks) × packSize
+      const paidPacks =
+        item.noOfPack != null && item.noOfPack !== undefined
+          ? Number(item.noOfPack)
+          : Number(item.quantity) || 0;
+      const freePacks = Number(item.free) || 0;
+      const packSize = Number(item.pack) || 1;
+      const stockUnits = (paidPacks + freePacks) * packSize;
+
       await this.itemsService.addBatchItems(
         item.item,
         {
           batchNumber: item.batch,
-          quantity: item.quantity,
+          quantity: stockUnits,
           expiryDate: item.expiryDate,
           purchasePrice: item.purchasePrice,
           supplier: supplier?.name || '-',
           unitPrice: item.pack ? item.unitPrice / item.pack : item.unitPrice,
           mrp: item.unitPrice,
           packing: item.pack,
-          stripCount: item.noOfPack,
+          stripCount: paidPacks,
         },
       );
     }

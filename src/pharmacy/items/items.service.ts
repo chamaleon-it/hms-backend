@@ -54,13 +54,18 @@ export class ItemsService {
 
   /**
    * Resolve which pharmacy ObjectId scopes inventory for this actor.
-   * Admin → null (unscoped). Pharmacy roles → own id.
+   * Admin / Super Admin → null (unscoped). Pharmacy roles → own id.
    * Others → IN_HOUSE_PHARMACY_ID when set, else own id.
    */
   private resolvePharmacyScope(
     user: JWTUserInterface,
   ): mongoose.Types.ObjectId | null {
-    if (user.role === UserRole.ADMIN) {
+    const role = String(user.role || '');
+    if (
+      user.role === UserRole.ADMIN ||
+      role === 'Super Admin' ||
+      role === 'SUPER_ADMIN'
+    ) {
       return null;
     }
     if (
@@ -74,6 +79,21 @@ export class ItemsService {
       return new mongoose.Types.ObjectId(inHouse);
     }
     return user.id;
+  }
+
+  /** Match batch by subdoc _id or batchNumber (import / legacy clients). */
+  private findBatch(item: Item, batchId: string) {
+    const key = decodeURIComponent(batchId || '').trim();
+    return (item.batches || []).find((b: any) => {
+      if (b._id?.toString() === key) return true;
+      if (
+        b.batchNumber &&
+        b.batchNumber.toString().toLowerCase() === key.toLowerCase()
+      ) {
+        return true;
+      }
+      return false;
+    });
   }
 
   private pharmacyFilter(
@@ -641,7 +661,7 @@ export class ItemsService {
     const item = await this.itemModel.findById(itemId);
     if (!item) throw new BadRequestException('Item not found');
 
-    const batch = item.batches.find((b: any) => b._id?.toString() === batchId);
+    const batch = this.findBatch(item, batchId);
     if (!batch) throw new BadRequestException('Batch not found');
 
     if (data.batchNumber !== undefined) batch.batchNumber = data.batchNumber;
@@ -652,9 +672,30 @@ export class ItemsService {
     if (data.stripCount !== undefined)
       batch.stripCount = Number(data.stripCount);
     if (data.mrp !== undefined) batch.mrp = Number(data.mrp);
-    if (data.unitPrice !== undefined) batch.unitPrice = Number(data.unitPrice);
-    if (data.purchasePrice !== undefined)
-      batch.purchasePrice = Number(data.purchasePrice);
+
+    const unitPrice =
+      data.unitPrice !== undefined
+        ? Number(data.unitPrice)
+        : data.saleRate !== undefined
+          ? Number(data.saleRate)
+          : undefined;
+    if (unitPrice !== undefined) {
+      batch.unitPrice = unitPrice;
+      (batch as any).saleRate = unitPrice;
+    }
+
+    const purchasePrice =
+      data.purchasePrice !== undefined
+        ? Number(data.purchasePrice)
+        : data.purchaseRate !== undefined
+          ? Number(data.purchaseRate)
+          : undefined;
+    if (purchasePrice !== undefined) {
+      batch.purchasePrice = purchasePrice;
+      // Keep import-era field in sync (lean reads often expose purchaseRate only).
+      (batch as any).purchaseRate = purchasePrice;
+    }
+
     if (data.gst !== undefined) batch.gst = Number(data.gst);
     if (data.supplier !== undefined) batch.supplier = data.supplier;
 
@@ -672,10 +713,14 @@ export class ItemsService {
     const item = await this.itemModel.findById(itemId);
     if (!item) throw new BadRequestException('Item not found');
 
-    const batch = item.batches.find((b: any) => b._id?.toString() === batchId);
+    const batch = this.findBatch(item, batchId);
     if (!batch) throw new BadRequestException('Batch not found');
 
-    (batch as any).isActive = !(batch as any).isActive;
+    const current =
+      (batch as any).isActive !== false &&
+      String((batch as any).status || 'active').toLowerCase() !== 'inactive';
+    (batch as any).isActive = !current;
+    (batch as any).status = !current ? 'active' : 'inactive';
     await item.save();
     return item;
   }
