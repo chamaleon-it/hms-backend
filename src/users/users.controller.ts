@@ -47,11 +47,11 @@ export class UsersController {
 
   @Post('forgot_password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    const data = await this.usersService.forgotPassword(forgotPasswordDto);
+    await this.usersService.forgotPassword(forgotPasswordDto);
+    // Generic message — do not reveal whether the email exists or return tokens.
     return {
-      data,
       message:
-        'The password reset link has been successfully sent to your email address.',
+        'If an account exists for that email, a password reset link will be sent.',
     };
   }
 

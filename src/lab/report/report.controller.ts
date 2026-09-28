@@ -3,9 +3,11 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
   Put,
 } from '@nestjs/common';
@@ -90,8 +92,16 @@ export class ReportController {
   }
 
   @Post('lis-result')
-  // No JwtAuthGuard here to allow local scripts to call it automatically
-  async receiveLisResult(@Body() dto: LisResultDto) {
+  // Intentionally not JWT-guarded (local instrument scripts). When LIS_API_KEY
+  // is set, require matching x-lis-api-key header. Production MUST set LIS_API_KEY.
+  async receiveLisResult(
+    @Headers('x-lis-api-key') apiKey: string | undefined,
+    @Body() dto: LisResultDto,
+  ) {
+    const expected = process.env.LIS_API_KEY;
+    if (expected && apiKey !== expected) {
+      throw new UnauthorizedException('Invalid or missing LIS API key');
+    }
     const data = await this.reportService.updateFromLis(dto);
     return {
       message: 'LIS Result Received',
