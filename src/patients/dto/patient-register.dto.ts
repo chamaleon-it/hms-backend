@@ -1,10 +1,13 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsString,
   IsOptional,
   IsIn,
   MaxLength,
   IsArray,
+  IsNumber,
+  Min,
+  Max,
 } from 'class-validator';
 
 export class PatientRegisterDto {
@@ -35,6 +38,22 @@ export class PatientRegisterDto {
   @IsOptional()
   @IsString()
   dateOfBirth?: string;
+
+  /** UI helper for DOB entry; stripped before persist (not stored). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(150)
+  age?: number;
+
+  /** UI helper for DOB entry (months); stripped before persist (not stored). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(600)
+  month?: number;
 
   @IsOptional()
   @Transform(({ value }) => {
@@ -141,5 +160,7 @@ export class PatientRegisterDto {
   notes?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   weight?: number;
 }

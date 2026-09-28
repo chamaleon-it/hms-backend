@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsMongoId,
   IsNotEmpty,
+  Allow,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import mongoose from 'mongoose';
@@ -38,13 +39,74 @@ export class UpdateOrderItemNameDto {
 
   @IsOptional()
   expiryDate?: Date;
+
+  /** Populated item extras the FE may re-send; allowed then ignored. */
+  @IsOptional()
+  @Allow()
+  quantity?: number;
+
+  @IsOptional()
+  @Allow()
+  openingStockQuantity?: number;
+
+  @IsOptional()
+  @Allow()
+  pharmacy?: string;
+
+  @IsOptional()
+  @Allow()
+  category?: string;
+
+  @IsOptional()
+  @Allow()
+  supplier?: string;
+
+  @IsOptional()
+  @Allow()
+  manufacturer?: string;
+
+  @IsOptional()
+  @Allow()
+  status?: string;
+
+  @IsOptional()
+  @Allow()
+  hsnCode?: string;
+
+  @IsOptional()
+  @Allow()
+  rackLocation?: string;
+
+  @IsOptional()
+  @Allow()
+  mrp?: number;
+
+  @IsOptional()
+  @Allow()
+  gst?: number;
+
+  @IsOptional()
+  @Allow()
+  packing?: number;
+
+  @IsOptional()
+  @Allow()
+  createdAt?: Date | string;
+
+  @IsOptional()
+  @Allow()
+  updatedAt?: Date | string;
+
+  @IsOptional()
+  @Allow()
+  batches?: unknown;
 }
 
 export class UpdateOrderItemDto {
   @ValidateNested()
   @Type(() => UpdateOrderItemNameDto)
   @IsOptional()
-  name?: UpdateOrderItemNameDto;
+  name?: UpdateOrderItemNameDto | mongoose.Types.ObjectId | string;
 
   @IsString()
   @IsOptional()
@@ -65,6 +127,58 @@ export class UpdateOrderItemDto {
   @IsNumber()
   @IsNotEmpty({ message: 'Quantity cannot be empty.' })
   quantity?: number;
+
+  @IsOptional()
+  @IsString()
+  batchNumber?: string;
+
+  @IsOptional()
+  @IsNumber()
+  unitPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  mrp?: number;
+
+  @IsOptional()
+  @IsNumber()
+  gst?: number;
+
+  @IsOptional()
+  @IsNumber()
+  purchasePrice?: number;
+
+  @IsOptional()
+  @Allow()
+  availableQuantity?: number;
+
+  @IsOptional()
+  @Allow()
+  medicineName?: string;
+
+  @IsOptional()
+  @Allow()
+  rowId?: string;
+
+  @IsOptional()
+  @Allow()
+  packing?: number;
+
+  @IsOptional()
+  @Allow()
+  stripCount?: number;
+
+  @IsOptional()
+  @Allow()
+  expiryDate?: string | Date;
+
+  @IsOptional()
+  @Allow()
+  supplier?: string;
+
+  @IsOptional()
+  @Allow()
+  _id?: string;
 }
 
 export class UpdateOrderDto {
@@ -76,13 +190,11 @@ export class UpdateOrderDto {
   @IsOptional()
   mrn?: string;
 
-  @IsString()
   @IsOptional()
-  patient?: string;
+  patient?: string | mongoose.Types.ObjectId;
 
-  @IsMongoId()
   @IsOptional()
-  doctor?: string;
+  doctor?: string | mongoose.Types.ObjectId;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -100,4 +212,49 @@ export class UpdateOrderDto {
   @IsString()
   @IsOptional()
   assignedTo?: string;
+
+  @IsOptional()
+  @IsNumber()
+  discount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  paidAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  billNo?: string;
+
+  @IsOptional()
+  @IsString()
+  pharmacist?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorName?: string;
+
+  @IsOptional()
+  @IsString()
+  allergies?: string;
+
+  /** FE may re-spread timestamps / flags from OrderType; allow then ignore. */
+  @IsOptional()
+  @Allow()
+  isDeleted?: boolean;
+
+  @IsOptional()
+  @Allow()
+  createdAt?: Date | string;
+
+  @IsOptional()
+  @Allow()
+  updatedAt?: Date | string;
+
+  @IsOptional()
+  @Allow()
+  __v?: number;
 }

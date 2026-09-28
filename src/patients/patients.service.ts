@@ -50,19 +50,36 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
-    if (!patientRegisterDto.mrn) {
+    const { age, month, ...rest } = patientRegisterDto as PatientRegisterDto & {
+      age?: number;
+      month?: number;
+    };
+
+    if (!rest.dateOfBirth && (age != null || month != null)) {
+      const yrs = Number(age) || 0;
+      const mths = Number(month) || 0;
+      const today = new Date();
+      const dob = new Date(
+        today.getFullYear() - yrs,
+        today.getMonth() - mths,
+        today.getDate(),
+      );
+      rest.dateOfBirth = dob.toISOString();
+    }
+
+    if (!rest.mrn) {
       const mrn = await this.generateUniqueMRN();
-      patientRegisterDto.mrn = mrn;
+      rest.mrn = mrn;
     } else {
       const mrn = await this.patientModel.exists({
-        mrn: patientRegisterDto.mrn,
+        mrn: rest.mrn,
       });
       if (mrn) {
         throw new BadRequestException('MRN already exists');
       }
     }
     const patient = await this.patientModel.create({
-      ...patientRegisterDto,
+      ...rest,
       createdBy,
     });
     return patient;
@@ -462,11 +479,26 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     patient: mongoose.Types.ObjectId,
   ) {
-    const data = await this.patientModel.findByIdAndUpdate(
-      patient,
-      patientRegisterDto,
-      { new: true },
-    );
+    const { age, month, ...rest } = patientRegisterDto as PatientRegisterDto & {
+      age?: number;
+      month?: number;
+    };
+
+    if (!rest.dateOfBirth && (age != null || month != null)) {
+      const yrs = Number(age) || 0;
+      const mths = Number(month) || 0;
+      const today = new Date();
+      const dob = new Date(
+        today.getFullYear() - yrs,
+        today.getMonth() - mths,
+        today.getDate(),
+      );
+      rest.dateOfBirth = dob.toISOString();
+    }
+
+    const data = await this.patientModel.findByIdAndUpdate(patient, rest, {
+      new: true,
+    });
     if (!data) {
       throw new BadRequestException('Patient not found.');
     }

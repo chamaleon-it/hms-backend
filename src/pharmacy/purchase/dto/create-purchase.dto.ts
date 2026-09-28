@@ -5,6 +5,7 @@ import {
   IsInt,
   IsMongoId,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -24,6 +25,13 @@ export class CreatePurchaseItemDto {
   @IsOptional()
   @IsString()
   notes?: string | null;
+
+  /** UI may send unit price; not persisted on purchase schema. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
 }
 
 export class CreatePurchaseDto {
@@ -40,6 +48,10 @@ export class CreatePurchaseDto {
   @IsString()
   @IsNotEmpty()
   phoneNumber: string;
+
+  @IsString()
+  @IsNotEmpty()
+  deliveryAddress: string;
 
   @IsString()
   @IsNotEmpty()

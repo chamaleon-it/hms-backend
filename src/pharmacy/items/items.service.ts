@@ -197,7 +197,10 @@ export class ItemsService {
         supplier: (addItemDto as any).supplier || '-',
         packing: (addItemDto as any).packing || 0,
         stripCount:
-          (addItemDto as any).stripCount || (addItemDto as any).noOfpacking || 0,
+          (addItemDto as any).stripCount ||
+          (addItemDto as any).noOfPacking ||
+          (addItemDto as any).noOfpacking ||
+          0,
         mrp: addItemDto.mrp || 0,
         unitPrice: addItemDto.unitPrice || 0,
         gst: (addItemDto as any).gst || 0,

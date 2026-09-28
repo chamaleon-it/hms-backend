@@ -294,7 +294,9 @@ export class ReportService implements OnModuleInit {
         (x) => x?.name?.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
-        report.test[index].value = n.value;
+        if (n.value !== undefined) {
+          report.test[index].value = n.value;
+        }
       }
     });
 

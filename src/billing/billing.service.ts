@@ -666,6 +666,9 @@ export class BillingService {
           cash: addPaymentDto.cash,
           upi: addPaymentDto.upi,
           card: addPaymentDto.card,
+          ...(addPaymentDto.discount !== undefined
+            ? { discount: addPaymentDto.discount }
+            : {}),
         },
       },
       { new: true },

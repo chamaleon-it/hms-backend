@@ -30,7 +30,12 @@ export class PurchaseEntryService {
       createPurchaseEntryDto.paymentStatus = PaymentStatus.PENDING;
     }
 
-    const data = await this.purchaseEntryModel.create(createPurchaseEntryDto);
+    const { grossAmount: _grossAmount, ...entryPayload } =
+      createPurchaseEntryDto as CreatePurchaseEntryDto & {
+        grossAmount?: number;
+      };
+
+    const data = await this.purchaseEntryModel.create(entryPayload);
     for (const item of createPurchaseEntryDto.items) {
       const supplier = await this.supplierModel
         .findById(createPurchaseEntryDto.supplier)
