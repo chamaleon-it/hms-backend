@@ -58,6 +58,19 @@ export class AccountTransaction {
 
   @Prop({ type: Date, required: false })
   deletedAt?: Date;
+
+  /** Tally Prime XML sync */
+  @Prop({ default: false })
+  tallySynced?: boolean;
+
+  @Prop({ type: Date, required: false })
+  tallySyncedAt?: Date;
+
+  @Prop({ required: false })
+  tallyVoucherType?: string;
+
+  @Prop({ required: false })
+  tallyError?: string;
 }
 
 export const AccountTransactionSchema =

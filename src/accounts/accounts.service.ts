@@ -1,8 +1,11 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
@@ -21,13 +24,24 @@ import {
   SourceModule,
   TransactionType,
 } from './enums/account-transaction.enum';
+import { TallyService } from 'src/tally/tally.service';
 
 @Injectable()
 export class AccountsService {
   constructor(
     @InjectModel(AccountTransaction.name)
     private accountTransactionModel: Model<AccountTransactionDocument>,
+    @Optional()
+    @Inject(forwardRef(() => TallyService))
+    private readonly tallyService?: TallyService,
   ) {}
+
+  private pushToTally(tx: AccountTransactionDocument | null | undefined) {
+    if (!tx || !this.tallyService) return;
+    void this.tallyService.syncAccountTransaction(tx).catch((err) => {
+      console.error('Tally sync error:', err?.message || err);
+    });
+  }
 
   private async generateTransactionId(): Promise<string> {
     const lastDoc = await this.accountTransactionModel
@@ -108,7 +122,9 @@ export class AccountsService {
         createdBy: createdByObjectId,
       });
 
-      return await newTransaction.save();
+      const saved = await newTransaction.save();
+      this.pushToTally(saved);
+      return saved;
     } catch (err) {
       console.error(
         `Failed to record transaction for module ${params.sourceModule}:`,
@@ -132,7 +148,9 @@ export class AccountsService {
       createdBy: new mongoose.Types.ObjectId(userId),
     });
 
-    return await newTransaction.save();
+    const saved = await newTransaction.save();
+    this.pushToTally(saved);
+    return saved;
   }
 
   async findAll(query: GetAccountTransactionsDto) {
