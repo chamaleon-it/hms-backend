@@ -69,13 +69,19 @@ export class Item {
   })
   hsnCode?: string;
 
+  /**
+   * Optional — AR Rahma / Bhumi imports drop sku. Keeping it required caused
+   * `item.save()` after batch edit to 500 with "Path `sku` is required".
+   * Sparse unique so multiple sku-less docs do not collide on null.
+   */
   @Prop({
-    required: true,
+    required: false,
     trim: true,
     uppercase: true,
     unique: true,
+    sparse: true,
   })
-  sku: string;
+  sku?: string;
 
   @Prop({ required: true, trim: true, default: 'Medicine' })
   category: string;
