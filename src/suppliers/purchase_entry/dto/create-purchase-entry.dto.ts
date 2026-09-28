@@ -48,6 +48,7 @@ export class PurchaseItemDto {
   @IsNotEmpty()
   purchasePrice: number;
 
+  /** GST rate percent (e.g. 5). Not the tax amount. */
   @IsNumber()
   @IsNotEmpty()
   gst: number;
