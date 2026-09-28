@@ -59,4 +59,8 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsBoolean({ message: 'isArrived must be a boolean value.' })
   isArrived?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'isWalkIn must be a boolean value.' })
+  isWalkIn?: boolean;
 }

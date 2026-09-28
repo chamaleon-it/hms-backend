@@ -117,12 +117,29 @@ export class AddItemDto {
   rackLocation?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   packing?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   noOfpacking?: number;
 
+  /** FE schema uses camelCase `noOfPacking`; accepted as alias of noOfpacking. */
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  noOfPacking?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  stripCount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   gst?: number;
 
   @IsOptional()

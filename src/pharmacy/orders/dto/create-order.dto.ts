@@ -56,6 +56,34 @@ export class OrderItemDto {
   @IsNumber()
   @IsOptional()
   purchasePrice?: number;
+
+  /** UI-only fields from order forms; accepted then ignored by service. */
+  @IsOptional()
+  @IsNumber()
+  availableQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  medicineName?: string;
+
+  @IsOptional()
+  @IsString()
+  rowId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  packing?: number;
+
+  @IsOptional()
+  @IsNumber()
+  stripCount?: number;
+
+  @IsOptional()
+  expiryDate?: string | Date;
+
+  @IsOptional()
+  @IsString()
+  supplier?: string;
 }
 
 export class CreateOrderDto {

@@ -294,7 +294,9 @@ export class ReportService implements OnModuleInit {
         (x) => x?.name?.toString() === n.name._id.toString(),
       );
       if (index !== -1) {
-        report.test[index].value = n.value;
+        if (n.value !== undefined) {
+          report.test[index].value = n.value;
+        }
       }
     });
 
@@ -342,9 +344,12 @@ export class ReportService implements OnModuleInit {
   async updateFromLis(dto: LisResultDto) {
     const { sampleId, patientId, machine, results, graphs } = dto;
 
+    // Escape regex metacharacters — sampleId is attacker-controlled on the public LIS endpoint
+    const escapedSampleId = String(sampleId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     // Use a regex to allow matching "004" to "004 (Blood)" safely in Mongoose
     let report = await this.reportModel.findOne({
-      sampleId: { $regex: `^${sampleId}(?:\\s|\\(|$)`, $options: 'i' },
+      sampleId: { $regex: `^${escapedSampleId}(?:\\s|\\(|$)`, $options: 'i' },
       isDeleted: false,
       status: { $ne: ReportStatus.COMPLETED },
     });

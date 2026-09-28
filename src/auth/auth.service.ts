@@ -28,9 +28,18 @@ export class AuthService {
         ],
       })
       .select('+password');
-    if (!user) {
+    // Constant-time-ish path: always compare against a hash to reduce timing leaks.
+    const passwordHash =
+      user?.password ||
+      '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWX12';
+    const isPasswordMatched = await bcrypt.compare(
+      loginDto.password,
+      passwordHash,
+    );
+
+    if (!user || !isPasswordMatched) {
       throw new BadRequestException(
-        'No user record found. Kindly register to proceed.',
+        'Invalid username or password. Please try again.',
       );
     }
     if ((user.status as UserStatus) === UserStatus.PENDING) {
@@ -45,13 +54,6 @@ export class AuthService {
       throw new BadRequestException(
         'This profile is blocked. Please contact the administrator for further assistance.',
       );
-    }
-    const isPasswordMatched = await bcrypt.compare(
-      loginDto.password,
-      user.password,
-    );
-    if (!isPasswordMatched) {
-      throw new BadRequestException('Incorrect password. Please try again.');
     }
 
     const accessToken = await this.jwtService.signAsync(

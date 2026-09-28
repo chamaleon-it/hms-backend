@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -18,12 +19,18 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
 import mongoose from 'mongoose';
+import { Public } from 'src/auth/decorators/public.decorator';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from './schemas/user.schema';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
-  //create
+  @Public()
+  @UseGuards(ThrottlerGuard)
   @Post()
   async createUser(@Body() createUserDto: CreateUserDto) {
     const data = await this.usersService.createUser(createUserDto);
@@ -45,13 +52,14 @@ export class UsersController {
     };
   }
 
+  @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('forgot_password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    const data = await this.usersService.forgotPassword(forgotPasswordDto);
+    await this.usersService.forgotPassword(forgotPasswordDto);
     return {
-      data,
       message:
-        'The password reset link has been successfully sent to your email address.',
+        'If an account exists for that email, a password reset link will be sent.',
     };
   }
 
@@ -64,16 +72,6 @@ export class UsersController {
     return {
       data,
       message: 'All doctors data retrieved successfully',
-    };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Delete(':id')
-  async deleteUser(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.usersService.softDeleteUser(id);
-    return {
-      message: 'Doctor soft deleted successfully.',
-      data,
     };
   }
 
@@ -97,18 +95,51 @@ export class UsersController {
     };
   }
 
+  @Get('doctor_availability/:id')
   @UseGuards(JwtAuthGuard)
-  @Patch(':id')
-  async updateUserById(
-    @Param('id') id: mongoose.Types.ObjectId,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
-    const data = await this.usersService.updateUser(id, updateUserDto);
+  async getDoctorAvailability(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.usersService.getDoctorAvailability(id);
     return {
-      message: data
-        ? 'User profile updated successfully.'
-        : 'Failed to update user profile. Please try again later.',
+      message: 'Doctor availability retrieved successfully',
       data,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('consultation_values')
+  async syncConsultationValues(
+    @GetUser() user: JWTUserInterface,
+    @Body() body: { value: string },
+  ) {
+    const data = await this.usersService.syncConsultationValues(
+      user.id,
+      body.value,
+    );
+    return {
+      message: 'Consultation values sync completed',
+      data,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('consultation_values')
+  async getConsultationValues(@GetUser() user: JWTUserInterface) {
+    const data = await this.usersService.getConsultationValues(user.id);
+    return {
+      message: 'Consultation value retrieved successfully',
+      data,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('update_password')
+  async updatePassword(
+    @GetUser() user: JWTUserInterface,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    await this.usersService.updatePassword(user.id, updatePasswordDto);
+    return {
+      message: 'User password is updated.',
     };
   }
 
@@ -127,47 +158,57 @@ export class UsersController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Patch('update_password')
-  async updatePassword(
-    @GetUser() user: JWTUserInterface,
-    @Body() updatePasswordDto: UpdatePasswordDto,
+  // Reception manages doctors; Admin can soft-delete any user.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTION)
+  @Delete(':id')
+  async deleteUser(
+    @GetUser() actor: JWTUserInterface,
+    @Param('id') id: mongoose.Types.ObjectId,
   ) {
-    await this.usersService.updatePassword(user.id, updatePasswordDto);
+    if (actor.role === UserRole.RECEPTION) {
+      const role = await this.usersService.findUserRoleById(id);
+      if (role !== UserRole.DOCTOR) {
+        throw new ForbiddenException(
+          'Reception may only soft-delete doctor accounts.',
+        );
+      }
+    }
+    const data = await this.usersService.softDeleteUser(id);
     return {
-      message: 'User password is updated.',
-    };
-  }
-
-  @Get('doctor_availability/:id')
-  @UseGuards(JwtAuthGuard)
-  async getDoctorAvailability(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.usersService.getDoctorAvailability(id);
-    return {
-      message: 'Doctor availability retrieved successfully',
+      message: 'Doctor soft deleted successfully.',
       data,
     };
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post('consultation_values')
-  async syncConsultationValues(
-    @GetUser() user: JWTUserInterface,
-    @Body() { value }: { value: string },
+  // Reception updates doctors; Admin can update any user by id.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTION)
+  @Patch(':id')
+  async updateUserById(
+    @GetUser() actor: JWTUserInterface,
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() updateUserDto: UpdateUserDto,
   ) {
-    const data = await this.usersService.syncConsultationValues(user.id, value);
+    if (actor.role === UserRole.RECEPTION) {
+      const role = await this.usersService.findUserRoleById(id);
+      if (role !== UserRole.DOCTOR) {
+        throw new ForbiddenException(
+          'Reception may only update doctor accounts.',
+        );
+      }
+      if (
+        (updateUserDto as any).role &&
+        (updateUserDto as any).role !== UserRole.DOCTOR
+      ) {
+        throw new ForbiddenException('Reception cannot change user roles.');
+      }
+    }
+    const data = await this.usersService.updateUser(id, updateUserDto);
     return {
-      message: 'Consultation values sync completed',
-      data,
-    };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('consultation_values')
-  async getConsultationValues(@GetUser() user: JWTUserInterface) {
-    const data = await this.usersService.getConsultationValues(user.id);
-    return {
-      message: 'Consultation value retrieved successfully',
+      message: data
+        ? 'User profile updated successfully.'
+        : 'Failed to update user profile. Please try again later.',
       data,
     };
   }

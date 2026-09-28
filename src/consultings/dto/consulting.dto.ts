@@ -132,7 +132,10 @@ class TestDto {
   @IsNotEmpty({ message: 'Priority cannot be empty.' })
   priority: string;
 
-  panels: string[];
+  @IsOptional()
+  @IsArray({ message: 'Panels must be an array of strings.' })
+  @IsString({ each: true })
+  panels?: string[];
 }
 
 class MedicalParametersDto {

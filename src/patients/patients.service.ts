@@ -50,19 +50,36 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
-    if (!patientRegisterDto.mrn) {
+    const { age, month, ...rest } = patientRegisterDto as PatientRegisterDto & {
+      age?: number;
+      month?: number;
+    };
+
+    if (!rest.dateOfBirth && (age != null || month != null)) {
+      const yrs = Number(age) || 0;
+      const mths = Number(month) || 0;
+      const today = new Date();
+      const dob = new Date(
+        today.getFullYear() - yrs,
+        today.getMonth() - mths,
+        today.getDate(),
+      );
+      rest.dateOfBirth = dob.toISOString();
+    }
+
+    if (!rest.mrn) {
       const mrn = await this.generateUniqueMRN();
-      patientRegisterDto.mrn = mrn;
+      rest.mrn = mrn;
     } else {
       const mrn = await this.patientModel.exists({
-        mrn: patientRegisterDto.mrn,
+        mrn: rest.mrn,
       });
       if (mrn) {
         throw new BadRequestException('MRN already exists');
       }
     }
     const patient = await this.patientModel.create({
-      ...patientRegisterDto,
+      ...rest,
       createdBy,
     });
     return patient;
@@ -195,7 +212,11 @@ export class PatientsService {
         $or: [
           { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
           { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-          { address: { $regex: addressSearchTerm, $options: 'i' } },
+          { city: { $regex: addressSearchTerm, $options: 'i' } },
+          { district: { $regex: addressSearchTerm, $options: 'i' } },
+          { state: { $regex: addressSearchTerm, $options: 'i' } },
+          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
+          { country: { $regex: addressSearchTerm, $options: 'i' } },
         ],
       });
     }
@@ -255,13 +276,13 @@ export class PatientsService {
           { name: searchRegex },
           { mrn: searchRegex },
           { phoneNumber: searchRegex },
-          { address: searchRegex },
           { addressLine1: searchRegex },
           { addressLine2: searchRegex },
           { city: searchRegex },
           { district: searchRegex },
           { state: searchRegex },
           { pinCode: searchRegex },
+          { country: searchRegex },
           { uhid: searchRegex },
         ],
       })
@@ -273,11 +294,13 @@ export class PatientsService {
       const mrn = (patient.mrn || '').toLowerCase();
       const phone = (patient.phoneNumber || '').toLowerCase();
       const address = [
-        patient.address,
         patient.addressLine1,
         patient.addressLine2,
         patient.city,
         patient.district,
+        patient.state,
+        patient.pinCode,
+        patient.country,
       ]
         .filter(Boolean)
         .join(' ')
@@ -462,9 +485,26 @@ export class PatientsService {
     patientRegisterDto: PatientRegisterDto,
     patient: mongoose.Types.ObjectId,
   ) {
+    const { age, month, ...rest } = patientRegisterDto as PatientRegisterDto & {
+      age?: number;
+      month?: number;
+    };
+
+    if (!rest.dateOfBirth && (age != null || month != null)) {
+      const yrs = Number(age) || 0;
+      const mths = Number(month) || 0;
+      const today = new Date();
+      const dob = new Date(
+        today.getFullYear() - yrs,
+        today.getMonth() - mths,
+        today.getDate(),
+      );
+      rest.dateOfBirth = dob.toISOString();
+    }
+
     const data = await this.patientModel.findByIdAndUpdate(
       patient,
-      patientRegisterDto,
+      { $set: rest, $unset: { address: 1 } },
       { new: true },
     );
     if (!data) {
@@ -531,7 +571,9 @@ export class PatientsService {
       .findOne({
         $or: orConditions,
       })
-      .select('name phoneNumber email gender dateOfBirth blood mrn address')
+      .select(
+        'name phoneNumber email gender dateOfBirth blood mrn addressLine1 addressLine2 city district state pinCode country',
+      )
       .lean()
       .exec();
     return data;

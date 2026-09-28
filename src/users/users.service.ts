@@ -10,8 +10,6 @@ import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { JwtService } from '@nestjs/jwt';
-import configuration from 'src/config/configuration';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
 
@@ -19,10 +17,20 @@ import { UpdatePasswordDto } from './dto/updatePassword';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    private jwtService: JwtService,
   ) { }
 
   async createUser(createUserDto: CreateUserDto) {
+    const requestedRole = (createUserDto.role || '').trim();
+    if (
+      requestedRole === UserRole.ADMIN ||
+      !Object.values(UserRole).includes(requestedRole as UserRole) ||
+      requestedRole === UserRole.NOT_ASSIGNED
+    ) {
+      throw new BadRequestException(
+        'Invalid role. Please select a valid account type.',
+      );
+    }
+
     const isUserExist = await this.userModel.findOne({
       $or: [
         { email: createUserDto.email },
@@ -39,7 +47,11 @@ export class UsersService {
       }
     }
     createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
-    const user = await this.userModel.create(createUserDto);
+    const user = await this.userModel.create({
+      ...createUserDto,
+      role: requestedRole,
+      status: UserStatus.PENDING,
+    });
     const { password, ...data } = user.toObject();
     return data;
   }
@@ -87,21 +99,11 @@ export class UsersService {
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-    const user = await this.userModel.findOne({
+    // Always return void — never leak whether the email exists or return a JWT.
+    // Email delivery is not wired yet; do not mint reset tokens into the API response.
+    await this.userModel.findOne({
       email: forgotPasswordDto.email,
     });
-    if (!user) {
-      throw new BadRequestException('Sorry, User not exist.');
-    }
-    const token = await this.jwtService.signAsync(
-      { id: user._id },
-      {
-        secret: configuration().secret.forgotPassword,
-        expiresIn: '7d',
-      },
-    );
-
-    return token;
   }
 
   async getAllDoctors(includeDeleted: boolean = false) {
@@ -117,6 +119,13 @@ export class UsersService {
       .sort({ name: 1 })
       .lean();
     return data;
+  }
+
+  async findUserRoleById(
+    id: mongoose.Types.ObjectId,
+  ): Promise<UserRole | null> {
+    const user = await this.userModel.findById(id).select('role').lean();
+    return (user?.role as UserRole) ?? null;
   }
 
   async softDeleteUser(id: mongoose.Types.ObjectId) {

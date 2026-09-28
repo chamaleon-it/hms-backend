@@ -129,15 +129,19 @@ function parseASTM(rawContent) {
 
 function sendToBackend(sampleId, machine, results) {
     const postData = JSON.stringify({ sampleId, machine, results });
+    const headers = {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+    };
+    if (process.env.LIS_API_KEY) {
+        headers['x-lis-api-key'] = process.env.LIS_API_KEY;
+    }
     const options = {
         hostname: 'localhost',
         port: 3001, // NestJS Backend port
         path: '/lab/report/lis-result',
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-        }
+        headers
     };
 
     const req = http.request(options, (res) => {

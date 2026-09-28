@@ -92,6 +92,11 @@ export class CreatePurchaseEntryDto {
   @IsNotEmpty()
   subTotal: number;
 
+  /** Alias of subTotal from FE; accepted then ignored in favor of subTotal. */
+  @IsOptional()
+  @IsNumber()
+  grossAmount?: number;
+
   @IsNumber()
   @IsNotEmpty()
   discount: number;

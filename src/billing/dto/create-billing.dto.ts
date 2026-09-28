@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsMongoId,
   IsNotEmpty,
   IsNumber,
@@ -122,4 +123,29 @@ export class CreateBillingDto {
   @Type(() => Number)
   @IsOptional()
   tokenNumber?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  roundOff?: boolean;
+
+  @IsOptional()
+  @IsString()
+  department?: string;
+
+  @IsOptional()
+  @IsString()
+  payer?: string;
+
+  @IsOptional()
+  @IsString()
+  policyNo?: string;
+
+  @IsOptional()
+  @IsString()
+  tpa?: string;
+
+  @IsOptional()
+  @IsString()
+  preAuthNo?: string;
 }

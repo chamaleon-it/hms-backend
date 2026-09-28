@@ -3,9 +3,11 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
   Put,
 } from '@nestjs/common';
@@ -19,6 +21,7 @@ import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
 import { LisResultDto } from './dto/lis-result.dto';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('lab/report')
 export class ReportController {
@@ -89,9 +92,26 @@ export class ReportController {
     };
   }
 
+  @Public()
   @Post('lis-result')
-  // No JwtAuthGuard here to allow local scripts to call it automatically
-  async receiveLisResult(@Body() dto: LisResultDto) {
+  // Not JWT-guarded (local instrument scripts). Authenticated via LIS_API_KEY.
+  // Fail-closed in production when LIS_API_KEY is unset.
+  async receiveLisResult(
+    @Headers('x-lis-api-key') apiKey: string | undefined,
+    @Body() dto: LisResultDto,
+  ) {
+    const expected = process.env.LIS_API_KEY?.trim();
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!expected) {
+      if (isProduction) {
+        throw new UnauthorizedException(
+          'LIS API key is not configured. Refusing public LIS writes.',
+        );
+      }
+      // Non-production: allow open only when explicitly unset for local LIS scripts.
+    } else if (apiKey !== expected) {
+      throw new UnauthorizedException('Invalid or missing LIS API key');
+    }
     const data = await this.reportService.updateFromLis(dto);
     return {
       message: 'LIS Result Received',
