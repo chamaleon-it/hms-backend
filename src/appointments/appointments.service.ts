@@ -330,33 +330,66 @@ export class AppointmentsService {
   }
 
   async getStatistics(doctor?: string) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const startOfDay = new Date(`${todayStr}T00:00:00.000Z`);
-    const endOfDay = new Date(`${todayStr}T23:59:59.999Z`);
+    // Align day/week boundaries with patients.statistics (server local time).
+    // "This week" = Monday 00:00 through Sunday 23:59:59 (ISO week, Monday start).
+    const now = new Date();
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setHours(23, 59, 59, 999);
 
-    const matchCondition: Record<string, any> = {
-      date: { $gte: startOfDay, $lte: endOfDay },
-      isDeleted: false,
-    };
+    const dayIndex = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - dayIndex);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const doctorFilter: Record<string, any> = {};
     if (doctor && mongoose.isValidObjectId(doctor)) {
-      matchCondition.doctor = new mongoose.Types.ObjectId(doctor);
+      doctorFilter.doctor = new mongoose.Types.ObjectId(doctor);
     }
 
-    const results: { count: number; _id: AppointmentStatus }[] =
-      await this.appointmentModel.aggregate([
-        {
-          $match: matchCondition,
-        },
-        {
-          $group: {
-            _id: '$status',
-            count: { $sum: 1 },
+    const matchToday: Record<string, any> = {
+      date: { $gte: startOfToday, $lte: endOfToday },
+      isDeleted: false,
+      ...doctorFilter,
+    };
+
+    const [results, thisWeek, total]: [
+      { count: number; _id: AppointmentStatus }[],
+      number,
+      number,
+    ] = await Promise.all([
+      this.appointmentModel
+        .aggregate([
+          { $match: matchToday },
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 },
+            },
           },
-        },
-      ]);
+        ])
+        .exec(),
+      this.appointmentModel.countDocuments({
+        date: { $gte: startOfWeek, $lte: endOfWeek },
+        isDeleted: false,
+        ...doctorFilter,
+      }),
+      this.appointmentModel.countDocuments({
+        isDeleted: false,
+        ...doctorFilter,
+      }),
+    ]);
 
     const stats: Record<string, number> = {
       today: 0,
+      thisWeek,
+      total,
       upcoming: 0,
       consulted: 0,
       observation: 0,
