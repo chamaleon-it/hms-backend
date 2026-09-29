@@ -15,6 +15,13 @@ import {
   IPStatus,
 } from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
+import {
+  addCalendarDays,
+  CONSULTATION_VALIDITY_DAYS,
+  displayValidUntil,
+  priorConsultationValidUntil,
+  resolveConsultationCharge,
+} from './consultation-validity';
 function getDoctorFirstNamePrefix(doctorName: string): string {
   if (!doctorName) return 'DOC';
   const cleanName = doctorName
@@ -39,11 +46,16 @@ export class AppointmentsService {
     createAppointmentDto: CreateAppointmentDto,
     createdBy: mongoose.Types.ObjectId,
   ) {
-    let shouldBillConsultation = true;
+    const visitDate = new Date(createAppointmentDto.date);
+    let consultation = resolveConsultationCharge({
+      visitDate,
+      currentValidUntil: null,
+      windowDays: CONSULTATION_VALIDITY_DAYS,
+    });
 
     try {
-      // Find the most recent prior appointment for the same patient and doctor that had a consultation fee
-      const lastAppointment = await this.appointmentModel
+      // The window belongs to the last paid visit, not to a free revisit.
+      const lastPaidAppointment = await this.appointmentModel
         .findOne({
           patient: createAppointmentDto.patient,
           doctor: createAppointmentDto.doctor,
@@ -53,20 +65,24 @@ export class AppointmentsService {
         })
         .sort({ date: -1 });
 
-      if (lastAppointment) {
-        const prevDate = new Date(lastAppointment.date);
-        const validityEnd = new Date(prevDate);
-        validityEnd.setDate(prevDate.getDate() + 10);
-        validityEnd.setHours(23, 59, 59, 999);
-
-        const newAppDate = new Date(createAppointmentDto.date);
-        if (newAppDate <= validityEnd) {
-          shouldBillConsultation = false;
-        }
+      if (lastPaidAppointment) {
+        const currentValidUntil = lastPaidAppointment.consultationValidUntil
+          ? new Date(lastPaidAppointment.consultationValidUntil)
+          : addCalendarDays(
+              new Date(lastPaidAppointment.date),
+              CONSULTATION_VALIDITY_DAYS,
+            );
+        consultation = resolveConsultationCharge({
+          visitDate,
+          currentValidUntil,
+          windowDays: CONSULTATION_VALIDITY_DAYS,
+        });
       }
     } catch (error) {
       console.error('Failed to look up last appointment:', error);
     }
+
+    const shouldBillConsultation = consultation.charge;
 
     // Calculate Token for Doctor on Appointment Date
     let tokenNumber = 1;
@@ -124,6 +140,7 @@ export class AppointmentsService {
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
       hasConsultationFee: shouldBillConsultation,
+      consultationValidUntil: consultation.validUntil,
       tokenNumber,
       token,
       isArrived,
@@ -311,7 +328,7 @@ export class AppointmentsService {
       .option({ allowDiskUse: true });
 
     const doctorCounters: Record<string, number> = {};
-    return list
+    const withTokens = list
       .map((item: any) => {
         const docId = item.doctor?._id?.toString() || 'unknown';
         doctorCounters[docId] = (doctorCounters[docId] || 0) + 1;
@@ -327,6 +344,67 @@ export class AppointmentsService {
         };
       })
       .sort((a: any, b: any) => (a.tokenNumber || 0) - (b.tokenNumber || 0));
+
+    return this.attachConsultationValidUntil(withTokens);
+  }
+
+  /**
+   * Older visits have no stored end date. Fill Valid Upto for the bill from
+   * the last paid visit so a free revisit does not print a new window.
+   */
+  private async attachConsultationValidUntil(rows: any[]) {
+    const missing = rows.filter(
+      (row) => !row.consultationValidUntil && row.patient?._id,
+    );
+    if (!missing.length) return rows;
+
+    const patientIds = [
+      ...new Set(missing.map((row) => row.patient._id)),
+    ];
+    const charged = await this.appointmentModel
+      .find({
+        patient: { $in: patientIds },
+        hasConsultationFee: { $ne: false },
+        isRefunded: { $ne: true },
+        isDeleted: { $ne: true },
+      })
+      .select('_id patient doctor date consultationValidUntil')
+      .lean();
+
+    return rows.map((row) => {
+      if (row.consultationValidUntil || !row.patient?._id) return row;
+      const patientId = String(row.patient._id);
+      const doctorId = String(row.doctor?._id || '');
+      const visits = (charged || [])
+        .filter(
+          (visit) =>
+            String(visit.patient) === patientId &&
+            String(visit.doctor) === doctorId,
+        )
+        .map((visit) => ({
+          id: String(visit._id),
+          date: new Date(visit.date),
+          consultationValidUntil: visit.consultationValidUntil
+            ? new Date(visit.consultationValidUntil)
+            : null,
+        }));
+      const priorValidUntil = priorConsultationValidUntil(
+        visits,
+        new Date(row.date),
+        String(row._id),
+        CONSULTATION_VALIDITY_DAYS,
+      );
+      return {
+        ...row,
+        consultationValidUntil: displayValidUntil({
+          visitDate: new Date(row.date),
+          hasConsultationFee: row.hasConsultationFee !== false,
+          consultationValidUntil: null,
+          priorValidUntil,
+          windowDays: CONSULTATION_VALIDITY_DAYS,
+        }),
+      };
+    });
   }
 
   async getStatistics(doctor?: string) {
