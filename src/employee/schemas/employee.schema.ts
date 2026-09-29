@@ -7,6 +7,9 @@ export enum EmployeeRole {
   PHARMACIST = 'Pharmacist',
   TECHNICIAN = 'Technician',
   THERAPIST = 'Therapist',
+  RECEPTIONIST = 'Receptionist',
+  TELECALLER = 'Telecaller',
+  ACCOUNTANT = 'Accountant',
 }
 
 @Schema({ timestamps: true, versionKey: false })

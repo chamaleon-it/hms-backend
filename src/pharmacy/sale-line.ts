@@ -129,8 +129,9 @@ export interface ResolvedSaleLine {
   unitPrice: number;
   gst: number;
   discount: number;
-  /** Taxable line amount (qty × unit price), before GST. */
+  /** Line amount (qty × unit price). Unit price already includes GST. */
   total: number;
+  /** Not added to the line. Unit price is tax-inclusive. */
   gstAmount: number;
   net: number;
 }
@@ -169,7 +170,6 @@ export function resolveSaleLine(input: {
     : readBatchNumber(batch);
   const expiryDate = input.expiryDate || batch?.expiryDate || item?.expiryDate;
   const total = roundMoney(unitPrice * quantity);
-  const gstAmount = roundMoney(total * (gst / 100));
 
   return {
     name: displayName,
@@ -181,7 +181,7 @@ export function resolveSaleLine(input: {
     gst,
     discount: 0,
     total,
-    gstAmount,
-    net: roundMoney(total + gstAmount),
+    gstAmount: 0,
+    net: total,
   };
 }

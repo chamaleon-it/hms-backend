@@ -45,6 +45,10 @@ export class Billing {
   @Prop({ type: String, default: 'Self' })
   doctor: string;
 
+  /** Accountant selected on the pharmacy order that produced this bill. */
+  @Prop({ type: String, default: '' })
+  inCharge?: string;
+
   @Prop({ type: [BillingItemSchema], default: [] })
   items: BillingItem[];
 

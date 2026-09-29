@@ -433,6 +433,15 @@ export class PatientsService {
     startOfWeek.setDate(startOfWeek.getDate() - dayIndex);
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     const facets = await this.patientModel
       .aggregate([
@@ -467,7 +476,11 @@ export class PatientsService {
               { $count: 'count' },
             ],
             thisMonth: [
-              { $match: { createdAt: { $gte: startOfMonth } } },
+              {
+                $match: {
+                  createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+                },
+              },
               { $count: 'count' },
             ],
             male: [{ $match: { gender: Gender.MALE } }, { $count: 'count' }],

@@ -175,6 +175,11 @@ export class BillingService {
         } else {
           order.paymentStatus = PaymentStatus.Paid;
         }
+        const accountant = String(order.pharmacist || '').trim();
+        if (accountant && accountant !== '-') {
+          data.inCharge = accountant;
+          await data.save();
+        }
         await order.save();
       }
     }

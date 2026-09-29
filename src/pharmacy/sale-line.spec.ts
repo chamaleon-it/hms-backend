@@ -32,8 +32,8 @@ describe('pharmacy sale line', () => {
     expect(line.total).toBe(270);
     expect(line.total).not.toBe(0);
     expect(line.gst).toBe(5);
-    expect(line.gstAmount).toBe(13.5);
-    expect(line.net).toBe(283.5);
+    expect(line.gstAmount).toBe(0);
+    expect(line.net).toBe(270);
     expect(line.batchNumber).toBe('DL-EXP-2027');
     expect(line.batchNumber).not.toBe('B0');
   });

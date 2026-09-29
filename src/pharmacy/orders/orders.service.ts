@@ -155,6 +155,7 @@ export class OrdersService {
           ),
           discount: order.discount ?? 0,
           doctor: order.doctorName || 'Self',
+          inCharge: order.pharmacist,
         });
 
         data.billNo = bill.mrn;
@@ -1013,6 +1014,7 @@ export class OrdersService {
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
         doctor: existOrder.doctorName || 'Self',
+        inCharge: existOrder.pharmacist,
       });
     }
 
