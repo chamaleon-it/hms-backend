@@ -17,7 +17,13 @@ import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
-import { resolveSaleLine } from '../sale-line';
+import {
+  batchSalePrice,
+  chosenBatch,
+  isPlaceholderBatchNumber,
+  readBatchNumber,
+  resolveSaleLine,
+} from '../sale-line';
 
 @Injectable()
 export class OrdersService {
@@ -777,8 +783,57 @@ export class OrdersService {
   }
 
   async updateOrder(dto: UpdateOrderDto) {
+    const $set: Record<string, unknown> = {};
+    const fields = [
+      'mrn',
+      'patient',
+      'doctor',
+      'doctorName',
+      'pharmacist',
+      'discount',
+      'paidAmount',
+      'paymentStatus',
+      'billNo',
+      'priority',
+      'status',
+      'assignedTo',
+    ] as const;
+    for (const key of fields) {
+      if (dto[key] !== undefined) $set[key] = dto[key];
+    }
+    if (dto.items) {
+      $set.items = dto.items.map((item) => {
+        const rawName = item.name as
+          | { _id?: mongoose.Types.ObjectId | string }
+          | mongoose.Types.ObjectId
+          | string
+          | undefined;
+        const name =
+          rawName && typeof rawName === 'object' && '_id' in rawName
+            ? rawName._id
+            : rawName;
+        const batchNumber = isPlaceholderBatchNumber(item.batchNumber)
+          ? undefined
+          : String(item.batchNumber).trim();
+        return {
+          name,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          food: item.food,
+          duration: item.duration,
+          quantity: item.quantity,
+          batchNumber,
+          unitPrice: item.unitPrice,
+          mrp: item.mrp,
+          gst: item.gst,
+          purchasePrice: item.purchasePrice,
+          expiryDate: item.expiryDate ? new Date(item.expiryDate) : undefined,
+        };
+      });
+    }
+
     const order = await this.orderModel
-      .findByIdAndUpdate(dto._id, dto, { new: true, runValidators: true })
+      .findByIdAndUpdate(dto._id, { $set }, { new: true, runValidators: true })
       .lean();
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -801,24 +856,53 @@ export class OrdersService {
         ? new mongoose.Types.ObjectId(userId)
         : new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id);
 
+      const deductions: {
+        itemId: mongoose.Types.ObjectId;
+        quantity: number;
+        batchNumber: string;
+      }[] = [];
+
       for (const item of order.items) {
-        if (item.name && item.quantity > 0) {
-          const itemId = (item.name as any)?._id || item.name;
-          const patientObj = order.patient as any;
-          await this.itemsService.decreaseItem(
-            itemId as mongoose.Types.ObjectId,
-            item.quantity,
-            userObjId,
-            patientObj?.name || (order as any).customerName,
-            patientObj?.phoneNumber ||
-            (order as any).customerPhone ||
-            patientObj?.phone,
-            (order as any).doctorName || (order as any).doctor,
-            (order as any).pharmacistName || (order as any).pharmacist,
-            patientObj?.mrn || (order as any).mrn,
-            (item as any).batchNumber,
+        if (!item.name || !(item.quantity > 0)) continue;
+        const itemId = ((item.name as any)?._id ||
+          item.name) as mongoose.Types.ObjectId;
+        const itemDoc = await this.itemsService.getItem(itemId);
+        const batch = chosenBatch(itemDoc?.batches, (item as any).batchNumber);
+        if (!batch) {
+          throw new BadRequestException(
+            `Select a batch for ${itemDoc?.name || 'this medicine'} before completing the order.`,
           );
         }
+        const batchNumber = readBatchNumber(batch);
+        const price = batchSalePrice(batch);
+        (item as any).batchNumber = batchNumber;
+        if (price > 0) (item as any).unitPrice = price;
+        if (!(Number((item as any).gst) > 0) && Number(batch.gst) > 0) {
+          (item as any).gst = Number(batch.gst);
+        }
+        if (batch.expiryDate) (item as any).expiryDate = batch.expiryDate;
+        deductions.push({
+          itemId,
+          quantity: item.quantity,
+          batchNumber,
+        });
+      }
+
+      const patientObj = order.patient as any;
+      for (const line of deductions) {
+        await this.itemsService.decreaseItem(
+          line.itemId,
+          line.quantity,
+          userObjId,
+          patientObj?.name || (order as any).customerName,
+          patientObj?.phoneNumber ||
+            (order as any).customerPhone ||
+            patientObj?.phone,
+          (order as any).doctorName || (order as any).doctor,
+          (order as any).pharmacistName || (order as any).pharmacist,
+          patientObj?.mrn || (order as any).mrn,
+          line.batchNumber,
+        );
       }
 
       order.status = OrderStatus.Completed;

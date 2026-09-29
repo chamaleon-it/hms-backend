@@ -57,6 +57,9 @@ export class OrderItem {
 
   @Prop({ default: 0 })
   purchasePrice?: number;
+
+  @Prop({ type: Date })
+  expiryDate?: Date;
 }
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 
