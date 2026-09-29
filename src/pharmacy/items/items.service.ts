@@ -509,19 +509,13 @@ export class ItemsService {
         effectiveUnitPrice = batch.unitPrice;
       }
     } else if (item.batches && item.batches.length > 0) {
-      const batch =
-        item.batches.find(
-          (b) => isBatchActive(b) && (Number(b.quantity) || 0) > 0,
-        ) || item.batches.find((b) => isBatchActive(b));
-      if (!batch) {
-        throw new BadRequestException('No active batch available for sale.');
-      }
-      if (batch?.unitPrice) {
-        effectiveUnitPrice = batch.unitPrice;
-      }
-      batch.quantity = allowNegativeStock
-        ? (batch.quantity || 0) - quantity
-        : Math.max((batch.quantity || 0) - quantity, 0);
+      throw new BadRequestException(
+        `Select a batch for ${item.name} before completing the order.`,
+      );
+    } else {
+      throw new BadRequestException(
+        `No batch available for ${item.name}. Add a batch before completing the order.`,
+      );
     }
 
     if (quantity > 0) {
