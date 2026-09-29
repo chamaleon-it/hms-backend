@@ -283,6 +283,42 @@ export class BillingService {
     return data;
   }
 
+  private readonly therapyBillRegex =
+    /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
+
+  private readonly procedureBillRegex = /procedure/i;
+
+  private treatmentBillClauses() {
+    return [
+      { note: this.therapyBillRegex },
+      { 'items.name': this.therapyBillRegex },
+      { note: this.procedureBillRegex },
+      { 'items.name': this.procedureBillRegex },
+    ];
+  }
+
+  private isTherapyOrProcedureBill(bill: {
+    note?: string;
+    items?: { name?: unknown }[];
+  }): boolean {
+    const note = String(bill?.note || '');
+    const names = (bill?.items || []).map((item) =>
+      String(
+        typeof item?.name === 'string'
+          ? item.name
+          : (item?.name as { name?: string })?.name || '',
+      ),
+    );
+    return (
+      this.therapyBillRegex.test(note) ||
+      this.procedureBillRegex.test(note) ||
+      names.some(
+        (name) =>
+          this.therapyBillRegex.test(name) || this.procedureBillRegex.test(name),
+      )
+    );
+  }
+
   async getBills(
     user: mongoose.Types.ObjectId | null,
     getBillisDto: GetBillisDto,
@@ -360,16 +396,19 @@ export class BillingService {
     }
 
     if (billType && billType !== 'all') {
-      const therapyRegex =
-        /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
-      const procedureRegex = /procedure/i;
       const receptionRegex =
         /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
 
       if (billType === 'therapy') {
-        match.$or = [{ note: therapyRegex }, { 'items.name': therapyRegex }];
+        match.$or = [
+          { note: this.therapyBillRegex },
+          { 'items.name': this.therapyBillRegex },
+        ];
       } else if (billType === 'procedure') {
-        match.$or = [{ note: procedureRegex }, { 'items.name': procedureRegex }];
+        match.$or = [
+          { note: this.procedureBillRegex },
+          { 'items.name': this.procedureBillRegex },
+        ];
       } else if (billType === 'reception') {
         match.$or = [
           { transactionType: { $in: ['Refund', 'Return'] } },
@@ -378,10 +417,7 @@ export class BillingService {
         ];
       } else if (billType === 'other') {
         match.$nor = [
-          { note: therapyRegex },
-          { 'items.name': therapyRegex },
-          { note: procedureRegex },
-          { 'items.name': procedureRegex },
+          ...this.treatmentBillClauses(),
           { note: receptionRegex },
           { 'items.name': receptionRegex },
           { transactionType: { $in: ['Refund', 'Return'] } },
@@ -445,7 +481,30 @@ export class BillingService {
       $unwind: { path: '$creator', preserveNullAndEmptyArrays: true },
     });
 
-    if (userRole) {
+    const requester = user ? await this.usersService.getUserById(user) : null;
+    const requesterRole = String(requester?.role || '').toLowerCase();
+    const pharmacyListing =
+      /^pharmacy$/i.test(userRole || '') || requesterRole.includes('pharmacy');
+
+    if (userRole && /^reception$/i.test(userRole)) {
+      pipeline.push({
+        $match: {
+          'creator.role': new RegExp(`^${userRole}$`, 'i'),
+          $nor: this.treatmentBillClauses(),
+        },
+      });
+    } else if (pharmacyListing) {
+      const pharmacyScope: Record<string, unknown>[] = [
+        ...this.treatmentBillClauses(),
+      ];
+      if (user) {
+        pharmacyScope.unshift({ user: new mongoose.Types.ObjectId(user) });
+      }
+      if (userRole && /^pharmacy$/i.test(userRole)) {
+        pharmacyScope.unshift({ 'creator.role': /^pharmacy$/i });
+      }
+      pipeline.push({ $match: { $or: pharmacyScope } });
+    } else if (userRole) {
       pipeline.push({
         $match: { 'creator.role': new RegExp(`^${userRole}$`, 'i') },
       });
@@ -1068,17 +1127,21 @@ export class BillingService {
       data = data.filter((bill: any) => {
         const userRole = (bill.user?.role || '').toLowerCase();
         if (role.toLowerCase() === 'pharmacy') {
+          if (this.isTherapyOrProcedureBill(bill)) return true;
           if (userRole.includes('pharmacy')) return true;
           if (userRole === 'doctor' || userRole === 'lab' || userRole === 'reception') return false;
           if (bill.reportId || bill.tokenNumber || bill.token) return false;
           const noteStr = String(bill.note || '').toLowerCase();
-          if (/consultation|registration|token|ncf|therapy|procedure/i.test(noteStr)) return false;
+          if (/consultation|registration|token|ncf/i.test(noteStr)) return false;
           const items = bill.items || [];
           if (items.length === 0) return false;
           return items.some((it: any) => {
             const n = String(typeof it.name === 'string' ? it.name : it.name?.name || '').toLowerCase();
-            return !/consultation|registration|token|ncf|therapy|procedure|lab|blood|scan|x-ray|ecg/i.test(n);
+            return !/consultation|registration|token|ncf|lab|blood|scan|x-ray|ecg/i.test(n);
           });
+        }
+        if (role.toLowerCase() === 'reception' && this.isTherapyOrProcedureBill(bill)) {
+          return false;
         }
         return new RegExp(`^${role}$`, 'i').test(userRole);
       });
