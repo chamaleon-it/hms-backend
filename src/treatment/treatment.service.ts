@@ -637,11 +637,7 @@ export class TreatmentService {
 
     const typeLabel =
       treatment.type === TreatmentType.Procedure ? 'Procedure' : 'Therapy';
-    const sessionNotes = dto.notes
-      ? `[${typeLabel} Session #${treatment.sessionNumber}] ${dto.notes}`
-      : treatment.notes
-        ? `[${typeLabel} Session #${treatment.sessionNumber}] ${treatment.notes}`
-        : `${typeLabel} Session #${treatment.sessionNumber}`;
+    const sessionNotes = `${typeLabel} Session #${treatment.sessionNumber}`;
 
     const billPayload: any = {
       user: new mongoose.Types.ObjectId(pharmacyUserIdStr),
@@ -675,9 +671,6 @@ export class TreatmentService {
     }
     if (dto.therapistName) {
       treatment.therapistName = dto.therapistName;
-    }
-    if (dto.notes) {
-      treatment.notes = dto.notes;
     }
 
     const saved = await treatment.save();
@@ -776,7 +769,6 @@ export class TreatmentService {
           upi: dto.upi,
           discount: dto.discount,
           paymentMethod: dto.paymentMethod,
-          notes: dto.notes,
           therapist: dto.therapist,
           therapistName: dto.therapistName,
         },

@@ -33,10 +33,6 @@ export class ProcessTreatmentDto {
   completedAt?: Date;
 
   @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
   @IsMongoId()
   therapist?: mongoose.Types.ObjectId;
 

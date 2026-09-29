@@ -182,13 +182,12 @@ describe('TreatmentService', () => {
 
     const processed = await service.processSession(treatmentId, {
       cash: 1500,
-      notes: 'First session completed',
       therapistName: 'Sarah Connor',
     });
 
     expect(mockBillingService.generateBill).toHaveBeenCalledWith(
       expect.objectContaining({
-        note: expect.stringContaining('[Therapy Session #1]'),
+        note: 'Therapy Session #1',
       }),
     );
     expect(
