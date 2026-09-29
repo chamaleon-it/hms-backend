@@ -45,6 +45,10 @@ export class Billing {
   @Prop({ type: String, default: 'Self' })
   doctor: string;
 
+  /** Therapist assigned when a therapy or procedure session was billed. */
+  @Prop({ type: String, default: '' })
+  therapistName?: string;
+
   /** Accountant selected on the pharmacy order that produced this bill. */
   @Prop({ type: String, default: '' })
   inCharge?: string;

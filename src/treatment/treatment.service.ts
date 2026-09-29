@@ -638,11 +638,17 @@ export class TreatmentService {
     const typeLabel =
       treatment.type === TreatmentType.Procedure ? 'Procedure' : 'Therapy';
     const sessionNotes = `${typeLabel} Session #${treatment.sessionNumber}`;
+    const assignedTherapist = String(
+      dto.therapistName || treatment.therapistName || '',
+    ).trim();
+    const therapistName =
+      assignedTherapist && assignedTherapist !== '-' ? assignedTherapist : '';
 
     const billPayload: any = {
       user: new mongoose.Types.ObjectId(pharmacyUserIdStr),
       patient: (treatment.patient as any)?._id || treatment.patient,
       doctor: treatment.doctorName || 'Self',
+      therapistName,
       items: billingItems,
       cash: dto.cash || 0,
       card: dto.card || 0,

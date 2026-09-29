@@ -609,9 +609,41 @@ export class BillingService {
       }
     }
 
+    await this.attachSessionTherapists(data);
     await this.repairZeroPricedBills(data);
 
     return { data, total };
+  }
+
+  /** Therapy and procedure bills keep the therapist chosen for that session. */
+  private async attachSessionTherapists(bills: any[]) {
+    if (!bills?.length) return;
+
+    const ids = bills.map((bill) => bill._id).filter(Boolean);
+    let sessions: { bill?: unknown; therapistName?: string }[] = [];
+    try {
+      sessions = await this.billingModel.db
+        .collection('treatments')
+        .find({ bill: { $in: ids }, isDeleted: { $ne: true } })
+        .project({ bill: 1, therapistName: 1 })
+        .toArray();
+    } catch {
+      sessions = [];
+    }
+
+    const byBill = new Map<string, string>();
+    for (const session of sessions) {
+      const name = String(session.therapistName || '').trim();
+      if (!session.bill || !name || name === '-') continue;
+      byBill.set(String(session.bill), name);
+    }
+
+    for (const bill of bills) {
+      const stored = String(bill.therapistName || '').trim();
+      const linked = byBill.get(String(bill._id)) || '';
+      const name = stored && stored !== '-' ? stored : linked;
+      bill.therapistName = name && name !== '-' ? name : '';
+    }
   }
 
   /**
