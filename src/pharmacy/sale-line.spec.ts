@@ -1,4 +1,4 @@
-import { resolveSaleLine } from './sale-line';
+import { chosenBatch, resolveSaleLine } from './sale-line';
 
 describe('pharmacy sale line', () => {
   const dolo = {
@@ -72,5 +72,38 @@ describe('pharmacy sale line', () => {
     expect(line.gst).toBe(5);
     expect(line.batchNumber).toBe('BATCH-A');
     expect(line.total).toBe(270);
+  });
+
+  it('does not treat an unselected batch as chosen when two batches exist', () => {
+    const batches = [
+      { batchNumber: 'B1', unitPrice: 1, quantity: 4000, expiryDate: '2032-08-01' },
+      { batchNumber: 'B2', unitPrice: 9, quantity: 10, expiryDate: '2033-01-01' },
+    ];
+
+    expect(chosenBatch(batches, undefined)).toBeUndefined();
+    expect(chosenBatch(batches, '')).toBeUndefined();
+    expect(chosenBatch(batches, 'B0')).toBeUndefined();
+    expect(chosenBatch(batches, 'B2')?.quantity).toBe(10);
+    expect(chosenBatch(batches, 'b2')?.unitPrice).toBe(9);
+  });
+
+  it('prices a chosen batch from MRP when unit price was not copied onto the line', () => {
+    const line = resolveSaleLine({
+      name: 'Dolo',
+      quantity: 15,
+      unitPrice: 0,
+      batchNumber: 'B2',
+      item: {
+        unitPrice: 1,
+        batches: [
+          { batchNumber: 'B1', unitPrice: 1, quantity: 4000 },
+          { batchNumber: 'B2', unitPrice: 0, mrp: 30, packing: 10, quantity: 20 },
+        ],
+      },
+    });
+
+    expect(line.batchNumber).toBe('B2');
+    expect(line.unitPrice).toBe(3);
+    expect(line.total).toBe(45);
   });
 });
