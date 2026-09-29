@@ -16,11 +16,9 @@ import {
 } from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
 import {
-  addCalendarDays,
-  CONSULTATION_VALIDITY_DAYS,
-  displayValidUntil,
-  priorConsultationValidUntil,
-  resolveConsultationCharge,
+  clinicDayKey,
+  resolveVisitValidity,
+  VisitWindowRef,
 } from './consultation-validity';
 function getDoctorFirstNamePrefix(doctorName: string): string {
   if (!doctorName) return 'DOC';
@@ -47,37 +45,18 @@ export class AppointmentsService {
     createdBy: mongoose.Types.ObjectId,
   ) {
     const visitDate = new Date(createAppointmentDto.date);
-    let consultation = resolveConsultationCharge({
-      visitDate,
-      currentValidUntil: null,
-      windowDays: CONSULTATION_VALIDITY_DAYS,
-    });
+    let consultation = resolveVisitValidity({ visitDate, priors: [] });
 
     try {
-      // The window belongs to the last paid visit, not to a free revisit.
-      const lastPaidAppointment = await this.appointmentModel
-        .findOne({
-          patient: createAppointmentDto.patient,
-          doctor: createAppointmentDto.doctor,
-          hasConsultationFee: { $ne: false },
-          isRefunded: { $ne: true },
-          isDeleted: { $ne: true },
-        })
-        .sort({ date: -1 });
-
-      if (lastPaidAppointment) {
-        const currentValidUntil = lastPaidAppointment.consultationValidUntil
-          ? new Date(lastPaidAppointment.consultationValidUntil)
-          : addCalendarDays(
-              new Date(lastPaidAppointment.date),
-              CONSULTATION_VALIDITY_DAYS,
-            );
-        consultation = resolveConsultationCharge({
-          visitDate,
-          currentValidUntil,
-          windowDays: CONSULTATION_VALIDITY_DAYS,
-        });
-      }
+      // Read the window from the previous visit, including a free revisit.
+      // The last charged visit alone drops a Valid Upto that was already
+      // copied onto a fee-zero visit, and the new visit then becomes
+      // visit + 10 days.
+      const priors = await this.loadConsultationWindows(
+        createAppointmentDto.patient,
+        createAppointmentDto.doctor,
+      );
+      consultation = resolveVisitValidity({ visitDate, priors });
     } catch (error) {
       console.error('Failed to look up last appointment:', error);
     }
@@ -349,62 +328,106 @@ export class AppointmentsService {
   }
 
   /**
-   * Older visits have no stored end date. Fill Valid Upto for the bill from
-   * the last paid visit so a free revisit does not print a new window.
+   * Put the open Valid Upto on each visit.
+   * A free revisit must keep the previous end date. A saved date that is only
+   * this visit plus 10 days is replaced, and the corrected date is stored.
    */
   private async attachConsultationValidUntil(rows: any[]) {
-    const missing = rows.filter(
-      (row) => !row.consultationValidUntil && row.patient?._id,
-    );
-    if (!missing.length) return rows;
-
     const patientIds = [
-      ...new Set(missing.map((row) => row.patient._id)),
+      ...new Set(
+        rows.map((row) => row.patient?._id).filter((id) => id),
+      ),
     ];
-    const charged = await this.appointmentModel
-      .find({
-        patient: { $in: patientIds },
-        hasConsultationFee: { $ne: false },
-        isRefunded: { $ne: true },
-        isDeleted: { $ne: true },
-      })
-      .select('_id patient doctor date consultationValidUntil')
-      .lean();
+    if (!patientIds.length) return rows;
 
-    return rows.map((row) => {
-      if (row.consultationValidUntil || !row.patient?._id) return row;
+    const priors = await this.loadConsultationWindows(patientIds);
+    const corrected: any[] = [];
+    for (const row of rows) {
+      if (!row.patient?._id) {
+        corrected.push(row);
+        continue;
+      }
       const patientId = String(row.patient._id);
-      const doctorId = String(row.doctor?._id || '');
-      const visits = (charged || [])
-        .filter(
-          (visit) =>
-            String(visit.patient) === patientId &&
-            String(visit.doctor) === doctorId,
-        )
-        .map((visit) => ({
-          id: String(visit._id),
-          date: new Date(visit.date),
-          consultationValidUntil: visit.consultationValidUntil
-            ? new Date(visit.consultationValidUntil)
-            : null,
-        }));
-      const priorValidUntil = priorConsultationValidUntil(
-        visits,
-        new Date(row.date),
-        String(row._id),
-        CONSULTATION_VALIDITY_DAYS,
+      const doctorId = String(row.doctor?._id || row.doctor || '');
+      const visits = priors.filter(
+        (visit) => visit.patientId === patientId && visit.doctorId === doctorId,
       );
-      return {
+      const decision = resolveVisitValidity({
+        visitDate: new Date(row.date),
+        visitId: String(row._id),
+        priors: visits,
+      });
+      const charge = row.isRefunded ? false : decision.charge;
+      const next = {
         ...row,
-        consultationValidUntil: displayValidUntil({
-          visitDate: new Date(row.date),
-          hasConsultationFee: row.hasConsultationFee !== false,
-          consultationValidUntil: null,
-          priorValidUntil,
-          windowDays: CONSULTATION_VALIDITY_DAYS,
-        }),
+        hasConsultationFee: charge,
+        consultationValidUntil: decision.validUntil,
       };
-    });
+      corrected.push(next);
+      await this.storeConsultationWindow(row, charge, decision.validUntil);
+    }
+    return corrected;
+  }
+
+  private async loadConsultationWindows(
+    patient: unknown,
+    doctor?: unknown,
+  ): Promise<Array<VisitWindowRef & { patientId: string; doctorId: string }>> {
+    const patientIds = Array.isArray(patient) ? patient : [patient];
+    const query: Record<string, unknown> = {
+      patient: Array.isArray(patient) ? { $in: patientIds } : patient,
+      isRefunded: { $ne: true },
+      isDeleted: { $ne: true },
+    };
+    if (doctor) query.doctor = doctor;
+    const found = await this.appointmentModel
+      .find(query)
+      .select('_id patient doctor date hasConsultationFee consultationValidUntil')
+      .lean();
+    const wantedPatients = new Set(patientIds.map((id) => String(id)));
+    const wantedDoctor = doctor ? String(doctor) : '';
+    return (found || [])
+      .map((visit) => ({
+        id: String(visit._id),
+        patientId: String(visit.patient),
+        doctorId: String(visit.doctor),
+        date: new Date(visit.date),
+        hasConsultationFee: visit.hasConsultationFee !== false,
+        consultationValidUntil: visit.consultationValidUntil
+          ? new Date(visit.consultationValidUntil)
+          : null,
+      }))
+      .filter(
+        (visit) =>
+          wantedPatients.has(visit.patientId) &&
+          (!wantedDoctor || visit.doctorId === wantedDoctor),
+      );
+  }
+
+  private async storeConsultationWindow(
+    row: any,
+    charge: boolean,
+    validUntil: Date,
+  ) {
+    if (!row?._id || typeof this.appointmentModel.updateOne !== 'function') {
+      return;
+    }
+    const sameDay =
+      !!row.consultationValidUntil &&
+      clinicDayKey(new Date(row.consultationValidUntil)) ===
+        clinicDayKey(validUntil);
+    const sameCharge = (row.hasConsultationFee !== false) === charge;
+    if (sameDay && (sameCharge || row.isRefunded)) return;
+    try {
+      await this.appointmentModel.updateOne(
+        { _id: row._id },
+        row.isRefunded
+          ? { consultationValidUntil: validUntil }
+          : { consultationValidUntil: validUntil, hasConsultationFee: charge },
+      );
+    } catch (error) {
+      console.error('Failed to store consultation Valid Upto:', error);
+    }
   }
 
   async getStatistics(doctor?: string) {
