@@ -9,13 +9,23 @@ import {
   ArrayMinSize,
   ValidateNested,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import { OrderPriority, OrderStatus } from '../schemas/order.schema';
 import mongoose from 'mongoose';
 
 export class OrderItemDto {
+  @IsOptional()
   @IsMongoId({ message: 'Item name must be a valid MongoDB ObjectId' })
-  name!: mongoose.Types.ObjectId;
+  name?: mongoose.Types.ObjectId;
+
+  @IsOptional()
+  @IsBoolean()
+  isCustom?: boolean;
+
+  @IsOptional()
+  @IsString()
+  referralName?: string;
 
   @IsString({ message: 'Dosage must be a string' })
   @IsOptional()
@@ -131,4 +141,8 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   doctorName?: string;
+
+  @IsString()
+  @IsOptional()
+  advice?: string;
 }

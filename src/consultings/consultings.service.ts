@@ -84,17 +84,46 @@ export class ConsultingsService {
       doctor: doctorId,
     });
 
-    const inventoryMedicines = (consultingDto.medicines || []).filter(
-      (m) => !m.isCustom && m.name && mongoose.isValidObjectId(m.name),
-    );
+    const orderItems: Record<string, unknown>[] = [];
+    for (const m of consultingDto.medicines || []) {
+      const outside =
+        Boolean(m.isCustom) ||
+        !m.name ||
+        !mongoose.isValidObjectId(String(m.name));
+      if (outside) {
+        const referralName = String(m.referralName || '').trim();
+        if (!referralName) continue;
+        orderItems.push({
+          isCustom: true,
+          referralName,
+          dosage: m.dosage,
+          frequency: m.frequency,
+          food: m.food,
+          duration: m.duration,
+          quantity: m.quantity,
+        });
+        continue;
+      }
+      orderItems.push({
+        name: m.name,
+        isCustom: false,
+        referralName: m.referralName,
+        dosage: m.dosage,
+        frequency: m.frequency,
+        food: m.food,
+        duration: m.duration,
+        quantity: m.quantity,
+      });
+    }
 
-    if (inventoryMedicines.length) {
+    if (orderItems.length) {
       await this.ordersService.createOrder({
         doctor: doctorId,
-        items: inventoryMedicines as any,
+        items: orderItems as any,
         patient: consultingDto.patient,
         priority: OrderPriority.Normal,
         status: OrderStatus.Pending,
+        advice: consultingDto.advice || undefined,
       });
     }
 

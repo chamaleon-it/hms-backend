@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsMongoId,
   IsNotEmpty,
+  IsBoolean,
   Allow,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -107,6 +108,14 @@ export class UpdateOrderItemDto {
   @Type(() => UpdateOrderItemNameDto)
   @IsOptional()
   name?: UpdateOrderItemNameDto | mongoose.Types.ObjectId | string;
+
+  @IsOptional()
+  @IsBoolean()
+  isCustom?: boolean;
+
+  @IsOptional()
+  @IsString()
+  referralName?: string;
 
   @IsString()
   @IsOptional()
@@ -240,6 +249,10 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsString()
   allergies?: string;
+
+  @IsOptional()
+  @IsString()
+  advice?: string;
 
   /** FE may re-spread timestamps / flags from OrderType; allow then ignore. */
   @IsOptional()

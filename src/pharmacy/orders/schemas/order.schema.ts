@@ -25,8 +25,20 @@ export enum PaymentStatus {
 
 @Schema({ _id: false, versionKey: false })
 export class OrderItem {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true })
-  name: Types.ObjectId;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Item',
+    required: false,
+    default: null,
+  })
+  name?: Types.ObjectId | null;
+
+  /** Doctor-prescribed medicine that is not taken from pharmacy stock. */
+  @Prop({ default: false })
+  isCustom?: boolean;
+
+  @Prop({ default: '' })
+  referralName?: string;
 
   @Prop({ default: null })
   dosage: string;
@@ -88,6 +100,10 @@ export class Order {
 
   @Prop({ type: [OrderItemSchema], default: [] })
   items: OrderItem[];
+
+  /** Clinical advice copied from the consultation that created this order. */
+  @Prop({ default: '' })
+  advice?: string;
 
   @Prop({
     required: true,

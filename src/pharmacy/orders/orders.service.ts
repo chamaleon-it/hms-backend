@@ -36,6 +36,19 @@ export class OrdersService {
     private readonly usersService: UsersService,
   ) { }
 
+  /**
+   * Outside medicines are printed on the order but are not stock and are not billed.
+   */
+  private isOutsideItem(item: any): boolean {
+    if (!item) return false;
+    if (item.isCustom === true) return true;
+    const raw = item.name;
+    const id =
+      raw && typeof raw === 'object' ? (raw as { _id?: unknown })._id : raw;
+    if (id && mongoose.isValidObjectId(String(id))) return false;
+    return Boolean(String(item.referralName || '').trim());
+  }
+
   /** Bill row priced from the selected batch, never a placeholder batch number. */
   private toBillItem(item: any, itemData: any) {
     const resolved = resolveSaleLine({
@@ -71,11 +84,13 @@ export class OrdersService {
     const bill = await this.billingModel.findOne({ mrn: order.billNo });
     if (!bill) return;
 
-    const items = (order.items || []).map((item: any) => {
-      const itemDoc =
-        item.name && typeof item.name === 'object' ? item.name : undefined;
-      return this.toBillItem(item, itemDoc);
-    });
+    const items = (order.items || [])
+      .filter((item: any) => !this.isOutsideItem(item))
+      .map((item: any) => {
+        const itemDoc =
+          item.name && typeof item.name === 'object' ? item.name : undefined;
+        return this.toBillItem(item, itemDoc);
+      });
     if (!items.some((line) => line.unitPrice > 0)) return;
 
     bill.items = items as any;
@@ -120,29 +135,39 @@ export class OrdersService {
       configuration().in_house_pharmacy_id,
     );
     if (autoGenerateBill) {
-      const items = await Promise.all(
-        order.items.map(async (item) => {
-          const itemData = await this.itemsService.getItem(item.name);
-          return this.toBillItem(item, itemData);
-        }),
+      const billable = (order.items || []).filter(
+        (item) => !this.isOutsideItem(item) && item.name,
       );
+      if (billable.length) {
+        const items = await Promise.all(
+          billable.map(async (item) => {
+            if (!item.name) return this.toBillItem(item, undefined);
+            const itemData = await this.itemsService.getItem(item.name);
+            return this.toBillItem(item, itemData);
+          }),
+        );
 
-      const bill = await this.billingService.generateBill({
-        patient: order.patient,
-        items,
-        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-        discount: order.discount ?? 0,
-        doctor: order.doctorName || 'Self',
-      });
+        const bill = await this.billingService.generateBill({
+          patient: order.patient,
+          items,
+          user: new mongoose.Types.ObjectId(
+            configuration().in_house_pharmacy_id,
+          ),
+          discount: order.discount ?? 0,
+          doctor: order.doctorName || 'Self',
+        });
 
-      data.billNo = bill.mrn;
+        data.billNo = bill.mrn;
+      }
 
       if (order.allergies) {
         await this.patientModel.findByIdAndUpdate(order.patient, {
           allergies: order.allergies,
         });
       }
-      await data.save();
+      if (billable.length || order.allergies) {
+        await data.save();
+      }
     }
     return data;
   }
@@ -797,6 +822,7 @@ export class OrdersService {
       'priority',
       'status',
       'assignedTo',
+      'advice',
     ] as const;
     for (const key of fields) {
       if (dto[key] !== undefined) $set[key] = dto[key];
@@ -812,22 +838,32 @@ export class OrdersService {
           rawName && typeof rawName === 'object' && '_id' in rawName
             ? rawName._id
             : rawName;
+        const outside = this.isOutsideItem({ ...item, name });
+        const inventoryName =
+          !outside && name && mongoose.isValidObjectId(String(name))
+            ? name
+            : undefined;
         const batchNumber = isPlaceholderBatchNumber(item.batchNumber)
           ? undefined
           : String(item.batchNumber).trim();
         return {
-          name,
+          name: inventoryName,
+          isCustom: outside,
+          referralName: outside
+            ? String(item.referralName || '').trim()
+            : item.referralName,
           dosage: item.dosage,
           frequency: item.frequency,
           food: item.food,
           duration: item.duration,
           quantity: item.quantity,
-          batchNumber,
-          unitPrice: item.unitPrice,
-          mrp: item.mrp,
-          gst: item.gst,
-          purchasePrice: item.purchasePrice,
-          expiryDate: item.expiryDate ? new Date(item.expiryDate) : undefined,
+          batchNumber: outside ? undefined : batchNumber,
+          unitPrice: outside ? 0 : item.unitPrice,
+          mrp: outside ? 0 : item.mrp,
+          gst: outside ? 0 : item.gst,
+          purchasePrice: outside ? 0 : item.purchasePrice,
+          expiryDate:
+            outside || !item.expiryDate ? undefined : new Date(item.expiryDate),
         };
       });
     }
@@ -863,6 +899,7 @@ export class OrdersService {
       }[] = [];
 
       for (const item of order.items) {
+        if (this.isOutsideItem(item)) continue;
         if (!item.name || !(item.quantity > 0)) continue;
         const itemId = ((item.name as any)?._id ||
           item.name) as mongoose.Types.ObjectId;
@@ -955,22 +992,29 @@ export class OrdersService {
     newOrder.priority = existOrder.priority;
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;
+    newOrder.advice = existOrder.advice;
     const data = await this.orderModel.create(newOrder);
 
-    const items = await Promise.all(
-      data.items.map(async (item) => {
-        const itemData = await this.itemsService.getItem(item.name);
-        return this.toBillItem(item, itemData);
-      }),
+    const billable = (data.items || []).filter(
+      (item) => !this.isOutsideItem(item) && item.name,
     );
+    if (billable.length) {
+      const items = await Promise.all(
+        billable.map(async (item) => {
+          if (!item.name) return this.toBillItem(item, undefined);
+          const itemData = await this.itemsService.getItem(item.name);
+          return this.toBillItem(item, itemData);
+        }),
+      );
 
-    await this.billingService.generateBill({
-      patient: data.patient,
-      items,
-      user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
-      discount: data.discount ?? 0,
-      doctor: existOrder.doctorName || 'Self',
-    });
+      await this.billingService.generateBill({
+        patient: data.patient,
+        items,
+        user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
+        discount: data.discount ?? 0,
+        doctor: existOrder.doctorName || 'Self',
+      });
+    }
 
     return data;
   }
