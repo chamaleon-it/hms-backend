@@ -4,6 +4,7 @@ import {
   CONSULTATION_VALIDITY_DAYS,
   displayValidUntil,
   resolveConsultationCharge,
+  resolveVisitValidity,
 } from './consultation-validity';
 
 function atClinicMorning(year: number, month: number, day: number): Date {
@@ -115,5 +116,79 @@ describe('consultation validity window', () => {
     });
 
     expect(clinicDayKey(shown)).toBe('2026-10-05');
+  });
+
+  it('paid 01/01/2026 is Valid Upto 11/01/2026, and later visits inside that date stay free', () => {
+    const paid = resolveVisitValidity({
+      visitDate: atClinicMorning(2026, 1, 1),
+      priors: [],
+    });
+    const onFifth = resolveVisitValidity({
+      visitDate: atClinicMorning(2026, 1, 5),
+      priors: [
+        {
+          id: 'paid',
+          date: atClinicMorning(2026, 1, 1),
+          hasConsultationFee: true,
+          consultationValidUntil: paid.validUntil,
+        },
+      ],
+    });
+    const onEnd = resolveVisitValidity({
+      visitDate: atClinicMorning(2026, 1, 11),
+      priors: [
+        {
+          id: 'fifth',
+          date: atClinicMorning(2026, 1, 5),
+          hasConsultationFee: false,
+          consultationValidUntil: paid.validUntil,
+        },
+      ],
+    });
+    const after = resolveVisitValidity({
+      visitDate: atClinicMorning(2026, 1, 13),
+      priors: [
+        {
+          id: 'end',
+          date: atClinicMorning(2026, 1, 11),
+          hasConsultationFee: false,
+          consultationValidUntil: paid.validUntil,
+        },
+      ],
+    });
+
+    expect(paid.charge).toBe(true);
+    expect(clinicDayKey(paid.validUntil)).toBe('2026-01-11');
+    expect(onFifth.charge).toBe(false);
+    expect(clinicDayKey(onFifth.validUntil)).toBe('2026-01-11');
+    expect(onEnd.charge).toBe(false);
+    expect(clinicDayKey(onEnd.validUntil)).toBe('2026-01-11');
+    expect(after.charge).toBe(true);
+    expect(clinicDayKey(after.validUntil)).toBe('2026-01-23');
+  });
+
+  it('keeps stored 09/10/2026 for a free visit on 01/10/2026 instead of 11/10/2026', () => {
+    const revisit = resolveVisitValidity({
+      visitDate: atClinicMorning(2026, 10, 1),
+      visitId: 'oct-1',
+      priors: [
+        {
+          id: 'oct-1',
+          date: atClinicMorning(2026, 10, 1),
+          hasConsultationFee: false,
+          consultationValidUntil: new Date(Date.UTC(2026, 9, 11, 12, 0, 0, 0)),
+        },
+        {
+          id: 'sep-29',
+          date: atClinicMorning(2026, 9, 29),
+          hasConsultationFee: false,
+          consultationValidUntil: new Date(Date.UTC(2026, 9, 9, 12, 0, 0, 0)),
+        },
+      ],
+    });
+
+    expect(revisit.charge).toBe(false);
+    expect(clinicDayKey(revisit.validUntil)).toBe('2026-10-09');
+    expect(clinicDayKey(revisit.validUntil)).not.toBe('2026-10-11');
   });
 });

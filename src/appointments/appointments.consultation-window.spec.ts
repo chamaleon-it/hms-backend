@@ -34,6 +34,19 @@ describe('stored registration-bill validity', () => {
       },
     })),
     countDocuments: jest.fn().mockResolvedValue(0),
+    find: jest.fn(() => ({
+      select() {
+        return this;
+      },
+      lean() {
+        return Promise.resolve(
+          appointments.filter(
+            (appointment) =>
+              appointment.isDeleted !== true && appointment.isRefunded !== true,
+          ),
+        );
+      },
+    })),
     create: jest.fn(async (doc: any) => {
       const saved = { ...doc, _id: new Types.ObjectId() };
       appointments.push(saved);
@@ -118,5 +131,46 @@ describe('stored registration-bill validity', () => {
     expect(clinicDayKey(revisit.consultationValidUntil)).toBe('2026-10-05');
     expect(clinicDayKey(revisit.consultationValidUntil)).not.toBe('2026-10-09');
     expect(bills).toHaveLength(0);
+  });
+
+  it('keeps stored 09/10/2026 on the 01/10 free revisit instead of 01/10 + 10 days', async () => {
+    const patient = new Types.ObjectId();
+    appointments.push({
+      _id: new Types.ObjectId(),
+      patient,
+      doctor: doctorId,
+      date: atClinicMorning(2026, 9, 29),
+      hasConsultationFee: false,
+      consultationValidUntil: new Date(Date.UTC(2026, 9, 9, 12, 0, 0, 0)),
+      isDeleted: false,
+      isRefunded: false,
+    });
+
+    const revisit = await book(atClinicMorning(2026, 10, 1), patient);
+    expect(revisit.hasConsultationFee).toBe(false);
+    expect(clinicDayKey(revisit.consultationValidUntil)).toBe('2026-10-09');
+    expect(clinicDayKey(revisit.consultationValidUntil)).not.toBe('2026-10-11');
+    expect(bills).toHaveLength(0);
+  });
+
+  it('charges 13/01/2026 after a window that ended 11/01/2026 and sets 23/01', async () => {
+    const patient = new Types.ObjectId();
+
+    const paid = await book(atClinicMorning(2026, 1, 1), patient);
+    expect(paid.hasConsultationFee).toBe(true);
+    expect(clinicDayKey(paid.consultationValidUntil)).toBe('2026-01-11');
+
+    const inside = await book(atClinicMorning(2026, 1, 5), patient);
+    expect(inside.hasConsultationFee).toBe(false);
+    expect(clinicDayKey(inside.consultationValidUntil)).toBe('2026-01-11');
+
+    const onEnd = await book(atClinicMorning(2026, 1, 11), patient);
+    expect(onEnd.hasConsultationFee).toBe(false);
+    expect(clinicDayKey(onEnd.consultationValidUntil)).toBe('2026-01-11');
+
+    const after = await book(atClinicMorning(2026, 1, 13), patient);
+    expect(after.hasConsultationFee).toBe(true);
+    expect(clinicDayKey(after.consultationValidUntil)).toBe('2026-01-23');
+    expect(bills[0].items[0].total).toBe(200);
   });
 });
