@@ -91,6 +91,14 @@ export class Appointment {
   })
   hasConsultationFee: boolean;
 
+  /**
+   * Inclusive clinic date through which a revisit stays free.
+   * Set when the visit is booked. A free revisit copies the paid visit's
+   * date instead of opening a new window.
+   */
+  @Prop({ type: Date, default: null })
+  consultationValidUntil?: Date | null;
+
   @Prop({ type: Number, required: false, default: null })
   tokenNumber?: number;
 

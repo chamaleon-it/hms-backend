@@ -1,25 +1,17 @@
-import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Gender } from '../schemas/patient.schema';
-
-// The global ValidationPipe runs with `whitelist: true`, which strips any
-// property that carries no class-validator decorator. Every filter here must
-// therefore be decorated or it silently never reaches the service.
-const toOptionalNumber = ({ value }: { value: unknown }) =>
-  value === '' || value == null ? undefined : Number(value);
 
 export class GetPatientsDto {
   @IsOptional()
-  @Transform(toOptionalNumber)
-  @IsInt()
-  @Min(1)
-  page: number = 1;
+  @Type(() => Number)
+  @IsNumber()
+  page?: number = 1;
 
   @IsOptional()
-  @Transform(toOptionalNumber)
-  @IsInt()
-  @Min(1)
-  limit: number = 100;
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number = 100;
 
   @IsOptional()
   @IsString()
@@ -30,23 +22,26 @@ export class GetPatientsDto {
   q?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(Object.values(Gender))
   gender?: Gender;
 
   @IsOptional()
-  @IsString()
-  minAge?: string;
+  @Type(() => Number)
+  @IsNumber()
+  minAge?: number;
 
   @IsOptional()
-  @IsString()
-  maxAge?: string;
+  @Type(() => Number)
+  @IsNumber()
+  maxAge?: number;
 
   @IsOptional()
   @IsString()
   lastVisit?: string;
 
   @IsOptional()
-  conditions?: string | string[];
+  @IsString()
+  conditions?: string;
 
   @IsOptional()
   @IsString()
@@ -63,10 +58,6 @@ export class GetPatientsDto {
   @IsOptional()
   @IsString()
   to?: string;
-
-  @IsOptional()
-  @IsString()
-  consultedOnly?: string;
 
   @IsOptional()
   @IsString()
@@ -87,4 +78,8 @@ export class GetPatientsDto {
   @IsOptional()
   @IsString()
   pincode?: string;
+
+  @IsOptional()
+  @IsString()
+  consultedOnly?: string;
 }

@@ -29,6 +29,7 @@ import {
 } from 'src/accounts/enums/account-transaction.enum';
 
 import configuration from 'src/config/configuration';
+import { resolveSaleLine } from 'src/pharmacy/sale-line';
 
 @Injectable()
 export class BillingService {
@@ -152,13 +153,16 @@ export class BillingService {
           (createBill.card ?? 0) +
           (createBill.upi ?? 0) +
           (createBill.discount ?? 0);
-        const getOrderItemPrice = (it: any) => {
-          if (it.unitPrice !== undefined && it.unitPrice !== null) return it.unitPrice;
-          const batch = it.name?.batches?.find(
-            (b: any) => b.batchNumber && b.batchNumber.toLowerCase() === it.batchNumber?.trim().toLowerCase(),
-          ) || it.name?.batches?.[0];
-          return batch?.unitPrice ?? 0;
-        };
+        const getOrderItemPrice = (it: any) =>
+          resolveSaleLine({
+            name: it.name,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            gst: it.gst,
+            batchNumber: it.batchNumber,
+            expiryDate: it.expiryDate,
+            item: it.name,
+          }).unitPrice;
         const orderTotal = order.items.reduce(
           (total: number, it: any) => total + (it.quantity || 1) * getOrderItemPrice(it),
           0,
@@ -541,7 +545,90 @@ export class BillingService {
       }
     }
 
+    await this.repairZeroPricedBills(data);
+
     return { data, total };
+  }
+
+  /**
+   * Bills created before the batch price was copied onto the line were stored
+   * at ₹0. Fill unit price, GST, batch, and expiry from the linked order.
+   */
+  private async repairZeroPricedBills(bills: any[]) {
+    const candidates = (bills || []).filter(
+      (bill) =>
+        Array.isArray(bill?.items) &&
+        bill.items.length > 0 &&
+        bill.items.every(
+          (item) =>
+            !(Number(item?.unitPrice) > 0) && !(Number(item?.total) > 0),
+        ),
+    );
+    if (!candidates.length) return;
+
+    const mrns = candidates.map((bill) => bill.mrn).filter(Boolean);
+    if (!mrns.length) return;
+
+    const orders = await this.orderModel
+      .find({ billNo: { $in: mrns } })
+      .populate('items.name')
+      .lean();
+    const byBill = new Map(orders.map((order: any) => [order.billNo, order]));
+
+    for (const bill of candidates) {
+      const order = byBill.get(bill.mrn);
+      if (!order) continue;
+
+      let changed = false;
+      const items = bill.items.map((line: any, index: number) => {
+        const orderItem =
+          (order.items || []).find((it: any) => {
+            const itemName =
+              it?.name && typeof it.name === 'object' ? it.name.name : '';
+            return (
+              itemName &&
+              itemName.toLowerCase() === String(line?.name || '').toLowerCase()
+            );
+          }) || order.items?.[index];
+        if (!orderItem) return line;
+
+        const itemDoc =
+          orderItem.name && typeof orderItem.name === 'object'
+            ? orderItem.name
+            : undefined;
+        const resolved = resolveSaleLine({
+          name: line.name || itemDoc?.name,
+          quantity: line.quantity || orderItem.quantity,
+          unitPrice: line.unitPrice || orderItem.unitPrice,
+          gst: line.gst || orderItem.gst,
+          batchNumber: line.batchNumber || orderItem.batchNumber,
+          expiryDate: line.expiryDate || orderItem.expiryDate,
+          item: itemDoc,
+        });
+        if (!(resolved.unitPrice > 0)) return line;
+        changed = true;
+        return {
+          ...line,
+          name: line.name || resolved.name,
+          quantity: resolved.quantity,
+          unitPrice: resolved.unitPrice,
+          gst: resolved.gst || Number(line.gst) || 0,
+          total: resolved.total,
+          batchNumber: resolved.batchNumber,
+          expiryDate: resolved.expiryDate,
+          generic: line.generic || resolved.generic,
+        };
+      });
+
+      if (!changed) continue;
+      bill.items = items;
+      if (bill._id) {
+        await this.billingModel.updateOne(
+          { _id: bill._id },
+          { $set: { items } },
+        );
+      }
+    }
   }
 
   async getBill(id: mongoose.Types.ObjectId) {
@@ -561,6 +648,7 @@ export class BillingService {
         (data as any).doctor = doc;
       }
     }
+    await this.repairZeroPricedBills([data]);
     return data;
   }
 
@@ -999,6 +1087,7 @@ export class BillingService {
         }
       }
     }
+    await this.repairZeroPricedBills(data);
     return data;
   }
 }

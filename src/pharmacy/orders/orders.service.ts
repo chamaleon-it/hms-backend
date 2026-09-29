@@ -17,6 +17,7 @@ import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
+import { resolveSaleLine } from '../sale-line';
 
 @Injectable()
 export class OrdersService {
@@ -28,6 +29,52 @@ export class OrdersService {
     private readonly billingService: BillingService,
     private readonly usersService: UsersService,
   ) { }
+
+  /** Bill row priced from the selected batch, never a placeholder batch number. */
+  private toBillItem(item: any, itemData: any) {
+    const resolved = resolveSaleLine({
+      name: itemData?.name,
+      quantity: item?.quantity,
+      unitPrice: item?.unitPrice,
+      gst: item?.gst,
+      batchNumber: item?.batchNumber,
+      expiryDate: item?.expiryDate,
+      item: itemData,
+    });
+    return {
+      name: resolved.name,
+      quantity: resolved.quantity,
+      unitPrice: resolved.unitPrice,
+      gst: resolved.gst,
+      discount: 0,
+      total: resolved.total,
+      batchNumber: resolved.batchNumber,
+      expiryDate: resolved.expiryDate,
+      generic: resolved.generic,
+    };
+  }
+
+  /** Rewrite a linked invoice when it was saved with a zero price. */
+  private async syncBillFromOrder(orderId: mongoose.Types.ObjectId) {
+    const order = await this.orderModel
+      .findById(orderId)
+      .populate('items.name')
+      .exec();
+    if (!order?.billNo || order.billNo === '-') return;
+
+    const bill = await this.billingModel.findOne({ mrn: order.billNo });
+    if (!bill) return;
+
+    const items = (order.items || []).map((item: any) => {
+      const itemDoc =
+        item.name && typeof item.name === 'object' ? item.name : undefined;
+      return this.toBillItem(item, itemDoc);
+    });
+    if (!items.some((line) => line.unitPrice > 0)) return;
+
+    bill.items = items as any;
+    await bill.save();
+  }
 
   private async generateUniqueMRN(): Promise<string> {
     const prefix = 'ORD-';
@@ -70,28 +117,7 @@ export class OrdersService {
       const items = await Promise.all(
         order.items.map(async (item) => {
           const itemData = await this.itemsService.getItem(item.name);
-          const batch = item.batchNumber && itemData.batches
-            ? itemData.batches.find(
-                (b: any) =>
-                  b.batchNumber &&
-                  b.batchNumber.toLowerCase() ===
-                    item.batchNumber?.trim().toLowerCase(),
-              )
-            : itemData.batches?.[0];
-
-          const unitPrice = item.unitPrice ?? batch?.unitPrice ?? 0;
-          const quantity = item.quantity;
-          const gst = item.gst ?? batch?.gst ?? 0;
-
-          return {
-            name: itemData.name,
-            batch: item.batchNumber || batch?.batchNumber,
-            unitPrice,
-            quantity,
-            discount: 0,
-            gst,
-            total: unitPrice * quantity,
-          };
+          return this.toBillItem(item, itemData);
         }),
       );
 
@@ -757,6 +783,7 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
+    await this.syncBillFromOrder(order._id as mongoose.Types.ObjectId);
     return order;
   }
 
@@ -798,6 +825,7 @@ export class OrdersService {
       await order.save();
     }
 
+    await this.syncBillFromOrder(order._id as mongoose.Types.ObjectId);
     return order;
   }
 
@@ -848,28 +876,7 @@ export class OrdersService {
     const items = await Promise.all(
       data.items.map(async (item) => {
         const itemData = await this.itemsService.getItem(item.name);
-        const batch = (item as any).batchNumber && itemData.batches
-          ? itemData.batches.find(
-              (b: any) =>
-                b.batchNumber &&
-                b.batchNumber.toLowerCase() ===
-                  (item as any).batchNumber?.trim().toLowerCase(),
-            )
-          : itemData.batches?.[0];
-
-        const unitPrice =
-          (item as any).unitPrice ?? batch?.unitPrice ?? 0;
-        const quantity = item.quantity;
-
-        return {
-          name: itemData.name,
-          batch: (item as any).batchNumber || batch?.batchNumber,
-          unitPrice,
-          quantity,
-          discount: 0,
-          gst: batch?.gst ?? 0,
-          total: unitPrice * quantity,
-        };
+        return this.toBillItem(item, itemData);
       }),
     );
 

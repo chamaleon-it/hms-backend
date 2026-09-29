@@ -20,6 +20,15 @@ export class BillingItem {
 
   @Prop({ required: true, type: Number, default: 0 })
   total: number;
+
+  @Prop({ type: String, trim: true })
+  batchNumber?: string;
+
+  @Prop({ type: Date })
+  expiryDate?: Date;
+
+  @Prop({ type: String, trim: true })
+  generic?: string;
 }
 export const BillingItemSchema = SchemaFactory.createForClass(BillingItem);
 

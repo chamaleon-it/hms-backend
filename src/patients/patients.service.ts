@@ -20,6 +20,49 @@ export class PatientsService {
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
   ) { }
 
+  private escapeRegex(term: string): string {
+    return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private searchRegex(term: string) {
+    return { $regex: this.escapeRegex(term), $options: 'i' as const };
+  }
+
+  private matchesPatientQuery(
+    patient: {
+      name?: string;
+      mrn?: string;
+      phoneNumber?: string;
+      addressLine1?: string;
+      addressLine2?: string;
+      city?: string;
+      district?: string;
+      state?: string;
+      pinCode?: string;
+      country?: string;
+      uhid?: string;
+    },
+    term: string,
+  ): boolean {
+    return [
+      patient.name,
+      patient.mrn,
+      patient.phoneNumber,
+      patient.addressLine1,
+      patient.addressLine2,
+      patient.city,
+      patient.district,
+      patient.state,
+      patient.pinCode,
+      patient.country,
+      patient.uhid,
+    ].some((value) =>
+      String(value ?? '')
+        .toLowerCase()
+        .includes(term),
+    );
+  }
+
   private async generateUniqueMRN(): Promise<string> {
     const lastRecord = await this.patientModel
       .findOne({ mrn: { $regex: /^\d{1,5}$/ } })
@@ -92,7 +135,10 @@ export class PatientsService {
 
     const matchQuery: any = { [field]: { $nin: [null, ''] } };
     if (q && q.trim()) {
-      matchQuery[field] = { $regex: q.trim(), $options: 'i', $nin: [null, ''] };
+      matchQuery[field] = {
+        ...this.searchRegex(q.trim()),
+        $nin: [null, ''],
+      };
     }
 
     const data = await this.patientModel.aggregate([
@@ -125,7 +171,7 @@ export class PatientsService {
       district,
       state,
       pincode,
-    } = getPatientsDto as any;
+    } = getPatientsDto;
 
     const skip = (page - 1) * limit;
 
@@ -206,35 +252,35 @@ export class PatientsService {
     }
 
     if (address) {
-      const addressSearchTerm = address.trim();
+      const addressPattern = () => this.searchRegex(address.trim());
       filter.$and = filter.$and || [];
       filter.$and.push({
         $or: [
-          { addressLine1: { $regex: addressSearchTerm, $options: 'i' } },
-          { addressLine2: { $regex: addressSearchTerm, $options: 'i' } },
-          { city: { $regex: addressSearchTerm, $options: 'i' } },
-          { district: { $regex: addressSearchTerm, $options: 'i' } },
-          { state: { $regex: addressSearchTerm, $options: 'i' } },
-          { pinCode: { $regex: addressSearchTerm, $options: 'i' } },
-          { country: { $regex: addressSearchTerm, $options: 'i' } },
+          { addressLine1: addressPattern() },
+          { addressLine2: addressPattern() },
+          { city: addressPattern() },
+          { district: addressPattern() },
+          { state: addressPattern() },
+          { pinCode: addressPattern() },
+          { country: addressPattern() },
         ],
       });
     }
 
     if (city) {
-      filter.city = { $regex: city.trim(), $options: 'i' };
+      filter.city = this.searchRegex(city.trim());
     }
 
     if (district) {
-      filter.district = { $regex: district.trim(), $options: 'i' };
+      filter.district = this.searchRegex(district.trim());
     }
 
     if (state) {
-      filter.state = { $regex: state.trim(), $options: 'i' };
+      filter.state = this.searchRegex(state.trim());
     }
 
     if (pincode) {
-      filter.pinCode = { $regex: pincode.trim(), $options: 'i' };
+      filter.pinCode = this.searchRegex(pincode.trim());
     }
 
     filter.status = status || { $ne: PatientStatus.DELETED };
@@ -267,27 +313,31 @@ export class PatientsService {
     }
 
     const searchTerm = rawQuery.toLowerCase();
-    const searchRegex = { $regex: rawQuery, $options: 'i' };
+    const searchPattern = () => this.searchRegex(rawQuery);
 
     const patients = await this.patientModel
       .find({
         ...filter,
         $or: [
-          { name: searchRegex },
-          { mrn: searchRegex },
-          { phoneNumber: searchRegex },
-          { addressLine1: searchRegex },
-          { addressLine2: searchRegex },
-          { city: searchRegex },
-          { district: searchRegex },
-          { state: searchRegex },
-          { pinCode: searchRegex },
-          { country: searchRegex },
-          { uhid: searchRegex },
+          { name: searchPattern() },
+          { mrn: searchPattern() },
+          { phoneNumber: searchPattern() },
+          { addressLine1: searchPattern() },
+          { addressLine2: searchPattern() },
+          { city: searchPattern() },
+          { district: searchPattern() },
+          { state: searchPattern() },
+          { pinCode: searchPattern() },
+          { country: searchPattern() },
+          { uhid: searchPattern() },
         ],
       })
       .populate('doctor')
       .lean();
+
+    const matchedPatients = patients.filter((patient) =>
+      this.matchesPatientQuery(patient, searchTerm),
+    );
 
     const getPriority = (patient: any): number => {
       const name = (patient.name || '').toLowerCase().trim();
@@ -339,7 +389,7 @@ export class PatientsService {
       return 10;
     };
 
-    const sortedPatients = patients
+    const sortedPatients = matchedPatients
       .map((patient) => ({
         ...patient,
         _searchPriority: getPriority(patient),
