@@ -154,6 +154,10 @@ class MedicalParametersDto {
   @IsOptional()
   @IsString()
   appetite?: null | string;
+
+  @IsOptional()
+  @IsString()
+  digestiveSystem?: null | string;
 }
 
 export class ConsultingDto {
