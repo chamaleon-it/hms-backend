@@ -44,7 +44,7 @@ export class MedicalCertificate {
   @Prop({ required: true, trim: true })
   doctorRegistrationNumber: string;
 
-  @Prop({ trim: true, default: null })
+  @Prop({ type: String, trim: true, default: null })
   doctorSignature?: string | null;
 
   @Prop({
