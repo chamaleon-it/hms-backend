@@ -35,6 +35,7 @@ import { EmployeeSalaryModule } from './employee/salary/employee-salary.module';
 import { TreatmentModule } from './treatment/treatment.module';
 import { SyncModule } from './sync/sync.module';
 import { TallyModule } from './tally/tally.module';
+import { MedicalCertificateModule } from './pharmacy/medical-certificate/medical-certificate.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { TallyModule } from './tally/tally.module';
     TreatmentModule,
     SyncModule,
     TallyModule,
+    MedicalCertificateModule,
   ],
   controllers: [AppController],
   providers: [

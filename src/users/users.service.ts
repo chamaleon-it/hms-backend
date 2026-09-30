@@ -238,4 +238,16 @@ export class UsersService {
     if (!mongoose.isValidObjectId(id)) return null;
     return this.userModel.findById(id).lean().exec();
   }
+
+  async findDoctorForCertificate(id: string) {
+    if (!mongoose.isValidObjectId(id)) return null;
+    return this.userModel
+      .findOne({
+        _id: id,
+        role: UserRole.DOCTOR,
+        isDeleted: { $ne: true },
+      })
+      .select('name qualification specialization licenseNo signature')
+      .lean();
+  }
 }
