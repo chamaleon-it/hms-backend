@@ -120,6 +120,78 @@ export function chosenBatch(
   });
 }
 
+function batchQuantity(batch: any): number {
+  const quantity = Number(batch?.quantity);
+  return Number.isFinite(quantity) ? quantity : 0;
+}
+
+/** Calendar day as UTC midnight. Date-only strings stay on that day. */
+function calendarDay(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+  }
+  const text = String(value).trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (match) {
+    return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+}
+
+function isSellableBatch(batch: any, now: Date): boolean {
+  if (!readBatchNumber(batch)) return false;
+  if (batch?.isActive === false) return false;
+  if (batchQuantity(batch) <= 0) return false;
+  const expiry = calendarDay(batch?.expiryDate);
+  if (expiry == null) return false;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return expiry >= today;
+}
+
+function bySoonestExpiry(a: any, b: any): number {
+  return (
+    (calendarDay(a?.expiryDate) ?? Number.POSITIVE_INFINITY) -
+      (calendarDay(b?.expiryDate) ?? Number.POSITIVE_INFINITY) ||
+    readBatchNumber(a).localeCompare(readBatchNumber(b))
+  );
+}
+
+export interface DefaultBatchPick {
+  batch: any;
+  /** True when no sellable batch covers the line quantity. */
+  oversell: boolean;
+}
+
+/**
+ * Batch used when the pharmacist has not chosen one.
+ * Prefer an in-stock, unexpired batch that covers the line, soonest expiry first.
+ * Otherwise the in-stock, unexpired batch with the most quantity (oversell).
+ */
+export function defaultSaleBatch(
+  batches: any[] | undefined,
+  quantityNeeded: number,
+  now: Date = new Date(),
+): DefaultBatchPick | undefined {
+  const sellable = (Array.isArray(batches) ? batches : []).filter((batch) =>
+    isSellableBatch(batch, now),
+  );
+  if (!sellable.length) return undefined;
+  const needed = Number(quantityNeeded) || 0;
+  const enough = sellable.filter((batch) => batchQuantity(batch) >= needed);
+  if (enough.length) {
+    enough.sort(bySoonestExpiry);
+    return { batch: enough[0], oversell: false };
+  }
+  sellable.sort(
+    (a, b) => batchQuantity(b) - batchQuantity(a) || bySoonestExpiry(a, b),
+  );
+  return { batch: sellable[0], oversell: needed > batchQuantity(sellable[0]) };
+}
+
 export interface ResolvedSaleLine {
   name: string;
   generic?: string;
