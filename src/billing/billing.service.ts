@@ -1002,20 +1002,26 @@ export class BillingService {
     const existingBill = await this.billingModel.findById(id);
     if (!existingBill) throw new NotFoundException('Bill is not found.');
 
-    const addedCash = Math.max(0, Number(markAsPaidDto.cash) || 0);
-    const addedCard = Math.max(0, Number(markAsPaidDto.card) || 0);
-    const addedUpi = Math.max(0, Number(markAsPaidDto.upi) || 0);
-    const addedDiscount = Math.max(0, Number(markAsPaidDto.discount) || 0);
+    const inputCash = Math.max(0, Number(markAsPaidDto.cash) || 0);
+    const inputCard = Math.max(0, Number(markAsPaidDto.card) || 0);
+    const inputUpi = Math.max(0, Number(markAsPaidDto.upi) || 0);
+    const inputDiscount = Math.max(0, Number(markAsPaidDto.discount) || 0);
+    const replace = markAsPaidDto.replace === true;
 
     const currentCash = existingBill.cash || 0;
     const currentCard = existingBill.card || 0;
     const currentUpi = existingBill.upi || 0;
     const currentDiscount = existingBill.discount || 0;
 
-    const newCash = currentCash + addedCash;
-    const newCard = currentCard + addedCard;
-    const newUpi = currentUpi + addedUpi;
-    const newDiscount = currentDiscount + addedDiscount;
+    // In replace mode the input is the final split; otherwise it is added on top.
+    const newCash = replace ? inputCash : currentCash + inputCash;
+    const newCard = replace ? inputCard : currentCard + inputCard;
+    const newUpi = replace ? inputUpi : currentUpi + inputUpi;
+    const newDiscount = replace ? inputDiscount : currentDiscount + inputDiscount;
+
+    const deltaCash = newCash - currentCash;
+    const deltaCard = newCard - currentCard;
+    const deltaUpi = newUpi - currentUpi;
 
     const totalPaid = newCash + newCard + newUpi + newDiscount;
     const itemsTotal = (existingBill.items || []).reduce(
@@ -1025,17 +1031,32 @@ export class BillingService {
     const roundOffAmount = existingBill.roundOff ? itemsTotal % 1 : 0;
     const netTotal = itemsTotal - roundOffAmount;
 
-    const updateObj: any = {
-      $inc: {
-        cash: addedCash,
-        card: addedCard,
-        upi: addedUpi,
-        discount: addedDiscount,
-      },
-    };
+    if (totalPaid > netTotal + 0.01) {
+      throw new BadRequestException(
+        'Payment split cannot exceed the bill total.',
+      );
+    }
+
+    const updateObj: any = replace
+      ? {
+          $set: {
+            cash: newCash,
+            card: newCard,
+            upi: newUpi,
+            discount: newDiscount,
+          },
+        }
+      : {
+          $inc: {
+            cash: inputCash,
+            card: inputCard,
+            upi: inputUpi,
+            discount: inputDiscount,
+          },
+        };
 
     if (totalPaid >= netTotal - 0.01) {
-      updateObj.$set = { status: 'Completed' };
+      updateObj.$set = { ...(updateObj.$set || {}), status: 'Completed' };
     }
 
     const data = await this.billingModel.findOneAndUpdate(
@@ -1045,8 +1066,11 @@ export class BillingService {
     );
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    const totalPayment = addedCash + addedCard + addedUpi;
-    if (totalPayment > 0) {
+    const hasMethodChange =
+      Math.abs(deltaCash) > 0.001 ||
+      Math.abs(deltaCard) > 0.001 ||
+      Math.abs(deltaUpi) > 0.001;
+    if (hasMethodChange) {
       try {
         const sourceModule = await this.determineSourceModule(data.user);
         const isRefund =
@@ -1102,20 +1126,72 @@ export class BillingService {
           else category = IncomeCategory.MedicineSale;
         }
 
-        const paymentsToRecord: { amount: number; method: PaymentMethod }[] = [
-          { amount: addedCash, method: PaymentMethod.Cash },
-          { amount: addedCard, method: PaymentMethod.Card },
-          { amount: addedUpi, method: PaymentMethod.UPI },
+        const reverseType = isExpense
+          ? TransactionType.Income
+          : TransactionType.Expense;
+        const correctionCategory = isExpense
+          ? IncomeCategory.PaymentCorrection
+          : ExpenseCategory.PaymentCorrection;
+        const reverseCorrectionCategory = isExpense
+          ? ExpenseCategory.PaymentCorrection
+          : IncomeCategory.PaymentCorrection;
+        const paymentLabel = isRefund
+          ? 'Refund'
+          : isReturn
+            ? 'Return'
+            : 'Payment';
+
+        const deltas: { amount: number; method: PaymentMethod }[] = [
+          { amount: deltaCash, method: PaymentMethod.Cash },
+          { amount: deltaCard, method: PaymentMethod.Card },
+          { amount: deltaUpi, method: PaymentMethod.UPI },
         ];
 
-        for (const p of paymentsToRecord) {
-          if (p.amount > 0) {
+        // Amount moved off one method must be re-posted to another as a
+        // correction so the bill's income category is not inflated.
+        let swapToReassign = 0;
+        for (const d of deltas) {
+          if (d.amount < -0.001) {
+            const amount = Math.abs(d.amount);
+            swapToReassign += amount;
+            await this.accountsService.recordTransaction({
+              type: reverseType,
+              category: correctionCategory,
+              amount,
+              description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} reduced)`,
+              paymentMethod: d.method,
+              sourceModule,
+              createdBy: data.user,
+              transactionDate: new Date(),
+            });
+          }
+        }
+
+        for (const d of deltas) {
+          if (d.amount <= 0.001) continue;
+          const reassigned = Math.min(swapToReassign, d.amount);
+          swapToReassign -= reassigned;
+          const fresh = d.amount - reassigned;
+
+          if (reassigned > 0.001) {
+            await this.accountsService.recordTransaction({
+              type,
+              category: reverseCorrectionCategory,
+              amount: reassigned,
+              description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} increased)`,
+              paymentMethod: d.method,
+              sourceModule,
+              createdBy: data.user,
+              transactionDate: new Date(),
+            });
+          }
+          if (fresh > 0.001) {
             await this.accountsService.recordTransaction({
               type,
               category,
-              amount: p.amount,
-              description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn} (${p.method})`,
-              paymentMethod: p.method,
+              amount: fresh,
+              description: `${sourceModule} ${paymentLabel} for Bill #${data.mrn} (${d.method})`,
+              paymentMethod: d.method,
               sourceModule,
               createdBy: data.user,
               transactionDate: new Date(),
