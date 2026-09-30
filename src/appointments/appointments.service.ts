@@ -449,6 +449,17 @@ export class AppointmentsService {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+
     const doctorFilter: Record<string, any> = {};
     if (doctor && mongoose.isValidObjectId(doctor)) {
       doctorFilter.doctor = new mongoose.Types.ObjectId(doctor);
@@ -460,8 +471,9 @@ export class AppointmentsService {
       ...doctorFilter,
     };
 
-    const [results, thisWeek, total]: [
+    const [results, thisWeek, thisMonth, total]: [
       { count: number; _id: AppointmentStatus }[],
+      number,
       number,
       number,
     ] = await Promise.all([
@@ -482,6 +494,11 @@ export class AppointmentsService {
         ...doctorFilter,
       }),
       this.appointmentModel.countDocuments({
+        date: { $gte: startOfMonth, $lte: endOfMonth },
+        isDeleted: false,
+        ...doctorFilter,
+      }),
+      this.appointmentModel.countDocuments({
         isDeleted: false,
         ...doctorFilter,
       }),
@@ -490,6 +507,7 @@ export class AppointmentsService {
     const stats: Record<string, number> = {
       today: 0,
       thisWeek,
+      thisMonth,
       total,
       upcoming: 0,
       consulted: 0,

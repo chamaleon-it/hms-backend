@@ -565,6 +565,35 @@ export class TreatmentService {
     return updated as Treatment;
   }
 
+  private async resolvePharmacyBillingUserId(
+    userId?: mongoose.Types.ObjectId,
+  ): Promise<string> {
+    const configured = configuration().in_house_pharmacy_id;
+    if (configured && mongoose.isValidObjectId(configured)) {
+      return configured.toString();
+    }
+
+    const users = this.treatmentModel?.db?.collection?.('users');
+    if (users) {
+      try {
+        const pharmacyUser = await users.findOne({
+          role: { $regex: /^pharmacy$/i },
+        });
+        if (pharmacyUser?._id && mongoose.isValidObjectId(pharmacyUser._id)) {
+          return pharmacyUser._id.toString();
+        }
+      } catch {
+        // Fall through to the actor when the users collection is unavailable.
+      }
+    }
+
+    if (userId && mongoose.isValidObjectId(userId)) {
+      return userId.toString();
+    }
+
+    return new mongoose.Types.ObjectId().toString();
+  }
+
   async processSession(
     id: string,
     dto: ProcessTreatmentDto,
@@ -592,27 +621,7 @@ export class TreatmentService {
       );
     }
 
-    // Helper to get Reception User ID for billing
-    let receptionUserIdStr = configuration().in_house_reception_id;
-    if (!receptionUserIdStr || !mongoose.isValidObjectId(receptionUserIdStr)) {
-      if (userId && mongoose.isValidObjectId(userId)) {
-        receptionUserIdStr = userId.toString();
-      } else if (this.treatmentModel?.db?.collection) {
-        try {
-          const receptionUser = await this.treatmentModel.db
-            .collection('users')
-            .findOne({ role: 'Reception' });
-          if (receptionUser) {
-            receptionUserIdStr = receptionUser._id.toString();
-          }
-        } catch {
-          // ignore error
-        }
-      }
-    }
-    if (!receptionUserIdStr || !mongoose.isValidObjectId(receptionUserIdStr)) {
-      receptionUserIdStr = new mongoose.Types.ObjectId().toString();
-    }
+    const pharmacyUserIdStr = await this.resolvePharmacyBillingUserId(userId);
 
     const billingItems = (treatment.items || []).map((item) => ({
       name: item.name,
@@ -628,16 +637,18 @@ export class TreatmentService {
 
     const typeLabel =
       treatment.type === TreatmentType.Procedure ? 'Procedure' : 'Therapy';
-    const sessionNotes = dto.notes
-      ? `[${typeLabel} Session #${treatment.sessionNumber}] ${dto.notes}`
-      : treatment.notes
-        ? `[${typeLabel} Session #${treatment.sessionNumber}] ${treatment.notes}`
-        : `${typeLabel} Session #${treatment.sessionNumber}`;
+    const sessionNotes = `${typeLabel} Session #${treatment.sessionNumber}`;
+    const assignedTherapist = String(
+      dto.therapistName || treatment.therapistName || '',
+    ).trim();
+    const therapistName =
+      assignedTherapist && assignedTherapist !== '-' ? assignedTherapist : '';
 
     const billPayload: any = {
-      user: new mongoose.Types.ObjectId(receptionUserIdStr),
+      user: new mongoose.Types.ObjectId(pharmacyUserIdStr),
       patient: (treatment.patient as any)?._id || treatment.patient,
       doctor: treatment.doctorName || 'Self',
+      therapistName,
       items: billingItems,
       cash: dto.cash || 0,
       card: dto.card || 0,
@@ -666,9 +677,6 @@ export class TreatmentService {
     }
     if (dto.therapistName) {
       treatment.therapistName = dto.therapistName;
-    }
-    if (dto.notes) {
-      treatment.notes = dto.notes;
     }
 
     const saved = await treatment.save();
@@ -767,7 +775,6 @@ export class TreatmentService {
           upi: dto.upi,
           discount: dto.discount,
           paymentMethod: dto.paymentMethod,
-          notes: dto.notes,
           therapist: dto.therapist,
           therapistName: dto.therapistName,
         },

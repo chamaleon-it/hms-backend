@@ -72,6 +72,10 @@ export class CreateBillingDto {
   @IsOptional()
   doctor: string;
 
+  @IsString()
+  @IsOptional()
+  inCharge?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateBillingItemDto)

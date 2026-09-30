@@ -177,13 +177,23 @@ describe('TreatmentService', () => {
       }),
     });
 
+    const pharmacyUserId = new Types.ObjectId().toString();
+    process.env.IN_HOUSE_PHARMACY_ID = pharmacyUserId;
+
     const processed = await service.processSession(treatmentId, {
       cash: 1500,
-      notes: 'First session completed',
-      therapistName: 'Sarah Connor',
+      therapistName: 'Shadan',
     });
 
-    expect(mockBillingService.generateBill).toHaveBeenCalled();
+    expect(mockBillingService.generateBill).toHaveBeenCalledWith(
+      expect.objectContaining({
+        note: 'Therapy Session #1',
+        therapistName: 'Shadan',
+      }),
+    );
+    expect(
+      mockBillingService.generateBill.mock.calls[0][0].user.toString(),
+    ).toBe(pharmacyUserId);
     expect(processed.bill.mrn).toBe('INV-00100');
     expect(processed.treatment.status).toBe(TreatmentStatus.Completed);
   });
