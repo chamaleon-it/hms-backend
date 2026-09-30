@@ -54,4 +54,13 @@ export class TallyController {
       message: data.message,
     };
   }
+
+  @Post('sync')
+  async sync() {
+    const data = await this.tallyService.syncPending();
+    return {
+      data,
+      message: data.message,
+    };
+  }
 }

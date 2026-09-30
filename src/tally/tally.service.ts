@@ -286,12 +286,18 @@ export class TallyService {
     paymentMethod?: PaymentMethod | string;
     transactionDate?: Date;
     tallySynced?: boolean;
-  }): Promise<void> {
-    if (!tx || !tx.amount || tx.amount <= 0) return;
-    if (tx.tallySynced) return;
+  }): Promise<TallySyncOutcome> {
+    if (!tx || !tx.amount || tx.amount <= 0) return { status: 'skipped' };
+    if (tx.tallySynced) return { status: 'skipped' };
 
     const doc = await this.connectionModel.findOne({ key: CONNECTION_KEY });
-    if (!doc?.connected) return;
+    if (!doc?.connected) {
+      return {
+        status: 'failed',
+        error: 'Tally is not connected',
+        unreachable: true,
+      };
+    }
 
     const party = this.paymentLedger(doc, tx.paymentMethod);
     const isIncome = tx.type === TransactionType.Income || tx.type === 'Income';
@@ -322,6 +328,7 @@ export class TallyService {
     });
 
     const result = await this.postXml(doc.host, doc.port, xml);
+    const unreachable = !result.ok && !!result.error && result.status === 0;
     const parsed = result.body ? parseTallyImportResult(result.body) : null;
 
     // Prefer explicit CREATED/ALTERED; treat duplicate/no-op (0/0, no LINEERROR) as synced
@@ -357,5 +364,120 @@ export class TallyService {
         tallyError: errorMsg,
       });
     }
+
+    return synced
+      ? { status: 'synced' }
+      : { status: 'failed', error: errorMsg, unreachable };
+  }
+
+  /**
+   * Manual push of hospital account data into Tally.
+   * Called only from POST /tally/sync — not on a timer or page load.
+   * Reuses the Connect Tally ledgers and the Receipt/Payment voucher import.
+   */
+  async syncPending() {
+    const current = await this.getOrCreateConnection();
+    if (!current.connected) {
+      throw new ServiceUnavailableException({
+        message: 'Tally is not connected. Use Connect Tally first.',
+        data: await this.getStatus(),
+      });
+    }
+
+    const probe = await this.testConnection();
+    if (!probe.ok) {
+      throw new ServiceUnavailableException({
+        message: probe.message || 'Tally is not reachable',
+        data: await this.getStatus(),
+      });
+    }
+
+    const doc = await this.getOrCreateConnection();
+    await this.ensureDefaultLedgers(doc);
+
+    const pending = await this.accountTransactionModel
+      .find({
+        isDeleted: { $ne: true },
+        tallySynced: { $ne: true },
+        amount: { $gt: 0 },
+      })
+      .sort({ transactionDate: 1, createdAt: 1 });
+
+    let synced = 0;
+    let failed = 0;
+    let skipped = 0;
+    let stoppedEarly = false;
+    const errors: string[] = [];
+
+    for (const tx of pending) {
+      const outcome = await this.syncAccountTransaction(tx);
+      if (outcome.status === 'synced') {
+        synced += 1;
+        continue;
+      }
+      if (outcome.status === 'skipped') {
+        skipped += 1;
+        continue;
+      }
+      failed += 1;
+      if (outcome.error && errors.length < 8) {
+        errors.push(`${tx.transactionId}: ${outcome.error}`);
+      }
+      if (outcome.unreachable) {
+        stoppedEarly = true;
+        break;
+      }
+    }
+
+    const data = {
+      synced,
+      failed,
+      skipped,
+      pending: pending.length,
+      stoppedEarly,
+      errors,
+      ledgers: [
+        doc.cashLedger || 'Cash',
+        doc.upiLedger || 'UPI',
+        doc.cardLedger || 'Card',
+        doc.salesLedger || 'Pharmacy Sales',
+        doc.expenseLedger || 'Indirect Expenses',
+      ],
+    };
+
+    return {
+      ...data,
+      message: this.syncMessage(data),
+    };
+  }
+
+  private syncMessage(result: {
+    synced: number;
+    failed: number;
+    stoppedEarly: boolean;
+    errors: string[];
+  }): string {
+    const { synced, failed, stoppedEarly, errors } = result;
+    const detail = errors[0] ? ` ${errors[0]}` : '';
+    if (stoppedEarly && synced === 0) {
+      return errors[0] || 'Tally is not reachable';
+    }
+    if (failed === 0 && synced === 0) {
+      return 'Tally is up to date. No unsynced transactions to push.';
+    }
+    if (failed === 0) {
+      return `Synced ${synced} transaction${synced === 1 ? '' : 's'} to Tally.`;
+    }
+    if (synced === 0) {
+      return `Tally sync failed for ${failed} transaction${failed === 1 ? '' : 's'}.${detail}`;
+    }
+    const stopped = stoppedEarly ? ' Sync stopped because Tally became unreachable.' : '';
+    return `Synced ${synced} of ${synced + failed} transactions. ${failed} failed.${detail}${stopped}`;
   }
 }
+
+type TallySyncOutcome = {
+  status: 'synced' | 'skipped' | 'failed';
+  error?: string;
+  unreachable?: boolean;
+};

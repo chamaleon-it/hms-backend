@@ -1,4 +1,4 @@
-import { chosenBatch, resolveSaleLine } from './sale-line';
+import { chosenBatch, defaultSaleBatch, resolveSaleLine } from './sale-line';
 
 describe('pharmacy sale line', () => {
   const dolo = {
@@ -105,5 +105,56 @@ describe('pharmacy sale line', () => {
     expect(line.batchNumber).toBe('B2');
     expect(line.unitPrice).toBe(3);
     expect(line.total).toBe(45);
+  });
+
+  describe('defaultSaleBatch', () => {
+    const now = new Date('2026-09-30T12:00:00.000Z');
+    const batches = [
+      { batchNumber: 'OLD', quantity: 20, expiryDate: '2026-01-01', isActive: true },
+      { batchNumber: 'SOON', quantity: 10, expiryDate: '2026-10-15', isActive: true },
+      { batchNumber: 'LATER', quantity: 40, expiryDate: '2027-06-01', isActive: true },
+      { batchNumber: 'EMPTY', quantity: 0, expiryDate: '2026-10-01', isActive: true },
+      { batchNumber: 'OFF', quantity: 50, expiryDate: '2026-10-02', isActive: false },
+      { batchNumber: 'SHORT', quantity: 3, expiryDate: '2026-10-01', isActive: true },
+    ];
+
+    it('picks the soonest unexpired in-stock batch that covers the line', () => {
+      const pick = defaultSaleBatch(batches, 8, now);
+      expect(pick?.batch.batchNumber).toBe('SOON');
+      expect(pick?.oversell).toBe(false);
+    });
+
+    it('picks the largest in-stock unexpired batch and flags oversell when none covers the line', () => {
+      const pick = defaultSaleBatch(batches, 100, now);
+      expect(pick?.batch.batchNumber).toBe('LATER');
+      expect(pick?.oversell).toBe(true);
+    });
+
+    it('treats a batch that expires today as still sellable and prefers it over a later one', () => {
+      const pick = defaultSaleBatch(
+        [
+          { batchNumber: 'TODAY', quantity: 4, expiryDate: '2026-09-30' },
+          { batchNumber: 'NEXT', quantity: 4, expiryDate: '2026-10-01' },
+        ],
+        2,
+        now,
+      );
+      expect(pick?.batch.batchNumber).toBe('TODAY');
+      expect(pick?.oversell).toBe(false);
+    });
+
+    it('returns nothing when every batch is expired, empty, or inactive', () => {
+      expect(
+        defaultSaleBatch(
+          [
+            { batchNumber: 'OLD', quantity: 5, expiryDate: '2020-01-01' },
+            { batchNumber: 'ZERO', quantity: 0, expiryDate: '2030-01-01' },
+            { batchNumber: 'OFF', quantity: 9, expiryDate: '2030-01-01', isActive: false },
+          ],
+          1,
+          now,
+        ),
+      ).toBeUndefined();
+    });
   });
 });

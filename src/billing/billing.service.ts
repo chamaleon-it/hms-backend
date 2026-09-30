@@ -1211,9 +1211,10 @@ export class BillingService {
 
   async getBillDropDown(getBillDropDownDto: GetBillDropdownDto) {
     const { query = '' } = getBillDropDownDto;
+    const safeQuery = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     const data = await this.billingModel
-      .find({ mrn: new RegExp(query, 'i'), transactionType: 'Sale' })
+      .find({ mrn: new RegExp(safeQuery, 'i'), transactionType: 'Sale' })
       .limit(10)
       .select('user patient mrn')
       .populate('patient', 'name phoneNumber gender dateOfBirth mrn address')

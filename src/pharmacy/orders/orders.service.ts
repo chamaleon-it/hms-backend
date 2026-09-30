@@ -20,6 +20,7 @@ import { Billing } from 'src/billing/schemas/billing.schema';
 import {
   batchSalePrice,
   chosenBatch,
+  defaultSaleBatch,
   isPlaceholderBatchNumber,
   readBatchNumber,
   resolveSaleLine,
@@ -242,7 +243,8 @@ export class OrdersService {
   }
 
   async getSingleOrder(q: string) {
-    const searchRegex = { $regex: '^' + q, $options: 'i' };
+    const safe = String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = { $regex: '^' + safe, $options: 'i' };
 
     const filter = {
       $or: [{ mrn: searchRegex }, { billNo: searchRegex }],
@@ -259,7 +261,20 @@ export class OrdersService {
       throw new NotFoundException('Order not found.');
     }
 
-    return data;
+    const bill =
+      data.billNo && data.billNo !== '-'
+        ? await this.billingModel
+            .findOne({ mrn: data.billNo })
+            .select('cash card upi')
+            .lean()
+        : null;
+
+    return {
+      ...data,
+      cash: bill?.cash ?? 0,
+      card: bill?.card ?? 0,
+      upi: bill?.upi ?? 0,
+    };
   }
 
   async getCustomers(query: GetCustomersDto) {
@@ -905,13 +920,17 @@ export class OrdersService {
         const itemId = ((item.name as any)?._id ||
           item.name) as mongoose.Types.ObjectId;
         const itemDoc = await this.itemsService.getItem(itemId);
-        const batch = chosenBatch(itemDoc?.batches, (item as any).batchNumber);
-        if (!batch) {
+        const explicit = chosenBatch(itemDoc?.batches, (item as any).batchNumber);
+        const picked = explicit
+          ? { batch: explicit }
+          : defaultSaleBatch(itemDoc?.batches, item.quantity);
+        const batch = picked?.batch;
+        const batchNumber = readBatchNumber(batch);
+        if (!batch || !batchNumber) {
           throw new BadRequestException(
-            `Select a batch for ${itemDoc?.name || 'this medicine'} before completing the order.`,
+            `No in-stock batch available for ${itemDoc?.name || 'this medicine'}.`,
           );
         }
-        const batchNumber = readBatchNumber(batch);
         const price = batchSalePrice(batch);
         (item as any).batchNumber = batchNumber;
         if (price > 0) (item as any).unitPrice = price;
