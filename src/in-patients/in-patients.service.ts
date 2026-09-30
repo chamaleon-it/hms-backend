@@ -37,9 +37,22 @@ export class InPatientsService {
       );
     }
 
-    // Generate sequential admission number: IP-0001, IP-0002, ...
+    const admissionNumber = await this.nextAdmissionNumber();
+
+    const newIP = new this.inPatientModel({
+      ...createInPatientDto,
+      admissionNumber,
+      createdBy: user?._id,
+      patientId: new Types.ObjectId(createInPatientDto.patientId),
+      doctorId: new Types.ObjectId(createInPatientDto.doctorId),
+    });
+    return newIP.save();
+  }
+
+  /** Next IP-0001 style number. Used by direct admits and appointment Admit/Observation. */
+  async nextAdmissionNumber(): Promise<string> {
     const last = await this.inPatientModel
-      .findOne()
+      .findOne({ admissionNumber: { $type: 'string', $ne: '' } })
       .sort({ createdAt: -1 })
       .select('admissionNumber')
       .lean();
@@ -51,16 +64,7 @@ export class InPatientsService {
       if (!isNaN(num)) nextSeq = num + 1;
     }
 
-    const admissionNumber = 'IP-' + String(nextSeq).padStart(4, '0');
-
-    const newIP = new this.inPatientModel({
-      ...createInPatientDto,
-      admissionNumber,
-      createdBy: user?._id,
-      patientId: new Types.ObjectId(createInPatientDto.patientId),
-      doctorId: new Types.ObjectId(createInPatientDto.doctorId),
-    });
-    return newIP.save();
+    return 'IP-' + String(nextSeq).padStart(4, '0');
   }
 
   async addIpNote(id: string, noteData: any, user: any) {

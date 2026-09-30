@@ -14,5 +14,6 @@ import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
   ],
   controllers: [InPatientsController],
   providers: [InPatientsService],
+  exports: [InPatientsService],
 })
 export class InPatientsModule {}

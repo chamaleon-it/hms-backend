@@ -15,6 +15,7 @@ import {
   IPStatus,
 } from '../in-patients/schemas/in-patient.schema';
 import { BillingService } from 'src/billing/billing.service';
+import { InPatientsService } from 'src/in-patients/in-patients.service';
 import {
   clinicDayKey,
   resolveVisitValidity,
@@ -38,6 +39,7 @@ export class AppointmentsService {
     private inPatientModel: Model<InPatientDocument>,
     private readonly usersService: UsersService,
     private readonly billingService: BillingService,
+    private readonly inPatientsService: InPatientsService,
   ) {}
 
   async createAppointment(
@@ -617,6 +619,7 @@ export class AppointmentsService {
           await this.inPatientModel.create({
             patientId: patientId.toString(),
             doctorId: doctorId.toString(),
+            admissionNumber: await this.inPatientsService.nextAdmissionNumber(),
             status:
               updateStatusDto.status === 'Observation'
                 ? IPStatus.OBSERVATION
