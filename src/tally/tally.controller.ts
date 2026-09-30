@@ -10,7 +10,7 @@ import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('tally')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.PHARMACY, UserRole.ADMIN)
+@Roles(UserRole.ACCOUNTANT, UserRole.ADMIN)
 export class TallyController {
   constructor(private readonly tallyService: TallyService) {}
 
