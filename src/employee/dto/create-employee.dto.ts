@@ -16,7 +16,7 @@ export class CreateEmployeeDto {
 
   @IsEnum(EmployeeRole, {
     message:
-      'Role must be one of: Pharmacist, Technician, Therapist, Receptionist, Telecaller, Accountant',
+      'Role must be one of: Pharmacist, Technician, Therapist, Receptionist, Telecaller, Accountant, Media Team, Cleaning Staff, Doctor',
   })
   @IsNotEmpty({ message: 'Employee role is required' })
   role: EmployeeRole;

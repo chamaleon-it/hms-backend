@@ -158,19 +158,19 @@ export class UsersController {
     };
   }
 
-  // Reception manages doctors; Admin can soft-delete any user.
+  // Reception and Accountant manage doctors; Admin can soft-delete any user.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.RECEPTION)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTION, UserRole.ACCOUNTANT)
   @Delete(':id')
   async deleteUser(
     @GetUser() actor: JWTUserInterface,
     @Param('id') id: mongoose.Types.ObjectId,
   ) {
-    if (actor.role === UserRole.RECEPTION) {
+    if (actor.role === UserRole.RECEPTION || actor.role === UserRole.ACCOUNTANT) {
       const role = await this.usersService.findUserRoleById(id);
       if (role !== UserRole.DOCTOR) {
         throw new ForbiddenException(
-          'Reception may only soft-delete doctor accounts.',
+          'Only doctor accounts can be soft-deleted from this role.',
         );
       }
     }
@@ -181,27 +181,27 @@ export class UsersController {
     };
   }
 
-  // Reception updates doctors; Admin can update any user by id.
+  // Reception and Accountant update doctors; Admin can update any user by id.
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.RECEPTION)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTION, UserRole.ACCOUNTANT)
   @Patch(':id')
   async updateUserById(
     @GetUser() actor: JWTUserInterface,
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateUserDto: UpdateUserDto,
   ) {
-    if (actor.role === UserRole.RECEPTION) {
+    if (actor.role === UserRole.RECEPTION || actor.role === UserRole.ACCOUNTANT) {
       const role = await this.usersService.findUserRoleById(id);
       if (role !== UserRole.DOCTOR) {
         throw new ForbiddenException(
-          'Reception may only update doctor accounts.',
+          'Only doctor accounts can be updated from this role.',
         );
       }
       if (
         (updateUserDto as any).role &&
         (updateUserDto as any).role !== UserRole.DOCTOR
       ) {
-        throw new ForbiddenException('Reception cannot change user roles.');
+        throw new ForbiddenException('This role cannot change user roles.');
       }
     }
     const data = await this.usersService.updateUser(id, updateUserDto);

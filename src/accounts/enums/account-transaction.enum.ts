@@ -15,6 +15,7 @@ export enum ExpenseCategory {
   Maintenance = 'Maintenance',
   Refund = 'Refund',
   SalesReturn = 'Sales Return',
+  PaymentCorrection = 'Payment Correction',
   Miscellaneous = 'Miscellaneous',
   OtherExpense = 'Other Expense',
 }
@@ -25,6 +26,7 @@ export enum IncomeCategory {
   LaboratoryIncome = 'Laboratory Income',
   TherapyIncome = 'Therapy Income',
   ProcedureIncome = 'Procedure Income',
+  PaymentCorrection = 'Payment Correction',
   OtherIncome = 'Other Income',
 }
 

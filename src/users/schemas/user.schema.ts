@@ -11,6 +11,7 @@ export enum UserRole {
   LAB = 'Lab',
   ADMIN = 'Admin',
   RECEPTION = 'Reception',
+  ACCOUNTANT = 'Accountant',
   //   PATIENT = 'Patient',
 }
 

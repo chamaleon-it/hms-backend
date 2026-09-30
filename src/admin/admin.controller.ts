@@ -18,6 +18,7 @@ export class AdminController {
   ) {}
 
   @Get('billing')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   async getAllBills(@Query() getBillisDto: GetBillisDto) {
     const { data, total } = await this.billingService.getBills(
       null,
@@ -33,12 +34,14 @@ export class AdminController {
   }
 
   @Get('dashboard/stats')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   async getDashboardStats() {
     const data = await this.adminService.getDashboardStats();
     return { message: 'Dashboard stats retrieved', data };
   }
 
   @Get('dashboard/analytics')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   async getDashboardAnalytics(@Query('range') range: string) {
     const data = await this.adminService.getDashboardAnalytics(range);
     return { message: 'Dashboard analytics retrieved', data };
@@ -51,6 +54,7 @@ export class AdminController {
   }
 
   @Get('doctors')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNTANT)
   async getAllDoctors() {
     const data = await this.adminService.getUsersByRole(UserRole.DOCTOR);
     return { message: 'Doctors retrieved', data };
