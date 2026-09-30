@@ -243,7 +243,8 @@ export class OrdersService {
   }
 
   async getSingleOrder(q: string) {
-    const searchRegex = { $regex: '^' + q, $options: 'i' };
+    const safe = String(q || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = { $regex: '^' + safe, $options: 'i' };
 
     const filter = {
       $or: [{ mrn: searchRegex }, { billNo: searchRegex }],
@@ -260,7 +261,20 @@ export class OrdersService {
       throw new NotFoundException('Order not found.');
     }
 
-    return data;
+    const bill =
+      data.billNo && data.billNo !== '-'
+        ? await this.billingModel
+            .findOne({ mrn: data.billNo })
+            .select('cash card upi')
+            .lean()
+        : null;
+
+    return {
+      ...data,
+      cash: bill?.cash ?? 0,
+      card: bill?.card ?? 0,
+      upi: bill?.upi ?? 0,
+    };
   }
 
   async getCustomers(query: GetCustomersDto) {
