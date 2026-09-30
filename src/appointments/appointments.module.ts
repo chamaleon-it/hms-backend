@@ -9,6 +9,7 @@ import {
   InPatientSchema,
 } from '../in-patients/schemas/in-patient.schema';
 import { BillingModule } from 'src/billing/billing.module';
+import { InPatientsModule } from 'src/in-patients/in-patients.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -17,6 +18,7 @@ import { BillingModule } from 'src/billing/billing.module';
     ]),
     UsersModule,
     BillingModule,
+    InPatientsModule,
   ],
   controllers: [AppointmentsController],
   providers: [AppointmentsService],
