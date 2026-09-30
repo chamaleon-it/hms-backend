@@ -96,10 +96,10 @@ export class AuthService {
       if (!decoded)
         throw new UnauthorizedException('Refresh token is missing or expired.');
       const { id } = decoded;
-      const user = await this.userModel.findById(id).select('+refreshToken');
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
+      // const user = await this.userModel.findById(id).select('+refreshToken');
+      // if (!user) {
+      //   throw new BadRequestException('User not found');
+      // }
 
       const isRefreshTokenMatching =
         user?.refreshToken === getRefreshTokenDto.refreshToken;
