@@ -462,8 +462,6 @@ export class TreatmentService {
     totalSpend: number;
     patient: any;
     doctor: any;
-    prescribedTherapies: string[];
-    prescribedProcedures: string[];
   }> {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException(`Invalid treatment ID: ${id}`);
@@ -511,11 +509,6 @@ export class TreatmentService {
       return sum + itemsTotal - (s.discount || 0);
     }, 0);
 
-    const prescribed = await this.prescribedProcedureNames(
-      rootTreatment,
-      sessions,
-    );
-
     return {
       rootTreatment: rootTreatment as Treatment,
       sessions: sessions as Treatment[],
@@ -524,111 +517,7 @@ export class TreatmentService {
       totalSpend,
       patient: rootTreatment?.patient || null,
       doctor: rootTreatment?.doctor || null,
-      prescribedTherapies: prescribed.therapies,
-      prescribedProcedures: prescribed.procedures,
     };
-  }
-
-  /**
-   * Therapy names, then procedure names, from the linked prescription and
-   * the treatments already on this sheet. Empty names are skipped.
-   */
-  private async prescribedProcedureNames(
-    root: any,
-    sessions: any[],
-  ): Promise<{ therapies: string[]; procedures: string[] }> {
-    const therapies: string[] = [];
-    const procedures: string[] = [];
-    const seenTherapy = new Set<string>();
-    const seenProcedure = new Set<string>();
-
-    const push = (list: string[], seen: Set<string>, raw: unknown) => {
-      const name = String(raw || '').trim();
-      if (!name) return;
-      const key = name.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      list.push(name);
-    };
-
-    const consultingId = root?.consulting?._id || root?.consulting;
-    if (consultingId && mongoose.isValidObjectId(consultingId)) {
-      try {
-        const consultings = this.treatmentModel?.db?.collection?.('consultings');
-        const consulting = consultings
-          ? await consultings.findOne(
-              { _id: new mongoose.Types.ObjectId(String(consultingId)) },
-              { projection: { therapy: 1, procedure: 1 } },
-            )
-          : null;
-        for (const item of consulting?.therapy || []) {
-          push(therapies, seenTherapy, item?.name);
-        }
-        for (const item of consulting?.procedure || []) {
-          push(procedures, seenProcedure, item?.name);
-        }
-      } catch {
-        // Sheet item names still cover treatments that have no consultation.
-      }
-    }
-
-    if (
-      (therapies.length === 0 || procedures.length === 0) &&
-      consultingId &&
-      mongoose.isValidObjectId(consultingId)
-    ) {
-      const related = await this.treatmentModel
-        .find({
-          consulting: new mongoose.Types.ObjectId(String(consultingId)),
-          isDeleted: { $ne: true },
-        })
-        .select('type category items')
-        .lean();
-      const procedureSideEmpty = procedures.length === 0;
-      const therapySideEmpty = therapies.length === 0;
-      for (const treatment of related || []) {
-        const type = String(treatment?.type || treatment?.category || '');
-        for (const item of treatment?.items || []) {
-          const markedProcedure =
-            Boolean(item?.procedureId) && !item?.therapyId;
-          const markedTherapy = Boolean(item?.therapyId) && !item?.procedureId;
-          const isProcedure = markedProcedure
-            ? true
-            : markedTherapy
-              ? false
-              : type.toLowerCase() === 'procedure';
-          if (isProcedure && procedureSideEmpty) {
-            push(procedures, seenProcedure, item?.name);
-          } else if (!isProcedure && therapySideEmpty) {
-            push(therapies, seenTherapy, item?.name);
-          }
-        }
-      }
-    }
-
-    const fillTherapiesFromSheet = therapies.length === 0;
-    const fillProceduresFromSheet = procedures.length === 0;
-    const sheet = [root, ...(sessions || [])];
-    for (const treatment of sheet) {
-      const type = String(treatment?.type || treatment?.category || '');
-      for (const item of treatment?.items || []) {
-        const name = item?.name;
-        const markedProcedure = Boolean(item?.procedureId) && !item?.therapyId;
-        const markedTherapy = Boolean(item?.therapyId) && !item?.procedureId;
-        const isProcedure = markedProcedure
-          ? true
-          : markedTherapy
-            ? false
-            : type.toLowerCase() === 'procedure';
-        if (isProcedure) {
-          if (fillProceduresFromSheet) push(procedures, seenProcedure, name);
-        } else if (fillTherapiesFromSheet) {
-          push(therapies, seenTherapy, name);
-        }
-      }
-    }
-
-    return { therapies, procedures };
   }
 
   async update(id: string, dto: UpdateTreatmentDto): Promise<Treatment> {
