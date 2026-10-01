@@ -122,7 +122,7 @@ export class TreatmentService {
     const { therapist, therapistName } = await this.getDefaultTherapist();
 
     const formattedItems = payload.items.map((item) => {
-      const unitPrice = Number(item.price ?? item.unitPrice ?? 0);
+      const unitPrice = Number(item.unitPrice ?? 0);
       const quantity = Number(item.quantity ?? 1);
       const discount = Number(item.discount ?? 0);
       const gst = Number(item.gst ?? 0);
@@ -623,9 +623,15 @@ export class TreatmentService {
 
     const pharmacyUserIdStr = await this.resolvePharmacyBillingUserId(userId);
 
+    const roundRupee = (value: unknown) => {
+      const amount = Number(value);
+      if (!Number.isFinite(amount)) return 0;
+      return Math.round(Math.max(0, amount) * 100) / 100;
+    };
+
     const sessionAmount =
       dto.amount !== undefined && dto.amount !== null
-        ? Math.max(0, Number(dto.amount) || 0)
+        ? roundRupee(dto.amount)
         : null;
 
     let billingItems = (treatment.items || []).map((item) => ({
@@ -664,6 +670,19 @@ export class TreatmentService {
 
     const totalDiscount =
       dto.discount !== undefined ? dto.discount : treatment.discount || 0;
+
+    const gross = roundRupee(
+      billingItems.reduce((sum, item) => sum + Number(item.total || 0), 0),
+    );
+    const netPayable = roundRupee(Math.max(0, gross - roundRupee(totalDiscount)));
+    const split = roundRupee(
+      roundRupee(dto.cash) + roundRupee(dto.card) + roundRupee(dto.upi),
+    );
+    if (split !== netPayable) {
+      throw new BadRequestException(
+        'Cash, Card, and UPI must equal the session amount.',
+      );
+    }
 
     const typeLabel =
       treatment.type === TreatmentType.Procedure ? 'Procedure' : 'Therapy';

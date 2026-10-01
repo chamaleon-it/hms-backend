@@ -11,9 +11,6 @@ export class SubProcedure {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: false, default: 0 })
-  price: number;
-
   @Prop({ required: false })
   code?: string;
 
@@ -39,9 +36,6 @@ export class Procedure {
 
   @Prop({ required: false })
   description?: string;
-
-  @Prop({ required: false, default: 0 })
-  price?: number;
 
   @Prop({ default: false })
   hasSubProcedures: boolean;

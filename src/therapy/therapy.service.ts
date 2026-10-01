@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model, Types } from 'mongoose';
@@ -15,15 +16,36 @@ export interface ResolvedTherapyItem {
   subTherapyId?: string | null;
   name: string;
   parentName?: string | null;
-  price: number;
   code?: string | null;
 }
 
+function withoutCatalogPrice(doc: any) {
+  if (!doc || typeof doc !== 'object') return doc;
+  const { price: _price, ...rest } = doc;
+  if (Array.isArray(rest.subTherapies)) {
+    rest.subTherapies = rest.subTherapies.map((sub: any) => {
+      const { price: _subPrice, ...subRest } = sub || {};
+      return subRest;
+    });
+  }
+  return rest;
+}
+
 @Injectable()
-export class TherapyService {
+export class TherapyService implements OnModuleInit {
   constructor(
     @InjectModel(Therapy.name) private therapyModel: Model<TherapyDocument>,
   ) {}
+
+  async onModuleInit() {
+    await this.therapyModel.updateMany(
+      {},
+      { $unset: { price: '', 'subTherapies.$[].price': '' } },
+    );
+    await this.therapyModel.db
+      .collection('consultings')
+      .updateMany({}, { $unset: { 'therapy.$[].price': '' } });
+  }
 
   async createTherapy(dto: CreateTherapyDto) {
     const hasSubs =
@@ -39,7 +61,6 @@ export class TherapyService {
           st._id && mongoose.isValidObjectId(st._id)
             ? new Types.ObjectId(st._id)
             : new Types.ObjectId(),
-        price: st.price ?? 0,
         isDeleted: st.isDeleted ?? false,
         status: st.status || 'Active',
       })),
@@ -74,10 +95,12 @@ export class TherapyService {
       .exec();
 
     // Filter out deleted sub-therapies in results
-    return therapies.map((t) => ({
-      ...t,
-      subTherapies: (t.subTherapies || []).filter((st: any) => !st.isDeleted),
-    }));
+    return therapies.map((t) =>
+      withoutCatalogPrice({
+        ...t,
+        subTherapies: (t.subTherapies || []).filter((st: any) => !st.isDeleted),
+      }),
+    );
   }
 
   async findOne(id: string): Promise<any> {
@@ -94,12 +117,12 @@ export class TherapyService {
       throw new NotFoundException(`Therapy with id ${id} not found`);
     }
 
-    return {
+    return withoutCatalogPrice({
       ...therapy,
       subTherapies: (therapy.subTherapies || []).filter(
         (st: any) => !st.isDeleted,
       ),
-    };
+    });
   }
 
   async updateTherapy(id: string, dto: UpdateTherapyDto) {
@@ -118,27 +141,20 @@ export class TherapyService {
     if (dto.name !== undefined) existing.name = dto.name;
     if (dto.code !== undefined) existing.code = dto.code;
     if (dto.description !== undefined) existing.description = dto.description;
-    if (dto.price !== undefined) existing.price = dto.price;
     if (dto.status !== undefined) existing.status = dto.status;
     if (dto.hasSubTherapies !== undefined)
       existing.hasSubTherapies = dto.hasSubTherapies;
 
     if (Array.isArray(dto.subTherapies)) {
-      existing.subTherapies = dto.subTherapies.map((st) => {
-        const previous = (existing.subTherapies || []).find(
-          (row: any) => st._id && String(row._id) === String(st._id),
-        );
-        return {
-          ...st,
-          _id:
-            st._id && mongoose.isValidObjectId(st._id)
-              ? new Types.ObjectId(st._id)
-              : new Types.ObjectId(),
-          price: st.price !== undefined ? st.price : (previous?.price ?? 0),
-          isDeleted: st.isDeleted ?? false,
-          status: st.status || 'Active',
-        };
-      }) as any;
+      existing.subTherapies = dto.subTherapies.map((st) => ({
+        ...st,
+        _id:
+          st._id && mongoose.isValidObjectId(st._id)
+            ? new Types.ObjectId(st._id)
+            : new Types.ObjectId(),
+        isDeleted: st.isDeleted ?? false,
+        status: st.status || 'Active',
+      })) as any;
       existing.hasSubTherapies = existing.subTherapies.length > 0;
     }
 
@@ -173,7 +189,6 @@ export class TherapyService {
     const newSubTherapy = {
       _id: new Types.ObjectId(),
       name: dto.name,
-      price: dto.price ?? 0,
       code: dto.code || undefined,
       description: dto.description || undefined,
       status: dto.status || 'Active',
@@ -213,8 +228,6 @@ export class TherapyService {
     const updateFields: any = {};
     if (dto.name !== undefined)
       updateFields['subTherapies.$.name'] = dto.name;
-    if (dto.price !== undefined)
-      updateFields['subTherapies.$.price'] = dto.price;
     if (dto.code !== undefined)
       updateFields['subTherapies.$.code'] = dto.code;
     if (dto.description !== undefined)
@@ -295,7 +308,6 @@ export class TherapyService {
             subTherapyId: String(sub._id),
             name: sub.name,
             parentName: t.name,
-            price: Number(sub.price) || 0,
             code: sub.code || t.code || null,
           });
           foundAsSub = true;
@@ -315,11 +327,9 @@ export class TherapyService {
           subTherapyId: null,
           name: mainTherapy.name,
           parentName: null,
-          price: Number(mainTherapy.price) || 0,
           code: mainTherapy.code || null,
         });
-      } else if (typeof item === 'object' && item.name && item.price !== undefined) {
-        // Fallback for custom or direct objects
+      } else if (typeof item === 'object' && item.name) {
         resolved.push({
           therapyId:
             item.therapyId && mongoose.isValidObjectId(item.therapyId)
@@ -328,7 +338,6 @@ export class TherapyService {
           subTherapyId: item.subTherapyId || null,
           name: item.name,
           parentName: item.parentName || null,
-          price: Number(item.price) || 0,
           code: item.code || null,
         });
       }
