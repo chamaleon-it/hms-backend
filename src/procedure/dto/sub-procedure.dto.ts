@@ -16,9 +16,10 @@ export class SubProcedureDto {
   @IsNotEmpty({ message: 'Sub-procedure name is required' })
   name: string;
 
+  @IsOptional()
   @IsNumber({}, { message: 'Sub-procedure price must be a valid number' })
   @Min(0, { message: 'Sub-procedure price must be non-negative' })
-  price: number;
+  price?: number;
 
   @IsOptional()
   @IsString()

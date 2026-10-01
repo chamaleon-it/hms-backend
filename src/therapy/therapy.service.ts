@@ -39,6 +39,7 @@ export class TherapyService {
           st._id && mongoose.isValidObjectId(st._id)
             ? new Types.ObjectId(st._id)
             : new Types.ObjectId(),
+        price: st.price ?? 0,
         isDeleted: st.isDeleted ?? false,
         status: st.status || 'Active',
       })),
@@ -123,15 +124,21 @@ export class TherapyService {
       existing.hasSubTherapies = dto.hasSubTherapies;
 
     if (Array.isArray(dto.subTherapies)) {
-      existing.subTherapies = dto.subTherapies.map((st) => ({
-        ...st,
-        _id:
-          st._id && mongoose.isValidObjectId(st._id)
-            ? new Types.ObjectId(st._id)
-            : new Types.ObjectId(),
-        isDeleted: st.isDeleted ?? false,
-        status: st.status || 'Active',
-      })) as any;
+      existing.subTherapies = dto.subTherapies.map((st) => {
+        const previous = (existing.subTherapies || []).find(
+          (row: any) => st._id && String(row._id) === String(st._id),
+        );
+        return {
+          ...st,
+          _id:
+            st._id && mongoose.isValidObjectId(st._id)
+              ? new Types.ObjectId(st._id)
+              : new Types.ObjectId(),
+          price: st.price !== undefined ? st.price : (previous?.price ?? 0),
+          isDeleted: st.isDeleted ?? false,
+          status: st.status || 'Active',
+        };
+      }) as any;
       existing.hasSubTherapies = existing.subTherapies.length > 0;
     }
 
@@ -166,7 +173,7 @@ export class TherapyService {
     const newSubTherapy = {
       _id: new Types.ObjectId(),
       name: dto.name,
-      price: dto.price,
+      price: dto.price ?? 0,
       code: dto.code || undefined,
       description: dto.description || undefined,
       status: dto.status || 'Active',

@@ -16,9 +16,10 @@ export class SubTherapyDto {
   @IsNotEmpty({ message: 'Sub-therapy name is required' })
   name: string;
 
+  @IsOptional()
   @IsNumber({}, { message: 'Sub-therapy price must be a valid number' })
   @Min(0, { message: 'Sub-therapy price must be non-negative' })
-  price: number;
+  price?: number;
 
   @IsOptional()
   @IsString()

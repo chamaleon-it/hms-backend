@@ -34,6 +34,7 @@ export class ProcedureService {
       subProcedures: (dto.subProcedures || []).map((sp) => ({
         ...sp,
         _id: sp._id && mongoose.isValidObjectId(sp._id) ? new Types.ObjectId(sp._id) : new Types.ObjectId(),
+        price: sp.price ?? 0,
         isDeleted: sp.isDeleted ?? false,
         status: sp.status || 'Active',
       })),
@@ -118,15 +119,21 @@ export class ProcedureService {
       existing.hasSubProcedures = dto.hasSubProcedures;
 
     if (Array.isArray(dto.subProcedures)) {
-      existing.subProcedures = dto.subProcedures.map((sp) => ({
-        ...sp,
-        _id:
-          sp._id && mongoose.isValidObjectId(sp._id)
-            ? new Types.ObjectId(sp._id)
-            : new Types.ObjectId(),
-        isDeleted: sp.isDeleted ?? false,
-        status: sp.status || 'Active',
-      })) as any;
+      existing.subProcedures = dto.subProcedures.map((sp) => {
+        const previous = (existing.subProcedures || []).find(
+          (row: any) => sp._id && String(row._id) === String(sp._id),
+        );
+        return {
+          ...sp,
+          _id:
+            sp._id && mongoose.isValidObjectId(sp._id)
+              ? new Types.ObjectId(sp._id)
+              : new Types.ObjectId(),
+          price: sp.price !== undefined ? sp.price : (previous?.price ?? 0),
+          isDeleted: sp.isDeleted ?? false,
+          status: sp.status || 'Active',
+        };
+      }) as any;
       existing.hasSubProcedures = existing.subProcedures.length > 0;
     }
 
@@ -161,7 +168,7 @@ export class ProcedureService {
     const newSubProc = {
       _id: new Types.ObjectId(),
       name: dto.name,
-      price: dto.price,
+      price: dto.price ?? 0,
       code: dto.code || undefined,
       description: dto.description || undefined,
       status: dto.status || 'Active',

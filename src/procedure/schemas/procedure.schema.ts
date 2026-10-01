@@ -11,7 +11,7 @@ export class SubProcedure {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ required: false, default: 0 })
   price: number;
 
   @Prop({ required: false })
