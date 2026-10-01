@@ -222,18 +222,11 @@ export class TreatmentService {
   }
 
   async create(createDto: CreateTreatmentDto): Promise<Treatment> {
-    let therapistId = createDto.therapist;
-    let therapistName = createDto.therapistName;
-
-    if (!therapistName || therapistName.trim() === '' || therapistName === '-') {
-      const def = await this.getDefaultTherapist();
-      therapistId = (def.therapist as any) || therapistId;
-      therapistName = def.therapistName;
-    }
-
-    if (!therapistName || therapistName.trim() === '') {
-      throw new BadRequestException('Therapist assignment is mandatory');
-    }
+    const namedTherapist = (createDto.therapistName || '').trim();
+    const therapistName =
+      namedTherapist && namedTherapist !== '-' ? namedTherapist : '-';
+    const therapistId =
+      therapistName !== '-' ? createDto.therapist || null : null;
 
     const mrn = await this.generateUniqueMRN();
 

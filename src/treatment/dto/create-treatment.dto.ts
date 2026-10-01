@@ -97,9 +97,9 @@ export class CreateTreatmentDto {
   @IsMongoId()
   therapist?: mongoose.Types.ObjectId;
 
-  @IsString({ message: 'Therapist name is required.' })
-  @IsNotEmpty({ message: 'Therapist name cannot be empty.' })
-  therapistName: string;
+  @IsOptional()
+  @IsString()
+  therapistName?: string;
 
   @IsOptional()
   @IsEnum(TreatmentStatus)
