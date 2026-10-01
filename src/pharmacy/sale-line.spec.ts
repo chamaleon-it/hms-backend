@@ -1,4 +1,13 @@
-import { batchSalePrice, chosenBatch, clampOrderDiscount, defaultSaleBatch, lineSaleBatch, resolveSaleLine } from './sale-line';
+import {
+  batchSalePrice,
+  chosenBatch,
+  clampOrderDiscount,
+  clampPaymentSplit,
+  defaultSaleBatch,
+  lineSaleBatch,
+  resolveSaleLine,
+  splitTotal,
+} from './sale-line';
 
 describe('pharmacy sale line', () => {
   it('caps a rupee discount at the subtotal', () => {
@@ -6,6 +15,25 @@ describe('pharmacy sale line', () => {
     expect(clampOrderDiscount(20, 12)).toBe(12);
     expect(clampOrderDiscount(-3, 12)).toBe(0);
     expect(clampOrderDiscount(4, 0)).toBe(0);
+  });
+
+  it('keeps cash, card, and UPI within the payable amount', () => {
+    expect(clampPaymentSplit({ cash: 100, card: 200, upi: 180 }, 480)).toEqual({
+      cash: 100,
+      card: 200,
+      upi: 180,
+    });
+    expect(clampPaymentSplit({ cash: 300, card: 300, upi: 50 }, 480)).toEqual({
+      cash: 300,
+      card: 180,
+      upi: 0,
+    });
+    expect(clampPaymentSplit({ cash: -5, card: 'x', upi: 20 }, 480)).toEqual({
+      cash: 0,
+      card: 0,
+      upi: 20,
+    });
+    expect(splitTotal({ cash: 100, card: 200, upi: 180 })).toBe(480);
   });
 
   const dolo = {

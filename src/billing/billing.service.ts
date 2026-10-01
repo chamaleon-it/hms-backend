@@ -148,6 +148,12 @@ export class BillingService {
         .populate('items.name');
       if (order) {
         order.billNo = data.mrn;
+        order.cash = createBill.cash ?? 0;
+        order.card = createBill.card ?? 0;
+        order.upi = createBill.upi ?? 0;
+        if (createBill.discount !== undefined) {
+          order.discount = createBill.discount ?? 0;
+        }
         const paidAmount =
           (createBill.cash ?? 0) +
           (createBill.card ?? 0) +
