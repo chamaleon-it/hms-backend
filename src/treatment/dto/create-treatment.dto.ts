@@ -42,13 +42,13 @@ export class TreatmentItemDto {
   @IsString()
   code?: string;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  quantity: number;
+  quantity?: number;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  unitPrice: number;
+  unitPrice?: number;
 
   @IsOptional()
   @IsNumber()
@@ -58,9 +58,9 @@ export class TreatmentItemDto {
   @IsNumber()
   discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  total: number;
+  total?: number;
 }
 
 export class CreateTreatmentDto {
