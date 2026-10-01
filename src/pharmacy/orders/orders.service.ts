@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderStatus } from './schemas/order.schema';
+import { Order, OrderStatus, PaymentStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { ItemsService } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
@@ -20,6 +20,7 @@ import { Billing } from 'src/billing/schemas/billing.schema';
 import {
   batchSalePrice,
   clampOrderDiscount,
+  clampPaymentSplit,
   isPlaceholderBatchNumber,
   lineSaleBatch,
   positiveMoney,
@@ -27,6 +28,7 @@ import {
   readBatchNumber,
   resolveSaleLine,
   roundMoney,
+  splitTotal,
 } from '../sale-line';
 
 @Injectable()
@@ -108,11 +110,30 @@ export class OrdersService {
       }, 0),
     );
     const discount = clampOrderDiscount(order.discount, subtotal);
-    if (Number(order.discount) !== discount) {
-      await this.orderModel.updateOne(
-        { _id: order._id },
-        { $set: { discount } },
-      );
+    const payable = roundMoney(subtotal - discount);
+    // Orders saved before the split existed only carry paidAmount; treat it as cash.
+    const legacyCash =
+      splitTotal(order) === 0 && positiveMoney(order.paidAmount) > 0
+        ? order.paidAmount
+        : order.cash;
+    const split = clampPaymentSplit({ ...order.toObject(), cash: legacyCash }, payable);
+    const paidAmount = splitTotal(split);
+    const paymentStatus =
+      paidAmount <= 0
+        ? PaymentStatus.Pending
+        : paidAmount + 0.009 < payable
+          ? PaymentStatus.Partial
+          : PaymentStatus.Paid;
+
+    const orderPatch: Record<string, unknown> = {};
+    if (Number(order.discount) !== discount) orderPatch.discount = discount;
+    if (Number(order.cash) !== split.cash) orderPatch.cash = split.cash;
+    if (Number(order.card) !== split.card) orderPatch.card = split.card;
+    if (Number(order.upi) !== split.upi) orderPatch.upi = split.upi;
+    if (Number(order.paidAmount) !== paidAmount) orderPatch.paidAmount = paidAmount;
+    if (order.paymentStatus !== paymentStatus) orderPatch.paymentStatus = paymentStatus;
+    if (Object.keys(orderPatch).length) {
+      await this.orderModel.updateOne({ _id: order._id }, { $set: orderPatch });
     }
 
     if (!order.billNo || order.billNo === '-') return;
@@ -124,6 +145,10 @@ export class OrdersService {
       bill.items = items as any;
     }
     bill.discount = discount;
+    bill.cash = split.cash;
+    bill.card = split.card;
+    bill.upi = split.upi;
+    bill.status = paidAmount + 0.009 >= payable ? 'Completed' : 'Draft';
     await bill.save();
   }
 
@@ -234,12 +259,12 @@ export class OrdersService {
     const [data, total] = await Promise.all([
       this.orderModel
         .find(filter)
+        .sort({ createdAt: 1, mrn: 1 })
         .skip(skip)
         .limit(limit)
         .populate('patient')
         .populate('doctor', 'name phoneNumber specialization')
         .populate('items.name')
-        .sort({ createdAt: -1 })
         .exec(),
       this.orderModel.countDocuments(filter),
     ]);
@@ -300,9 +325,9 @@ export class OrdersService {
 
     return {
       ...data,
-      cash: bill?.cash ?? 0,
-      card: bill?.card ?? 0,
-      upi: bill?.upi ?? 0,
+      cash: bill?.cash ?? data.cash ?? 0,
+      card: bill?.card ?? data.card ?? 0,
+      upi: bill?.upi ?? data.upi ?? 0,
     };
   }
 
@@ -861,6 +886,9 @@ export class OrdersService {
       'doctorName',
       'pharmacist',
       'discount',
+      'cash',
+      'card',
+      'upi',
       'paidAmount',
       'paymentStatus',
       'billNo',

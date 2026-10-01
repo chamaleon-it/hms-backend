@@ -29,6 +29,39 @@ export function clampOrderDiscount(amount: unknown, subtotal: unknown): number {
   return roundMoney(Math.min(n, sub));
 }
 
+export interface PaymentSplit {
+  cash: number;
+  card: number;
+  upi: number;
+}
+
+/**
+ * Cash, card, and UPI together never exceed the payable amount.
+ * Cash is kept first, then card, then UPI.
+ */
+export function clampPaymentSplit(
+  split: Partial<Record<keyof PaymentSplit, unknown>> | null | undefined,
+  payable: unknown,
+): PaymentSplit {
+  let remaining = Math.max(0, roundMoney(Number(payable) || 0));
+  const take = (value: unknown) => {
+    const n = positiveMoney(value);
+    const used = roundMoney(Math.min(n, remaining));
+    remaining = roundMoney(remaining - used);
+    return used;
+  };
+  const cash = take(split?.cash);
+  const card = take(split?.card);
+  const upi = take(split?.upi);
+  return { cash, card, upi };
+}
+
+export function splitTotal(split: Partial<PaymentSplit> | null | undefined): number {
+  return roundMoney(
+    positiveMoney(split?.cash) + positiveMoney(split?.card) + positiveMoney(split?.upi),
+  );
+}
+
 /** Dual-read unitPrice and the import alias saleRate. */
 export function batchUnitPrice(batch: any): number {
   if (!batch) return 0;

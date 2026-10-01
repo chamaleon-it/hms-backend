@@ -336,6 +336,7 @@ export class TreatmentService {
       endDate,
       patient,
       therapist,
+      sort,
     } = query;
 
     const skip = (page - 1) * limit;
@@ -414,7 +415,11 @@ export class TreatmentService {
         .populate('therapist')
         .populate('bill')
         .populate('parentTreatment')
-        .sort({ createdAt: -1 })
+        .sort(
+          sort === 'asc'
+            ? { createdAt: 1, mrn: 1 }
+            : { createdAt: -1, mrn: -1 },
+        )
         .skip(skip)
         .limit(limit)
         .lean()

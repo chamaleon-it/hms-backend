@@ -148,6 +148,12 @@ export class BillingService {
         .populate('items.name');
       if (order) {
         order.billNo = data.mrn;
+        order.cash = createBill.cash ?? 0;
+        order.card = createBill.card ?? 0;
+        order.upi = createBill.upi ?? 0;
+        if (createBill.discount !== undefined) {
+          order.discount = createBill.discount ?? 0;
+        }
         const paidAmount =
           (createBill.cash ?? 0) +
           (createBill.card ?? 0) +
@@ -337,6 +343,7 @@ export class BillingService {
       userRole,
       billType,
       patientVisitor,
+      sort,
     } = getBillisDto;
     const skip = (page - 1) * limit;
 
@@ -572,7 +579,12 @@ export class BillingService {
       $facet: {
         metadata: [{ $count: 'total' }],
         data: [
-          { $sort: { createdAt: -1 } },
+          {
+            $sort:
+              sort === 'asc'
+                ? { createdAt: 1, mrn: 1 }
+                : { createdAt: -1, mrn: -1 },
+          },
           ...(activeDate === 'Today' || activeDate === 'Custom' || true
             ? []
             : [{ $skip: skip }, { $limit: limit }]),

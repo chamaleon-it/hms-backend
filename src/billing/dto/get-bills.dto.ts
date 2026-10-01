@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -71,4 +72,9 @@ export class GetBillisDto {
   @Transform(({ value }) => (value === '' ? undefined : value))
   @IsEnum(['new', 'existing', 'all'])
   patientVisitor?: 'new' | 'existing' | 'all';
+
+  /** List order. Pharmacy billing asks for oldest invoice first. */
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sort?: 'asc' | 'desc';
 }

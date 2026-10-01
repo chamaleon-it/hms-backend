@@ -142,6 +142,16 @@ export class Order {
   @Prop({ default: 0, required: true })
   paidAmount: number;
 
+  /** Payment split entered on the order; copied onto the linked bill. */
+  @Prop({ type: Number, default: 0 })
+  cash: number;
+
+  @Prop({ type: Number, default: 0 })
+  card: number;
+
+  @Prop({ type: Number, default: 0 })
+  upi: number;
+
   @Prop({ default: '-' })
   paymentReference: string;
 

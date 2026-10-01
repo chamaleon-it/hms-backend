@@ -231,6 +231,18 @@ export class UpdateOrderDto {
   paidAmount?: number;
 
   @IsOptional()
+  @IsNumber()
+  cash?: number;
+
+  @IsOptional()
+  @IsNumber()
+  card?: number;
+
+  @IsOptional()
+  @IsNumber()
+  upi?: number;
+
+  @IsOptional()
   @IsString()
   paymentStatus?: string;
 
