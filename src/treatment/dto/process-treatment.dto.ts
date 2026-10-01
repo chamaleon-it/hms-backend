@@ -4,10 +4,17 @@ import {
   IsNumber,
   IsDateString,
   IsMongoId,
+  Min,
 } from 'class-validator';
 import mongoose from 'mongoose';
 
 export class ProcessTreatmentDto {
+  /** Session charge entered at completion. Not the catalog price. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amount?: number;
+
   @IsOptional()
   @IsNumber()
   cash?: number;
