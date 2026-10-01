@@ -21,6 +21,14 @@ export function roundMoney(value: number): number {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+/** Rupee discount, never below zero and never above the subtotal. */
+export function clampOrderDiscount(amount: unknown, subtotal: unknown): number {
+  const sub = Math.max(0, Number(subtotal) || 0);
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0 || sub <= 0) return 0;
+  return roundMoney(Math.min(n, sub));
+}
+
 /** Dual-read unitPrice and the import alias saleRate. */
 export function batchUnitPrice(batch: any): number {
   if (!batch) return 0;

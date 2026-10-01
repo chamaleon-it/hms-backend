@@ -19,11 +19,14 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
 import {
   batchSalePrice,
+  clampOrderDiscount,
   isPlaceholderBatchNumber,
   lineSaleBatch,
+  positiveMoney,
   rawBatchNumber,
   readBatchNumber,
   resolveSaleLine,
+  roundMoney,
 } from '../sale-line';
 
 @Injectable()
@@ -74,16 +77,13 @@ export class OrdersService {
     };
   }
 
-  /** Rewrite a linked invoice when it was saved with a zero price. */
+  /** Rewrite a linked invoice when it was saved with a zero price, and keep its discount in step with the order. */
   private async syncBillFromOrder(orderId: mongoose.Types.ObjectId) {
     const order = await this.orderModel
       .findById(orderId)
       .populate('items.name')
       .exec();
-    if (!order?.billNo || order.billNo === '-') return;
-
-    const bill = await this.billingModel.findOne({ mrn: order.billNo });
-    if (!bill) return;
+    if (!order) return;
 
     const items = (order.items || [])
       .filter((item: any) => !this.isOutsideItem(item))
@@ -92,9 +92,38 @@ export class OrdersService {
           item.name && typeof item.name === 'object' ? item.name : undefined;
         return this.toBillItem(item, itemDoc);
       });
-    if (!items.some((line) => line.unitPrice > 0)) return;
+    const subtotal = roundMoney(
+      (order.items || []).reduce((sum: number, item: any) => {
+        if (this.isOutsideItem(item)) return sum;
+        const catalog =
+          item.name && typeof item.name === 'object' ? item.name : undefined;
+        const batch = lineSaleBatch(
+          catalog?.batches,
+          item.batchNumber,
+          item.quantity,
+        );
+        const unit =
+          (batch ? batchSalePrice(batch) : 0) || positiveMoney(item.unitPrice);
+        return sum + unit * (Number(item.quantity) || 0);
+      }, 0),
+    );
+    const discount = clampOrderDiscount(order.discount, subtotal);
+    if (Number(order.discount) !== discount) {
+      await this.orderModel.updateOne(
+        { _id: order._id },
+        { $set: { discount } },
+      );
+    }
 
-    bill.items = items as any;
+    if (!order.billNo || order.billNo === '-') return;
+
+    const bill = await this.billingModel.findOne({ mrn: order.billNo });
+    if (!bill) return;
+
+    if (items.some((line) => line.unitPrice > 0)) {
+      bill.items = items as any;
+    }
+    bill.discount = discount;
     await bill.save();
   }
 

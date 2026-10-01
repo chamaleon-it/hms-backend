@@ -1,6 +1,13 @@
-import { batchSalePrice, chosenBatch, defaultSaleBatch, lineSaleBatch, resolveSaleLine } from './sale-line';
+import { batchSalePrice, chosenBatch, clampOrderDiscount, defaultSaleBatch, lineSaleBatch, resolveSaleLine } from './sale-line';
 
 describe('pharmacy sale line', () => {
+  it('caps a rupee discount at the subtotal', () => {
+    expect(clampOrderDiscount(5, 12)).toBe(5);
+    expect(clampOrderDiscount(20, 12)).toBe(12);
+    expect(clampOrderDiscount(-3, 12)).toBe(0);
+    expect(clampOrderDiscount(4, 0)).toBe(0);
+  });
+
   const dolo = {
     name: 'Dolo',
     generic: 'test',
