@@ -259,12 +259,12 @@ export class OrdersService {
     const [data, total] = await Promise.all([
       this.orderModel
         .find(filter)
+        .sort({ createdAt: 1, mrn: 1 })
         .skip(skip)
         .limit(limit)
         .populate('patient')
         .populate('doctor', 'name phoneNumber specialization')
         .populate('items.name')
-        .sort({ createdAt: -1 })
         .exec(),
       this.orderModel.countDocuments(filter),
     ]);

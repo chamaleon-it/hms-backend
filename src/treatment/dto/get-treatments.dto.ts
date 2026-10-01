@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GetTreatmentsDto {
@@ -51,4 +51,9 @@ export class GetTreatmentsDto {
   @IsOptional()
   @IsString()
   therapist?: string;
+
+  /** List order. Pharmacy treatments ask for oldest record first. */
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sort?: 'asc' | 'desc';
 }
