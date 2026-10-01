@@ -51,6 +51,23 @@ export function readBatchNumber(batch: any): string {
   return '';
 }
 
+/** Stock key, including a batch whose number is the placeholder "B0". */
+export function rawBatchNumber(batch: any): string {
+  if (!batch) return '';
+  const candidates = [
+    batch.batchNumber,
+    batch.batchNo,
+    batch.batch,
+    batch.lotNumber,
+    batch.lot,
+  ];
+  for (const candidate of candidates) {
+    const text = String(candidate ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 export function pickGst(...values: unknown[]): number {
   for (const value of values) {
     const n = Number(value);
@@ -143,11 +160,15 @@ function calendarDay(value: unknown): number | null {
 }
 
 function isSellableBatch(batch: any, now: Date): boolean {
-  if (!readBatchNumber(batch)) return false;
+  if (!rawBatchNumber(batch)) return false;
   if (batch?.isActive === false) return false;
   if (batchQuantity(batch) <= 0) return false;
   const expiry = calendarDay(batch?.expiryDate);
-  if (expiry == null) return false;
+  if (expiry == null) {
+    // Doctor orders often point at imported stock whose only batch number is B0
+    // and which has no expiry. Other batches still need an unexpired date.
+    return isPlaceholderBatchNumber(rawBatchNumber(batch));
+  }
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   return expiry >= today;
 }
@@ -156,7 +177,7 @@ function bySoonestExpiry(a: any, b: any): number {
   return (
     (calendarDay(a?.expiryDate) ?? Number.POSITIVE_INFINITY) -
       (calendarDay(b?.expiryDate) ?? Number.POSITIVE_INFINITY) ||
-    readBatchNumber(a).localeCompare(readBatchNumber(b))
+    rawBatchNumber(a).localeCompare(rawBatchNumber(b))
   );
 }
 
@@ -190,6 +211,32 @@ export function defaultSaleBatch(
     (a, b) => batchQuantity(b) - batchQuantity(a) || bySoonestExpiry(a, b),
   );
   return { batch: sellable[0], oversell: needed > batchQuantity(sellable[0]) };
+}
+
+/**
+ * Batch used to price and sell a queue line.
+ * An explicit choice wins. A placeholder such as "B0" is a choice only when
+ * stock exists under that number. Otherwise the default in-stock batch is used.
+ */
+export function lineSaleBatch(
+  batches: any[] | undefined,
+  wanted?: unknown,
+  quantityNeeded?: number,
+  now: Date = new Date(),
+): any | undefined {
+  const explicit = chosenBatch(batches, wanted);
+  if (explicit) return explicit;
+
+  const key = String(wanted ?? '').trim().toLowerCase();
+  if (key) {
+    const listed = (Array.isArray(batches) ? batches : []).find((batch) => {
+      if (!isSellableBatch(batch, now)) return false;
+      return rawBatchNumber(batch).toLowerCase() === key;
+    });
+    if (listed) return listed;
+  }
+
+  return defaultSaleBatch(batches, Number(quantityNeeded) || 0, now)?.batch;
 }
 
 export interface ResolvedSaleLine {

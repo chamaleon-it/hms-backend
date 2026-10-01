@@ -19,9 +19,9 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
 import {
   batchSalePrice,
-  chosenBatch,
-  defaultSaleBatch,
   isPlaceholderBatchNumber,
+  lineSaleBatch,
+  rawBatchNumber,
   readBatchNumber,
   resolveSaleLine,
 } from '../sale-line';
@@ -920,17 +920,18 @@ export class OrdersService {
         const itemId = ((item.name as any)?._id ||
           item.name) as mongoose.Types.ObjectId;
         const itemDoc = await this.itemsService.getItem(itemId);
-        const explicit = chosenBatch(itemDoc?.batches, (item as any).batchNumber);
-        const picked = explicit
-          ? { batch: explicit }
-          : defaultSaleBatch(itemDoc?.batches, item.quantity);
-        const batch = picked?.batch;
-        const batchNumber = readBatchNumber(batch);
-        if (!batch || !batchNumber) {
+        const batch = lineSaleBatch(
+          itemDoc?.batches,
+          (item as any).batchNumber,
+          item.quantity,
+        );
+        const stockBatchNumber = rawBatchNumber(batch);
+        if (!batch || !stockBatchNumber) {
           throw new BadRequestException(
             `No in-stock batch available for ${itemDoc?.name || 'this medicine'}.`,
           );
         }
+        const batchNumber = readBatchNumber(batch) || stockBatchNumber;
         const price = batchSalePrice(batch);
         (item as any).batchNumber = batchNumber;
         if (price > 0) (item as any).unitPrice = price;
