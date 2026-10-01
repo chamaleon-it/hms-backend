@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model, Types } from 'mongoose';
 import { Procedure, ProcedureDocument } from './schemas/procedure.schema';
@@ -11,16 +16,37 @@ export interface ResolvedProcedureItem {
   subProcedureId?: string | null;
   name: string;
   parentName?: string | null;
-  price: number;
   code?: string | null;
 }
 
+function withoutCatalogPrice(doc: any) {
+  if (!doc || typeof doc !== 'object') return doc;
+  const { price: _price, ...rest } = doc;
+  if (Array.isArray(rest.subProcedures)) {
+    rest.subProcedures = rest.subProcedures.map((sub: any) => {
+      const { price: _subPrice, ...subRest } = sub || {};
+      return subRest;
+    });
+  }
+  return rest;
+}
+
 @Injectable()
-export class ProcedureService {
+export class ProcedureService implements OnModuleInit {
   constructor(
     @InjectModel(Procedure.name)
     private procedureModel: Model<ProcedureDocument>,
   ) {}
+
+  async onModuleInit() {
+    await this.procedureModel.updateMany(
+      {},
+      { $unset: { price: '', 'subProcedures.$[].price': '' } },
+    );
+    await this.procedureModel.db
+      .collection('consultings')
+      .updateMany({}, { $unset: { 'procedure.$[].price': '' } });
+  }
 
   async createProcedure(dto: CreateProcedureDto) {
     // If subProcedures are provided, ensure hasSubProcedures is true
@@ -68,10 +94,12 @@ export class ProcedureService {
       .exec();
 
     // Filter out deleted sub-procedures in results
-    return procedures.map((p) => ({
-      ...p,
-      subProcedures: (p.subProcedures || []).filter((sp: any) => !sp.isDeleted),
-    }));
+    return procedures.map((p) =>
+      withoutCatalogPrice({
+        ...p,
+        subProcedures: (p.subProcedures || []).filter((sp: any) => !sp.isDeleted),
+      }),
+    );
   }
 
   async findOne(id: string): Promise<any> {
@@ -88,12 +116,12 @@ export class ProcedureService {
       throw new NotFoundException(`Procedure with id ${id} not found`);
     }
 
-    return {
+    return withoutCatalogPrice({
       ...procedure,
       subProcedures: (procedure.subProcedures || []).filter(
         (sp: any) => !sp.isDeleted,
       ),
-    };
+    });
   }
 
   async updateProcedure(id: string, dto: UpdateProcedureDto) {
@@ -112,7 +140,6 @@ export class ProcedureService {
     if (dto.name !== undefined) existing.name = dto.name;
     if (dto.code !== undefined) existing.code = dto.code;
     if (dto.description !== undefined) existing.description = dto.description;
-    if (dto.price !== undefined) existing.price = dto.price;
     if (dto.status !== undefined) existing.status = dto.status;
     if (dto.hasSubProcedures !== undefined)
       existing.hasSubProcedures = dto.hasSubProcedures;
@@ -161,7 +188,6 @@ export class ProcedureService {
     const newSubProc = {
       _id: new Types.ObjectId(),
       name: dto.name,
-      price: dto.price,
       code: dto.code || undefined,
       description: dto.description || undefined,
       status: dto.status || 'Active',
@@ -201,8 +227,6 @@ export class ProcedureService {
     const updateFields: any = {};
     if (dto.name !== undefined)
       updateFields['subProcedures.$.name'] = dto.name;
-    if (dto.price !== undefined)
-      updateFields['subProcedures.$.price'] = dto.price;
     if (dto.code !== undefined)
       updateFields['subProcedures.$.code'] = dto.code;
     if (dto.description !== undefined)
@@ -283,7 +307,6 @@ export class ProcedureService {
             subProcedureId: String(sub._id),
             name: sub.name,
             parentName: p.name,
-            price: Number(sub.price) || 0,
             code: sub.code || p.code || null,
           });
           foundAsSub = true;
@@ -303,11 +326,9 @@ export class ProcedureService {
           subProcedureId: null,
           name: mainProc.name,
           parentName: null,
-          price: Number(mainProc.price) || 0,
           code: mainProc.code || null,
         });
-      } else if (typeof item === 'object' && item.name && item.price !== undefined) {
-        // Fallback for custom or direct objects
+      } else if (typeof item === 'object' && item.name) {
         resolved.push({
           procedureId:
             item.procedureId && mongoose.isValidObjectId(item.procedureId)
@@ -316,7 +337,6 @@ export class ProcedureService {
           subProcedureId: item.subProcedureId || null,
           name: item.name,
           parentName: item.parentName || null,
-          price: Number(item.price) || 0,
           code: item.code || null,
         });
       }

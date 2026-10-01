@@ -11,9 +11,6 @@ export class SubTherapy {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, default: 0 })
-  price: number;
-
   @Prop({ required: false })
   code?: string;
 
@@ -39,9 +36,6 @@ export class Therapy {
 
   @Prop({ required: false })
   description?: string;
-
-  @Prop({ required: false, default: 0 })
-  price?: number;
 
   @Prop({ default: false })
   hasSubTherapies: boolean;

@@ -114,7 +114,6 @@ export class Consulting {
         subTherapyId: { type: String, default: null },
         name: { type: String, required: true },
         parentName: { type: String, default: null },
-        price: { type: Number, required: true, default: 0 },
         code: { type: String, default: null },
       },
     ],
@@ -125,7 +124,6 @@ export class Consulting {
     subTherapyId?: string | null;
     name: string;
     parentName?: string | null;
-    price: number;
     code?: string | null;
   }[];
 
@@ -146,7 +144,6 @@ export class Consulting {
         subProcedureId: { type: String, default: null },
         name: { type: String, required: true },
         parentName: { type: String, default: null },
-        price: { type: Number, required: true, default: 0 },
         code: { type: String, default: null },
       },
     ],
@@ -157,7 +154,6 @@ export class Consulting {
     subProcedureId?: string | null;
     name: string;
     parentName?: string | null;
-    price: number;
     code?: string | null;
   }[];
 

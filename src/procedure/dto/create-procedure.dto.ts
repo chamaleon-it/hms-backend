@@ -2,10 +2,8 @@ import {
   IsArray,
   IsBoolean,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -23,11 +21,6 @@ export class CreateProcedureDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'Price must be a valid number' })
-  @Min(0, { message: 'Price must be non-negative' })
-  price?: number;
 
   @IsOptional()
   @IsBoolean()

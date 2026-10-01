@@ -122,7 +122,7 @@ export class TreatmentService {
     const { therapist, therapistName } = await this.getDefaultTherapist();
 
     const formattedItems = payload.items.map((item) => {
-      const unitPrice = Number(item.price ?? item.unitPrice ?? 0);
+      const unitPrice = Number(item.unitPrice ?? 0);
       const quantity = Number(item.quantity ?? 1);
       const discount = Number(item.discount ?? 0);
       const gst = Number(item.gst ?? 0);
@@ -222,18 +222,11 @@ export class TreatmentService {
   }
 
   async create(createDto: CreateTreatmentDto): Promise<Treatment> {
-    let therapistId = createDto.therapist;
-    let therapistName = createDto.therapistName;
-
-    if (!therapistName || therapistName.trim() === '' || therapistName === '-') {
-      const def = await this.getDefaultTherapist();
-      therapistId = (def.therapist as any) || therapistId;
-      therapistName = def.therapistName;
-    }
-
-    if (!therapistName || therapistName.trim() === '') {
-      throw new BadRequestException('Therapist assignment is mandatory');
-    }
+    const namedTherapist = (createDto.therapistName || '').trim();
+    const therapistName =
+      namedTherapist && namedTherapist !== '-' ? namedTherapist : '-';
+    const therapistId =
+      therapistName !== '-' ? createDto.therapist || null : null;
 
     const mrn = await this.generateUniqueMRN();
 
@@ -391,17 +384,22 @@ export class TreatmentService {
     }
 
     if (q && q.trim()) {
-      const searchRegex = { $regex: q.trim(), $options: 'i' };
-      andConditions.push({
-        $or: [
-          { mrn: searchRegex },
-          { billNo: searchRegex },
-          { doctorName: searchRegex },
-          { therapistName: searchRegex },
-          { notes: searchRegex },
-          { 'items.name': searchRegex },
-        ],
-      });
+      const term = q.trim();
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      const patientIds = await this.findPatientIdsByNameOrMrn(searchRegex);
+      const matches: Record<string, unknown>[] = [
+        { mrn: searchRegex },
+        { billNo: searchRegex },
+        { doctorName: searchRegex },
+        { therapistName: searchRegex },
+        { notes: searchRegex },
+        { 'items.name': searchRegex },
+      ];
+      if (patientIds.length) {
+        matches.push({ patient: { $in: patientIds } });
+      }
+      andConditions.push({ $or: matches });
     }
 
     if (andConditions.length > 0) {
@@ -429,6 +427,30 @@ export class TreatmentService {
       total,
       message: 'Treatments retrieved successfully',
     };
+  }
+
+  /** Patients whose name or displayed MRN matches the treatments list search. */
+  private async findPatientIdsByNameOrMrn(searchRegex: {
+    $regex: string;
+    $options: string;
+  }): Promise<mongoose.Types.ObjectId[]> {
+    const patients = this.treatmentModel?.db?.collection?.('patients');
+    if (!patients) return [];
+    try {
+      const matches = await patients
+        .find(
+          { $or: [{ name: searchRegex }, { mrn: searchRegex }] },
+          { projection: { _id: 1 } },
+        )
+        .limit(500)
+        .toArray();
+      return matches
+        .map((patient) => patient?._id)
+        .filter((id) => id && mongoose.isValidObjectId(id))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+    } catch {
+      return [];
+    }
   }
 
   async findOne(id: string): Promise<Treatment> {
@@ -623,7 +645,18 @@ export class TreatmentService {
 
     const pharmacyUserIdStr = await this.resolvePharmacyBillingUserId(userId);
 
-    const billingItems = (treatment.items || []).map((item) => ({
+    const roundRupee = (value: unknown) => {
+      const amount = Number(value);
+      if (!Number.isFinite(amount)) return 0;
+      return Math.round(Math.max(0, amount) * 100) / 100;
+    };
+
+    const sessionAmount =
+      dto.amount !== undefined && dto.amount !== null
+        ? roundRupee(dto.amount)
+        : null;
+
+    let billingItems = (treatment.items || []).map((item) => ({
       name: item.name,
       quantity: item.quantity || 1,
       unitPrice: item.unitPrice || 0,
@@ -632,8 +665,46 @@ export class TreatmentService {
       total: item.total || (item.quantity || 1) * (item.unitPrice || 0),
     }));
 
+    if (sessionAmount !== null) {
+      const lineName =
+        (treatment.items || [])
+          .map((item) => String(item.name || '').trim())
+          .filter(Boolean)
+          .join(', ') || `${treatment.type || 'Treatment'} session`;
+      billingItems = [
+        {
+          name: lineName,
+          quantity: 1,
+          unitPrice: sessionAmount,
+          gst: 0,
+          discount: 0,
+          total: sessionAmount,
+        },
+      ];
+      (treatment.items || []).forEach((item, index) => {
+        const lineTotal = index === 0 ? sessionAmount : 0;
+        item.unitPrice = lineTotal;
+        item.quantity = item.quantity || 1;
+        item.total = lineTotal;
+      });
+      treatment.markModified('items');
+    }
+
     const totalDiscount =
       dto.discount !== undefined ? dto.discount : treatment.discount || 0;
+
+    const gross = roundRupee(
+      billingItems.reduce((sum, item) => sum + Number(item.total || 0), 0),
+    );
+    const netPayable = roundRupee(Math.max(0, gross - roundRupee(totalDiscount)));
+    const split = roundRupee(
+      roundRupee(dto.cash) + roundRupee(dto.card) + roundRupee(dto.upi),
+    );
+    if (split !== netPayable) {
+      throw new BadRequestException(
+        'Cash, Card, and UPI must equal the session amount.',
+      );
+    }
 
     const typeLabel =
       treatment.type === TreatmentType.Procedure ? 'Procedure' : 'Therapy';

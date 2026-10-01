@@ -42,13 +42,13 @@ export class TreatmentItemDto {
   @IsString()
   code?: string;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  quantity: number;
+  quantity?: number;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  unitPrice: number;
+  unitPrice?: number;
 
   @IsOptional()
   @IsNumber()
@@ -58,9 +58,9 @@ export class TreatmentItemDto {
   @IsNumber()
   discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  total: number;
+  total?: number;
 }
 
 export class CreateTreatmentDto {
@@ -97,9 +97,9 @@ export class CreateTreatmentDto {
   @IsMongoId()
   therapist?: mongoose.Types.ObjectId;
 
-  @IsString({ message: 'Therapist name is required.' })
-  @IsNotEmpty({ message: 'Therapist name cannot be empty.' })
-  therapistName: string;
+  @IsOptional()
+  @IsString()
+  therapistName?: string;
 
   @IsOptional()
   @IsEnum(TreatmentStatus)

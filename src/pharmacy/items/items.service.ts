@@ -55,11 +55,14 @@ export class ItemsService {
   /**
    * Resolve which pharmacy ObjectId scopes inventory for this actor.
    * Admin / Super Admin → null (unscoped). Pharmacy roles → own id.
-   * Others → IN_HOUSE_PHARMACY_ID when set, else own id.
+   * Clinical roles → the pharmacy that owns active inventory.
+   * A configured IN_HOUSE_PHARMACY_ID is used only when that pharmacy has
+   * items. Otherwise the pharmacy with the most non-deleted items is used.
+   * Falling back to the actor's own id returned no medicines in doctor search.
    */
-  private resolvePharmacyScope(
+  private async resolvePharmacyScope(
     user: JWTUserInterface,
-  ): mongoose.Types.ObjectId | null {
+  ): Promise<mongoose.Types.ObjectId | null> {
     const role = String(user.role || '');
     if (
       user.role === UserRole.ADMIN ||
@@ -74,11 +77,38 @@ export class ItemsService {
     ) {
       return user.id;
     }
-    const inHouse = configuration().in_house_pharmacy_id;
-    if (inHouse && mongoose.isValidObjectId(inHouse)) {
-      return new mongoose.Types.ObjectId(inHouse);
+    return this.resolveInventoryPharmacyId();
+  }
+
+  private async resolveInventoryPharmacyId(): Promise<mongoose.Types.ObjectId | null> {
+    const configured = String(configuration().in_house_pharmacy_id || '').trim();
+    if (configured && mongoose.isValidObjectId(configured)) {
+      const configuredId = new mongoose.Types.ObjectId(configured);
+      const ownsInventory = await this.itemModel.exists({
+        pharmacy: configuredId,
+        status: { $ne: ItemStatus.Deleted },
+      });
+      if (ownsInventory) return configuredId;
     }
-    return user.id;
+
+    const [top] = await this.itemModel.aggregate<{
+      _id?: mongoose.Types.ObjectId;
+    }>([
+      {
+        $match: {
+          status: { $ne: ItemStatus.Deleted },
+          pharmacy: { $exists: true, $ne: null },
+        },
+      },
+      { $group: { _id: '$pharmacy', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 1 },
+    ]);
+
+    if (top?._id && mongoose.isValidObjectId(top._id)) {
+      return new mongoose.Types.ObjectId(String(top._id));
+    }
+    return null;
   }
 
   /** Match batch by subdoc _id or batchNumber (import / legacy clients). */
@@ -96,10 +126,10 @@ export class ItemsService {
     });
   }
 
-  private pharmacyFilter(
+  private async pharmacyFilter(
     user: JWTUserInterface,
-  ): { pharmacy?: mongoose.Types.ObjectId } {
-    const pharmacyId = this.resolvePharmacyScope(user);
+  ): Promise<{ pharmacy?: mongoose.Types.ObjectId }> {
+    const pharmacyId = await this.resolvePharmacyScope(user);
     return pharmacyId ? { pharmacy: pharmacyId } : {};
   }
 
@@ -114,7 +144,7 @@ export class ItemsService {
     if (!item) {
       throw new NotFoundException('Item not found.');
     }
-    const scope = this.resolvePharmacyScope(user);
+    const scope = await this.resolvePharmacyScope(user);
     if (
       scope &&
       item.pharmacy &&
@@ -245,7 +275,7 @@ export class ItemsService {
     } = query;
 
     const skip = (page - 1) * limit;
-    const scopeFilter = this.pharmacyFilter(user);
+    const scopeFilter = await this.pharmacyFilter(user);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -462,7 +492,10 @@ export class ItemsService {
 
   async exportCsv(user: JWTUserInterface) {
     const items = await this.itemModel
-      .find({ ...this.pharmacyFilter(user), status: { $ne: ItemStatus.Deleted } })
+      .find({
+        ...(await this.pharmacyFilter(user)),
+        status: { $ne: ItemStatus.Deleted },
+      })
       .lean()
       .exec();
     const csv = parse(items);
@@ -637,7 +670,7 @@ export class ItemsService {
 
   async getSuppliers(user: JWTUserInterface) {
     const batchSuppliers = await this.itemModel
-      .distinct('batches.supplier', this.pharmacyFilter(user))
+      .distinct('batches.supplier', await this.pharmacyFilter(user))
       .lean();
     return batchSuppliers.filter(
       (supplier) => supplier && supplier !== '' && supplier !== '-',

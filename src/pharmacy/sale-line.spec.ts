@@ -1,6 +1,13 @@
-import { chosenBatch, defaultSaleBatch, resolveSaleLine } from './sale-line';
+import { batchSalePrice, chosenBatch, clampOrderDiscount, defaultSaleBatch, lineSaleBatch, resolveSaleLine } from './sale-line';
 
 describe('pharmacy sale line', () => {
+  it('caps a rupee discount at the subtotal', () => {
+    expect(clampOrderDiscount(5, 12)).toBe(5);
+    expect(clampOrderDiscount(20, 12)).toBe(12);
+    expect(clampOrderDiscount(-3, 12)).toBe(0);
+    expect(clampOrderDiscount(4, 0)).toBe(0);
+  });
+
   const dolo = {
     name: 'Dolo',
     generic: 'test',
@@ -141,6 +148,49 @@ describe('pharmacy sale line', () => {
       );
       expect(pick?.batch.batchNumber).toBe('TODAY');
       expect(pick?.oversell).toBe(false);
+    });
+
+    it('sells an in-stock batch named B0 when the pharmacist has not chosen one', () => {
+      const batches = [
+        {
+          batchNumber: 'B0',
+          unitPrice: 12,
+          mrp: 120,
+          quantity: 60,
+          expiryDate: '2031-11-01',
+          isActive: true,
+        },
+      ];
+      const pick = defaultSaleBatch(batches, 6, now);
+      expect(pick?.batch.batchNumber).toBe('B0');
+      expect(pick?.oversell).toBe(false);
+      expect(batchSalePrice(pick?.batch)).toBe(12);
+
+      expect(lineSaleBatch(batches, undefined, 6, now)?.quantity).toBe(60);
+      expect(lineSaleBatch(batches, 'B0', 6, now)?.batchNumber).toBe('B0');
+      expect(chosenBatch(batches, 'B0')).toBeUndefined();
+    });
+
+    it('sells in-stock B0 stock that has no expiry, and still skips a real batch with none', () => {
+      expect(
+        defaultSaleBatch(
+          [{ batchNumber: 'B0', unitPrice: 12, mrp: 120, quantity: 320, isActive: true }],
+          6,
+          now,
+        )?.batch.quantity,
+      ).toBe(320);
+      expect(
+        defaultSaleBatch([{ batchNumber: 'B1', unitPrice: 5, quantity: 10 }], 1, now),
+      ).toBeUndefined();
+    });
+
+    it('keeps the soonest real batch when B0 is only a placeholder and other stock exists', () => {
+      const batches = [
+        { batchNumber: 'B1', unitPrice: 1, quantity: 40, expiryDate: '2026-10-15' },
+        { batchNumber: 'B2', unitPrice: 9, quantity: 10, expiryDate: '2027-01-01' },
+      ];
+      expect(lineSaleBatch(batches, 'B0', 6, now)?.batchNumber).toBe('B1');
+      expect(lineSaleBatch(batches, 'B2', 6, now)?.unitPrice).toBe(9);
     });
 
     it('returns nothing when every batch is expired, empty, or inactive', () => {
