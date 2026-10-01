@@ -384,17 +384,22 @@ export class TreatmentService {
     }
 
     if (q && q.trim()) {
-      const searchRegex = { $regex: q.trim(), $options: 'i' };
-      andConditions.push({
-        $or: [
-          { mrn: searchRegex },
-          { billNo: searchRegex },
-          { doctorName: searchRegex },
-          { therapistName: searchRegex },
-          { notes: searchRegex },
-          { 'items.name': searchRegex },
-        ],
-      });
+      const term = q.trim();
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      const patientIds = await this.findPatientIdsByNameOrMrn(searchRegex);
+      const matches: Record<string, unknown>[] = [
+        { mrn: searchRegex },
+        { billNo: searchRegex },
+        { doctorName: searchRegex },
+        { therapistName: searchRegex },
+        { notes: searchRegex },
+        { 'items.name': searchRegex },
+      ];
+      if (patientIds.length) {
+        matches.push({ patient: { $in: patientIds } });
+      }
+      andConditions.push({ $or: matches });
     }
 
     if (andConditions.length > 0) {
@@ -422,6 +427,30 @@ export class TreatmentService {
       total,
       message: 'Treatments retrieved successfully',
     };
+  }
+
+  /** Patients whose name or displayed MRN matches the treatments list search. */
+  private async findPatientIdsByNameOrMrn(searchRegex: {
+    $regex: string;
+    $options: string;
+  }): Promise<mongoose.Types.ObjectId[]> {
+    const patients = this.treatmentModel?.db?.collection?.('patients');
+    if (!patients) return [];
+    try {
+      const matches = await patients
+        .find(
+          { $or: [{ name: searchRegex }, { mrn: searchRegex }] },
+          { projection: { _id: 1 } },
+        )
+        .limit(500)
+        .toArray();
+      return matches
+        .map((patient) => patient?._id)
+        .filter((id) => id && mongoose.isValidObjectId(id))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+    } catch {
+      return [];
+    }
   }
 
   async findOne(id: string): Promise<Treatment> {
