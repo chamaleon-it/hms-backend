@@ -751,4 +751,69 @@ export class ItemsService {
     await item.save();
     return item;
   }
+
+  async getInventoryStatistics(
+    user: JWTUserInterface,
+    lowStockThreshold: number = 20,
+  ) {
+    const scopeFilter = await this.pharmacyFilter(user);
+    const filter = {
+      ...scopeFilter,
+      status: { $ne: ItemStatus.Deleted },
+    };
+
+    // Fetch all items with their batches
+    const items = await this.itemModel
+      .find(filter)
+      .lean()
+      .exec();
+
+    let totalInventoryValue = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    // Calculate inventory metrics
+    const itemStats = items.map((item: any) => {
+      const totalQuantity = sumActiveQuantity(item.batches);
+      const itemValue = (item.batches || []).reduce((sum: number, batch: any) => {
+        if (!isBatchActive(batch)) return sum;
+        return sum + ((Number(batch.quantity) || 0) * (Number(batch.unitPrice) || 0));
+      }, 0);
+
+      totalInventoryValue += itemValue;
+
+      if (totalQuantity === 0) {
+        outOfStockCount++;
+      } else if (totalQuantity < lowStockThreshold) {
+        lowStockCount++;
+      }
+
+      return {
+        _id: item._id,
+        name: item.name,
+        totalQuantity,
+        itemValue: Math.round(itemValue * 100) / 100,
+        soldQuantity: item.soldQuantity || 0,
+      };
+    });
+
+    // Get top 5 moving items (by soldQuantity)
+    const topMoving = itemStats
+      .sort((a: any, b: any) => (b.soldQuantity || 0) - (a.soldQuantity || 0))
+      .slice(0, 5);
+
+    // Get bottom 5 moving items (lowest soldQuantity, excluding completely new items)
+    const lowestMoving = itemStats
+      .filter((item: any) => item.soldQuantity > 0)
+      .sort((a: any, b: any) => (a.soldQuantity || 0) - (b.soldQuantity || 0))
+      .slice(0, 5);
+
+    return {
+      totalInventoryValue: Math.round(totalInventoryValue * 100) / 100,
+      lowStockCount,
+      outOfStockCount,
+      topMoving,
+      lowestMoving,
+    };
+  }
 }

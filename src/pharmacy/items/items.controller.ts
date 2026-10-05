@@ -103,6 +103,19 @@ export class ItemsController {
     res.status(200).send(csv);
   }
 
+  @Get('statistics/dashboard')
+  async getInventoryStatistics(
+    @GetUser() user: JWTUserInterface,
+    @Query('lowStockThreshold') lowStockThreshold?: string,
+  ) {
+    const threshold = lowStockThreshold ? Number(lowStockThreshold) : 20;
+    const data = await this.itemsService.getInventoryStatistics(user, threshold);
+    return {
+      data,
+      message: 'Inventory statistics retrieved successfully',
+    };
+  }
+
   @Get(':id')
   async getItem(
     @GetUser() user: JWTUserInterface,

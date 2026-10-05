@@ -151,7 +151,7 @@ export class AppointmentsService {
         const createBillingDto = {
           user: createdBy,
           patient: appointment.patient,
-          doctor: appointment.doctor.toString(),
+          doctor: appointment.doctor ?? null,
           token: appointment.token,
           tokenNumber: appointment.tokenNumber,
           items: [
@@ -853,7 +853,7 @@ export class AppointmentsService {
     const refundBill = await this.billingService.generateBill({
       user: userId,
       patient: appointment.patient,
-      doctor: appointment.doctor.toString(),
+      doctor: appointment.doctor ?? null,
       items: [
         {
           name: 'Consultation Fee Refund',

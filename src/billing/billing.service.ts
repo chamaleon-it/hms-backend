@@ -41,6 +41,36 @@ export class BillingService {
     private readonly accountsService: AccountsService,
   ) {}
 
+  private normalizeDoctorValue(value: unknown): mongoose.Types.ObjectId | null {
+    if (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      value === 'Self' ||
+      value === 'self' ||
+      value === '-'
+    ) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed || trimmed === 'Self' || trimmed === 'self' || trimmed === '-') {
+        return null;
+      }
+
+      return mongoose.isValidObjectId(trimmed)
+        ? new mongoose.Types.ObjectId(trimmed)
+        : null;
+    }
+
+    if (value instanceof mongoose.Types.ObjectId) {
+      return value;
+    }
+
+    return null;
+  }
+
   private async determineSourceModule(userId: any): Promise<SourceModule> {
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return SourceModule.Pharmacy;
@@ -121,6 +151,7 @@ export class BillingService {
   }
 
   async generateBill(createBill: CreateBillingDto) {
+    createBill.doctor = this.normalizeDoctorValue(createBill.doctor);
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
@@ -613,11 +644,16 @@ export class BillingService {
 
     // Populate doctor names for the bills
     for (const bill of data) {
-      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
-        const doc = await this.usersService.getUserById(bill.doctor);
+      const normalizedDoctor = this.normalizeDoctorValue(bill.doctor);
+      if (normalizedDoctor) {
+        const doc = await this.usersService.getUserById(normalizedDoctor);
         if (doc) {
           bill.doctor = doc;
         }
+      }
+
+      if (!normalizedDoctor) {
+        bill.doctor = null;
       }
     }
 
@@ -750,11 +786,15 @@ export class BillingService {
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
-      const doc = await this.usersService.getUserById(data.doctor);
+    const normalizedDoctor = this.normalizeDoctorValue(data.doctor);
+    if (normalizedDoctor) {
+      const doc = await this.usersService.getUserById(normalizedDoctor);
       if (doc) {
         (data as any).doctor = doc;
       }
+    }
+    if (!normalizedDoctor) {
+      (data as any).doctor = null;
     }
     await this.repairZeroPricedBills([data]);
     return data;
@@ -771,11 +811,15 @@ export class BillingService {
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
-      const doc = await this.usersService.getUserById(data.doctor);
+    const normalizedDoctor = this.normalizeDoctorValue(data.doctor);
+    if (normalizedDoctor) {
+      const doc = await this.usersService.getUserById(normalizedDoctor);
       if (doc) {
         (data as any).doctor = doc;
       }
+    }
+    if (!normalizedDoctor) {
+      (data as any).doctor = null;
     }
     return data;
   }

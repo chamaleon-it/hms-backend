@@ -209,7 +209,7 @@ export class OrdersService {
             configuration().in_house_pharmacy_id,
           ),
           discount: order.discount ?? 0,
-          doctor: order.doctorName || 'Self',
+          doctor: order.doctor ?? null,
           inCharge: order.pharmacist,
         });
 
@@ -1090,7 +1090,7 @@ export class OrdersService {
         items,
         user: new mongoose.Types.ObjectId(configuration().in_house_pharmacy_id),
         discount: data.discount ?? 0,
-        doctor: existOrder.doctorName || 'Self',
+        doctor: data.doctor ?? null,
         inCharge: existOrder.pharmacist,
       });
     }

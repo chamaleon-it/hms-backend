@@ -42,8 +42,13 @@ export class Billing {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient', required: true })
   patient: Types.ObjectId;
 
-  @Prop({ type: String, default: 'Self' })
-  doctor: string;
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    nullable: true,
+  })
+  doctor?: Types.ObjectId | null;
 
   /** Therapist assigned when a therapy or procedure session was billed. */
   @Prop({ type: String, default: '' })
