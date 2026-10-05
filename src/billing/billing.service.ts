@@ -1323,4 +1323,47 @@ export class BillingService {
     await this.repairZeroPricedBills(data);
     return data;
   }
+
+  /**
+   * Public API to convert a string doctor ID to MongoDB ObjectId
+   * Only converts if the string is a valid MongoDB ObjectId
+   * Returns null if the string is "Self", "self", "-", empty, or not a valid ObjectId
+   */
+  validateAndConvertDoctorString(
+    doctorString: string,
+  ): { valid: boolean; objectId: string | null; message: string } {
+    if (!doctorString || typeof doctorString !== 'string') {
+      return {
+        valid: false,
+        objectId: null,
+        message: 'Doctor string is required and must be a string',
+      };
+    }
+
+    const trimmed = doctorString.trim();
+
+    if (!trimmed || trimmed === 'Self' || trimmed === 'self' || trimmed === '-') {
+      return {
+        valid: true,
+        objectId: null,
+        message:
+          'Doctor string represents "Self" or empty - converted to null (no specific doctor)',
+      };
+    }
+
+    if (!mongoose.isValidObjectId(trimmed)) {
+      return {
+        valid: false,
+        objectId: null,
+        message: `"${trimmed}" is not a valid MongoDB ObjectId`,
+      };
+    }
+
+    const objectId = new mongoose.Types.ObjectId(trimmed).toString();
+    return {
+      valid: true,
+      objectId,
+      message: `Successfully converted "${trimmed}" to ObjectId: ${objectId}`,
+    };
+  }
 }
