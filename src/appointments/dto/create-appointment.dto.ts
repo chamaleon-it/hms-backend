@@ -4,6 +4,7 @@ import {
   AppointmentStatus,
   AppointmentType,
 } from '../schemas/appointment.schema';
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsMongoId,
@@ -11,6 +12,8 @@ import {
   IsEnum,
   IsDateString,
   IsBoolean,
+  IsNumber,
+  Min,
 } from 'class-validator';
 
 export class CreateAppointmentDto {
@@ -63,4 +66,28 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsBoolean({ message: 'isWalkIn must be a boolean value.' })
   isWalkIn?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Cash must be a number.' })
+  @Min(0, { message: 'Cash cannot be negative.' })
+  cash?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Card must be a number.' })
+  @Min(0, { message: 'Card cannot be negative.' })
+  card?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'UPI must be a number.' })
+  @Min(0, { message: 'UPI cannot be negative.' })
+  upi?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Discount must be a number.' })
+  @Min(0, { message: 'Discount cannot be negative.' })
+  discount?: number;
 }

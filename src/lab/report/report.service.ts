@@ -223,7 +223,7 @@ export class ReportService implements OnModuleInit {
       await this.billingService.generateBill({
         patient: report.patient,
         user: report.lab,
-        doctor: report.doctor ? report.doctor.toString() : 'Self',
+        doctor: report.doctor ?? null,
         items,
         cash: 0,
         card: 0,

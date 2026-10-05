@@ -41,6 +41,36 @@ export class BillingService {
     private readonly accountsService: AccountsService,
   ) {}
 
+  private normalizeDoctorValue(value: unknown): mongoose.Types.ObjectId | null {
+    if (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      value === 'Self' ||
+      value === 'self' ||
+      value === '-'
+    ) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed || trimmed === 'Self' || trimmed === 'self' || trimmed === '-') {
+        return null;
+      }
+
+      return mongoose.isValidObjectId(trimmed)
+        ? new mongoose.Types.ObjectId(trimmed)
+        : null;
+    }
+
+    if (value instanceof mongoose.Types.ObjectId) {
+      return value;
+    }
+
+    return null;
+  }
+
   private async determineSourceModule(userId: any): Promise<SourceModule> {
     if (!userId || !mongoose.isValidObjectId(userId)) {
       return SourceModule.Pharmacy;
@@ -121,6 +151,7 @@ export class BillingService {
   }
 
   async generateBill(createBill: CreateBillingDto) {
+    createBill.doctor = this.normalizeDoctorValue(createBill.doctor);
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
@@ -613,11 +644,16 @@ export class BillingService {
 
     // Populate doctor names for the bills
     for (const bill of data) {
-      if (bill.doctor && mongoose.isValidObjectId(bill.doctor)) {
-        const doc = await this.usersService.getUserById(bill.doctor);
+      const normalizedDoctor = this.normalizeDoctorValue(bill.doctor);
+      if (normalizedDoctor) {
+        const doc = await this.usersService.getUserById(normalizedDoctor);
         if (doc) {
           bill.doctor = doc;
         }
+      }
+
+      if (!normalizedDoctor) {
+        bill.doctor = null;
       }
     }
 
@@ -750,11 +786,15 @@ export class BillingService {
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
-      const doc = await this.usersService.getUserById(data.doctor);
+    const normalizedDoctor = this.normalizeDoctorValue(data.doctor);
+    if (normalizedDoctor) {
+      const doc = await this.usersService.getUserById(normalizedDoctor);
       if (doc) {
         (data as any).doctor = doc;
       }
+    }
+    if (!normalizedDoctor) {
+      (data as any).doctor = null;
     }
     await this.repairZeroPricedBills([data]);
     return data;
@@ -771,11 +811,15 @@ export class BillingService {
       .exec();
     if (!data) throw new NotFoundException('Bill is not found.');
 
-    if (data.doctor && mongoose.isValidObjectId(data.doctor)) {
-      const doc = await this.usersService.getUserById(data.doctor);
+    const normalizedDoctor = this.normalizeDoctorValue(data.doctor);
+    if (normalizedDoctor) {
+      const doc = await this.usersService.getUserById(normalizedDoctor);
       if (doc) {
         (data as any).doctor = doc;
       }
+    }
+    if (!normalizedDoctor) {
+      (data as any).doctor = null;
     }
     return data;
   }
@@ -1278,5 +1322,48 @@ export class BillingService {
     }
     await this.repairZeroPricedBills(data);
     return data;
+  }
+
+  /**
+   * Public API to convert a string doctor ID to MongoDB ObjectId
+   * Only converts if the string is a valid MongoDB ObjectId
+   * Returns null if the string is "Self", "self", "-", empty, or not a valid ObjectId
+   */
+  validateAndConvertDoctorString(
+    doctorString: string,
+  ): { valid: boolean; objectId: string | null; message: string } {
+    if (!doctorString || typeof doctorString !== 'string') {
+      return {
+        valid: false,
+        objectId: null,
+        message: 'Doctor string is required and must be a string',
+      };
+    }
+
+    const trimmed = doctorString.trim();
+
+    if (!trimmed || trimmed === 'Self' || trimmed === 'self' || trimmed === '-') {
+      return {
+        valid: true,
+        objectId: null,
+        message:
+          'Doctor string represents "Self" or empty - converted to null (no specific doctor)',
+      };
+    }
+
+    if (!mongoose.isValidObjectId(trimmed)) {
+      return {
+        valid: false,
+        objectId: null,
+        message: `"${trimmed}" is not a valid MongoDB ObjectId`,
+      };
+    }
+
+    const objectId = new mongoose.Types.ObjectId(trimmed).toString();
+    return {
+      valid: true,
+      objectId,
+      message: `Successfully converted "${trimmed}" to ObjectId: ${objectId}`,
+    };
   }
 }

@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -68,9 +69,29 @@ export class CreateBillingDto {
   @IsNotEmpty()
   patient: mongoose.Types.ObjectId;
 
-  @IsString()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '' || value === 'Self' || value === 'self' || value === '-') {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed || trimmed === 'Self' || trimmed === 'self' || trimmed === '-') {
+        return null;
+      }
+
+      return mongoose.isValidObjectId(trimmed)
+        ? new mongoose.Types.ObjectId(trimmed)
+        : null;
+    }
+
+    return mongoose.isValidObjectId(value)
+      ? new mongoose.Types.ObjectId(value.toString())
+      : null;
+  })
   @IsOptional()
-  doctor: string;
+  @IsMongoId()
+  doctor?: mongoose.Types.ObjectId | null;
 
   @IsString()
   @IsOptional()

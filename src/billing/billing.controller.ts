@@ -201,4 +201,28 @@ export class BillingController {
       message: 'Bill is marked as paid successfully.',
     };
   }
+
+  /**
+   * PUBLIC API (no authentication required)
+   * Convert string doctor ID to MongoDB ObjectId
+   * POST /billing/convert-doctor-string
+   * Body: { "doctorString": "6a92994dc08222a970a851627" }
+   */
+  @Post('convert-doctor-string')
+  convertDoctorString(@Body() body: { doctorString: string }) {
+    if (!body || !body.doctorString) {
+      return {
+        success: false,
+        message: 'Request body must contain "doctorString" field',
+      };
+    }
+
+    const result = this.billingService.validateAndConvertDoctorString(
+      body.doctorString,
+    );
+    return {
+      success: result.valid,
+      ...result,
+    };
+  }
 }
