@@ -109,6 +109,22 @@ export class Appointment {
     default: false,
   })
   isArrived: boolean;
+
+  /**
+   * Money collected when the visit was booked. The same split and discount
+   * are written onto the consultation bill when one is created.
+   */
+  @Prop({ type: Number, default: 0 })
+  cash: number;
+
+  @Prop({ type: Number, default: 0 })
+  card: number;
+
+  @Prop({ type: Number, default: 0 })
+  upi: number;
+
+  @Prop({ type: Number, default: 0 })
+  discount: number;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

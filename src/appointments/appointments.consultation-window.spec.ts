@@ -153,6 +153,67 @@ describe('stored registration-bill validity', () => {
     expect(bills).toHaveLength(0);
   });
 
+  it('stores the booking split on the appointment and the consultation bill', async () => {
+    const patient = new Types.ObjectId();
+    bills.length = 0;
+
+    const created: any = await service.createAppointment(
+      {
+        patient,
+        doctor: doctorId,
+        date: atClinicMorning(2026, 3, 2),
+        cash: 120,
+        card: 50,
+        upi: 999,
+        discount: 400,
+      } as any,
+      userId as any,
+    );
+
+    // Discount is capped at the ₹200 fee, then the split at the fee after discount.
+    expect(created).toMatchObject({ cash: 0, card: 0, upi: 0, discount: 200 });
+    expect(bills).toHaveLength(1);
+    expect(bills[0]).toMatchObject({
+      cash: 0,
+      card: 0,
+      upi: 0,
+      discount: 200,
+      status: 'Completed',
+    });
+
+    bills.length = 0;
+    const partial: any = await service.createAppointment(
+      {
+        patient: new Types.ObjectId(),
+        doctor: doctorId,
+        date: atClinicMorning(2026, 3, 2),
+        cash: 50,
+        upi: 30,
+      } as any,
+      userId as any,
+    );
+    expect(partial).toMatchObject({ cash: 50, card: 0, upi: 30, discount: 0 });
+    expect(bills[0]).toMatchObject({
+      cash: 50,
+      card: 0,
+      upi: 30,
+      discount: 0,
+      status: 'Draft',
+    });
+
+    bills.length = 0;
+    const unpaid: any = await service.createAppointment(
+      {
+        patient: new Types.ObjectId(),
+        doctor: doctorId,
+        date: atClinicMorning(2026, 3, 2),
+      } as any,
+      userId as any,
+    );
+    expect(unpaid).toMatchObject({ cash: 0, card: 0, upi: 0, discount: 0 });
+    expect(bills[0]).toMatchObject({ cash: 0, card: 0, upi: 0, discount: 0, status: 'Draft' });
+  });
+
   it('charges 13/01/2026 after a window that ended 11/01/2026 and sets 23/01', async () => {
     const patient = new Types.ObjectId();
 

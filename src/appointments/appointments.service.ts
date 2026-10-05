@@ -21,6 +21,7 @@ import {
   resolveVisitValidity,
   VisitWindowRef,
 } from './consultation-validity';
+import { resolveAppointmentPayment } from './appointment-payment';
 function getDoctorFirstNamePrefix(doctorName: string): string {
   if (!doctorName) return 'DOC';
   const cleanName = doctorName
@@ -65,6 +66,20 @@ export class AppointmentsService {
 
     const shouldBillConsultation = consultation.charge;
 
+    let doctorUser: { name?: string; consultationFee?: number } | null = null;
+    try {
+      doctorUser = await this.usersService.getUserById(
+        createAppointmentDto.doctor,
+      );
+    } catch (error) {
+      console.error('Failed to look up appointment doctor:', error);
+    }
+    const consultationFee = doctorUser?.consultationFee ?? 0;
+    const payment = resolveAppointmentPayment(
+      createAppointmentDto,
+      consultationFee,
+    );
+
     // Calculate Token for Doctor on Appointment Date
     let tokenNumber = 1;
     let token = 'DOC-01';
@@ -99,9 +114,6 @@ export class AppointmentsService {
         tokenNumber = existingCount + 1;
       }
 
-      const doctorUser = await this.usersService.getUserById(
-        createAppointmentDto.doctor,
-      );
       const prefix = getDoctorFirstNamePrefix(doctorUser?.name || '');
       token = `${prefix}-${String(tokenNumber).padStart(2, '0')}`;
     } catch (tokenErr) {
@@ -120,6 +132,10 @@ export class AppointmentsService {
 
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
+      cash: payment.cash,
+      card: payment.card,
+      upi: payment.upi,
+      discount: payment.discount,
       hasConsultationFee: shouldBillConsultation,
       consultationValidUntil: consultation.validUntil,
       tokenNumber,
@@ -130,13 +146,8 @@ export class AppointmentsService {
 
     try {
       if (shouldBillConsultation) {
-        // Fetch the doctor from database to retrieve their consultation fee
-        const doctorUser = await this.usersService.getUserById(
-          appointment.doctor,
-        );
-        const consultationFee = doctorUser?.consultationFee ?? 0;
-
-        // Construct a Draft bill containing the consultation fee
+        // Consultation fee bill carrying the split collected at booking.
+        // Fully covered (paid + discount) bills are Completed, others Draft.
         const createBillingDto = {
           user: createdBy,
           patient: appointment.patient,
@@ -153,11 +164,11 @@ export class AppointmentsService {
               total: consultationFee,
             },
           ],
-          cash: 0,
-          card: 0,
-          upi: 0,
-          discount: 0,
-          status: 'Draft',
+          cash: payment.cash,
+          card: payment.card,
+          upi: payment.upi,
+          discount: payment.discount,
+          status: payment.settled ? 'Completed' : 'Draft',
         };
 
         await this.billingService.generateBill(createBillingDto);
