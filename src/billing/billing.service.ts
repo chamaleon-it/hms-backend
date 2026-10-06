@@ -334,6 +334,25 @@ export class BillingService {
     ];
   }
 
+  /**
+   * Consultation, registration, NCF, and empty bills.
+   * Refund/Return is not included on its own: a medicine return stays a pharmacy sale.
+   */
+  private receptionFeeClauses() {
+    return [
+      { note: /consultation|reception|registration|ncf|refund/i },
+      {
+        'items.name':
+          /consultation|registration|ncf|refund|fee|opd|doctor|token/i,
+      },
+      {
+        $expr: {
+          $eq: [{ $size: { $ifNull: ['$items', []] } }, 0],
+        },
+      },
+    ];
+  }
+
   private isTherapyOrProcedureBill(bill: {
     note?: string;
     items?: { name?: unknown }[];
@@ -455,7 +474,23 @@ export class BillingService {
           match.$or = clauses;
         }
       } else if (billType === 'pharmacy') {
-        match.$nor = [...(match.$nor || []), ...this.treatmentBillClauses()];
+        // Pharmacy sales only: not procedure/therapy, and not reception fees.
+        match.$nor = [
+          ...(match.$nor || []),
+          ...this.treatmentBillClauses(),
+          ...this.receptionFeeClauses(),
+        ];
+      } else if (billType === 'counter') {
+        // Pharmacy desk: pharmacy sales plus procedure/therapy, with reception omitted.
+        match.$and = [
+          ...(match.$and || []),
+          {
+            $or: [
+              ...this.treatmentBillClauses(),
+              { $nor: this.receptionFeeClauses() },
+            ],
+          },
+        ];
       } else if (billType === 'reception') {
         match.$or = [
           { transactionType: { $in: ['Refund', 'Return'] } },
