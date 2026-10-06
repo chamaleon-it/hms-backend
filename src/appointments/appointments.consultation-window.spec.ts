@@ -118,6 +118,48 @@ describe('stored registration-bill validity', () => {
     expect(bills).toHaveLength(1);
   });
 
+  it('hides the fee inside the window and drops payment sent with the booking', async () => {
+    const patient = new Types.ObjectId();
+    await book(atClinicMorning(2026, 9, 15), patient);
+
+    const preview = await service.previewConsultationCharge({
+      patient: String(patient),
+      doctor: String(doctorId),
+      date: atClinicMorning(2026, 9, 20).toISOString(),
+    });
+    expect(preview.charge).toBe(false);
+    expect(preview.consultationFee).toBe(0);
+    expect(clinicDayKey(preview.validUntil)).toBe('2026-09-25');
+
+    bills.length = 0;
+    const revisit = await service.createAppointment(
+      {
+        patient,
+        doctor: doctorId,
+        date: atClinicMorning(2026, 9, 20),
+        cash: 200,
+        card: 50,
+        upi: 25,
+        discount: 10,
+      } as any,
+      userId as any,
+    );
+    expect(revisit.hasConsultationFee).toBe(false);
+    expect(revisit.cash).toBe(0);
+    expect(revisit.card).toBe(0);
+    expect(revisit.upi).toBe(0);
+    expect(revisit.discount).toBe(0);
+    expect(bills).toHaveLength(0);
+
+    const afterWindow = await service.previewConsultationCharge({
+      patient: String(patient),
+      doctor: String(doctorId),
+      date: atClinicMorning(2026, 9, 26).toISOString(),
+    });
+    expect(afterWindow.charge).toBe(true);
+    expect(afterWindow.consultationFee).toBe(200);
+  });
+
   it('stores 05/10/2026 after a paid 25/09 visit and keeps it on the 29/09 free revisit', async () => {
     const patient = new Types.ObjectId();
 

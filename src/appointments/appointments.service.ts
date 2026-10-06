@@ -75,10 +75,11 @@ export class AppointmentsService {
       console.error('Failed to look up appointment doctor:', error);
     }
     const consultationFee = doctorUser?.consultationFee ?? 0;
-    const payment = resolveAppointmentPayment(
-      createAppointmentDto,
-      consultationFee,
-    );
+    // A visit inside the open 10-day window is free. Ignore any payment the
+    // form still sent so cash, card, UPI, and discount stay at zero.
+    const payment = shouldBillConsultation
+      ? resolveAppointmentPayment(createAppointmentDto, consultationFee)
+      : { cash: 0, card: 0, upi: 0, discount: 0, settled: true };
 
     // Calculate Token for Doctor on Appointment Date
     let tokenNumber = 1;
@@ -181,6 +182,43 @@ export class AppointmentsService {
     }
 
     return appointment;
+  }
+
+  /**
+   * Whether this patient still has a free consultation with this doctor.
+   * Uses the same 10-day window as booking, so the form can hide payment
+   * before the visit is saved.
+   */
+  async previewConsultationCharge(input: {
+    patient: string;
+    doctor: string;
+    date: string;
+  }) {
+    const visitDate = new Date(input.date);
+    if (!input.patient || !input.doctor || Number.isNaN(visitDate.getTime())) {
+      throw new BadRequestException(
+        'Patient, doctor, and a valid visit date are required.',
+      );
+    }
+    const priors = await this.loadConsultationWindows(
+      input.patient,
+      input.doctor,
+    );
+    const consultation = resolveVisitValidity({ visitDate, priors });
+    let consultationFee = 0;
+    if (consultation.charge) {
+      try {
+        const doctorUser = await this.usersService.getUserById(input.doctor);
+        consultationFee = doctorUser?.consultationFee ?? 0;
+      } catch (error) {
+        console.error('Failed to look up appointment doctor:', error);
+      }
+    }
+    return {
+      charge: consultation.charge,
+      validUntil: consultation.validUntil,
+      consultationFee,
+    };
   }
 
   async getAppointments({
