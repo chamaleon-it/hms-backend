@@ -447,6 +447,15 @@ export class BillingService {
           { note: this.procedureBillRegex },
           { 'items.name': this.procedureBillRegex },
         ];
+      } else if (billType === 'treatment') {
+        const clauses = this.treatmentBillClauses();
+        if (match.$or) {
+          match.$and = [...(match.$and || []), { $or: clauses }];
+        } else {
+          match.$or = clauses;
+        }
+      } else if (billType === 'pharmacy') {
+        match.$nor = [...(match.$nor || []), ...this.treatmentBillClauses()];
       } else if (billType === 'reception') {
         match.$or = [
           { transactionType: { $in: ['Refund', 'Return'] } },
