@@ -20,6 +20,7 @@ import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 
 import { AccountsService } from 'src/accounts/accounts.service';
+import { displayDoctorName, pickVisitDoctor } from './session-doctor';
 import {
   ExpenseCategory,
   IncomeCategory,
@@ -707,34 +708,90 @@ export class BillingService {
     return { data, total };
   }
 
-  /** Therapy and procedure bills keep the therapist chosen for that session. */
+  /**
+   * Therapy and procedure bills keep the therapist and the prescribing doctor
+   * from the visit. The bill itself often has no doctor id, because the visit
+   * stored the doctor's name and that name was not an id.
+   */
   private async attachSessionTherapists(bills: any[]) {
     if (!bills?.length) return;
 
     const ids = bills.map((bill) => bill._id).filter(Boolean);
-    let sessions: { bill?: unknown; therapistName?: string }[] = [];
+    let sessions: {
+      bill?: unknown;
+      therapistName?: string;
+      doctor?: unknown;
+      doctorName?: unknown;
+    }[] = [];
     try {
       sessions = await this.billingModel.db
         .collection('treatments')
         .find({ bill: { $in: ids }, isDeleted: { $ne: true } })
-        .project({ bill: 1, therapistName: 1 })
+        .project({ bill: 1, therapistName: 1, doctor: 1, doctorName: 1 })
         .toArray();
     } catch {
       sessions = [];
     }
 
-    const byBill = new Map<string, string>();
+    const therapists = new Map<string, string>();
+    const visits = new Map<string, { id: string | null; name: string }>();
     for (const session of sessions) {
-      const name = String(session.therapistName || '').trim();
-      if (!session.bill || !name || name === '-') continue;
-      byBill.set(String(session.bill), name);
+      if (!session.bill) continue;
+      const key = String(session.bill);
+      const therapist = String(session.therapistName || '').trim();
+      if (therapist && therapist !== '-') therapists.set(key, therapist);
+      const picked = pickVisitDoctor(session);
+      const current = visits.get(key);
+      visits.set(key, {
+        id: picked.id || current?.id || null,
+        name: picked.name || current?.name || '',
+      });
     }
 
     for (const bill of bills) {
+      const key = String(bill._id);
       const stored = String(bill.therapistName || '').trim();
-      const linked = byBill.get(String(bill._id)) || '';
+      const linked = therapists.get(key) || '';
       const name = stored && stored !== '-' ? stored : linked;
       bill.therapistName = name && name !== '-' ? name : '';
+
+      if (displayDoctorName(bill.doctor)) continue;
+      const visit = visits.get(key);
+      if (!visit || (!visit.id && !visit.name)) continue;
+
+      if (visit.id) {
+        try {
+          const doc = await this.usersService.getUserById(visit.id);
+          if (doc && displayDoctorName(doc)) {
+            bill.doctor = doc;
+            await this.storeVisitDoctor(bill._id, doc._id || visit.id);
+            continue;
+          }
+        } catch (error) {
+          console.error('Failed to look up visit doctor:', error);
+        }
+      }
+      if (visit.name) {
+        bill.doctor = { name: visit.name };
+      }
+    }
+  }
+
+  /** Keep a resolved visit doctor on the bill when the bill had none. */
+  private async storeVisitDoctor(billId: unknown, doctorId: unknown) {
+    if (!billId || !doctorId || typeof this.billingModel.updateOne !== 'function') {
+      return;
+    }
+    try {
+      await this.billingModel.updateOne(
+        {
+          _id: billId,
+          $or: [{ doctor: null }, { doctor: { $exists: false } }],
+        },
+        { $set: { doctor: doctorId } },
+      );
+    } catch (error) {
+      console.error('Failed to store visit doctor on bill:', error);
     }
   }
 

@@ -723,7 +723,7 @@ export class TreatmentService {
     const billPayload: any = {
       user: new mongoose.Types.ObjectId(pharmacyUserIdStr),
       patient: (treatment.patient as any)?._id || treatment.patient,
-      doctor: treatment.doctorName || 'Self',
+      doctor: treatment.doctor || null,
       therapistName,
       items: billingItems,
       cash: dto.cash || 0,
