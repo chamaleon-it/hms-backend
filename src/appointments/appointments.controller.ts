@@ -135,6 +135,23 @@ export class AppointmentsController {
     };
   }
 
+  @Get('consultation-charge')
+  async consultationCharge(
+    @Query('patient') patient?: string,
+    @Query('doctor') doctor?: string,
+    @Query('date') date?: string,
+  ) {
+    const data = await this.appointmentsService.previewConsultationCharge({
+      patient: patient || '',
+      doctor: doctor || '',
+      date: date || '',
+    });
+    return {
+      data,
+      message: 'Consultation charge retrieved successfully',
+    };
+  }
+
   @Get('booked_slot')
   async getBookedSlot(
     @Query('date') date?: string,
