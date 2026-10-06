@@ -14,16 +14,37 @@ export function displayDoctorName(value: unknown): string {
   return '';
 }
 
-/** ObjectId string, or the id on a populated user. A display name is not an id. */
-export function doctorObjectId(value: unknown): string | null {
+function isObjectId(value: object): value is { toHexString: () => string } {
+  if ((value as { _bsontype?: unknown })._bsontype === 'ObjectId') return true;
+  const name = value.constructor?.name;
+  return (
+    (name === 'ObjectId' || name === 'ObjectID') &&
+    typeof (value as { toHexString?: unknown }).toHexString === 'function'
+  );
+}
+
+/**
+ * ObjectId string, or the id on a populated user. A display name is not an id.
+ * A Mongoose ObjectId's `_id` getter returns the same ObjectId, so that value
+ * is recognized before `_id` is read and is never walked again.
+ */
+export function doctorObjectId(
+  value: unknown,
+  seen?: WeakSet<object>,
+): string | null {
   if (typeof value === 'string') {
     const text = value.trim();
     return /^[a-f0-9]{24}$/i.test(text) ? text : null;
   }
-  if (value && typeof value === 'object' && '_id' in value) {
-    return doctorObjectId((value as { _id?: unknown })._id);
-  }
-  return null;
+  if (!value || typeof value !== 'object') return null;
+  if (isObjectId(value)) return value.toHexString();
+  if (seen?.has(value)) return null;
+  if (!('_id' in value)) return null;
+  const nested = (value as { _id?: unknown })._id;
+  if (!nested || nested === value) return null;
+  const next = seen ?? new WeakSet<object>();
+  next.add(value);
+  return doctorObjectId(nested, next);
 }
 
 export type VisitDoctorSource = {
