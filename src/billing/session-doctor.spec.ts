@@ -1,4 +1,5 @@
-import { displayDoctorName, pickVisitDoctor } from './session-doctor';
+import { Types } from 'mongoose';
+import { displayDoctorName, doctorObjectId, pickVisitDoctor } from './session-doctor';
 
 describe('visit doctor on a therapy or procedure bill', () => {
   it('keeps a real doctor name and drops placeholders', () => {
@@ -27,6 +28,18 @@ describe('visit doctor on a therapy or procedure bill', () => {
     expect(pickVisitDoctor({ doctorName: 'Doctor' })).toEqual({
       id: null,
       name: '',
+    });
+  });
+
+  it('returns one id for an ObjectId and for a populated doc', () => {
+    const oid = new Types.ObjectId('64b7f0c2a1b2c3d4e5f60718');
+    expect(doctorObjectId(oid)).toBe('64b7f0c2a1b2c3d4e5f60718');
+    expect(doctorObjectId({ _id: oid, name: 'Mukhthar' })).toBe(
+      '64b7f0c2a1b2c3d4e5f60718',
+    );
+    expect(pickVisitDoctor({ doctor: oid, doctorName: 'Dr. Mukhthar' })).toEqual({
+      id: '64b7f0c2a1b2c3d4e5f60718',
+      name: 'Dr. Mukhthar',
     });
   });
 });
