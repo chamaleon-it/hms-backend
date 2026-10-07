@@ -63,7 +63,7 @@ export class Consulting {
       bowelMovement: { type: String, default: null },
       urineMovement: { type: String, default: null },
       appetite: { type: String, default: null },
-      digestiveSystem: { type: String, default: null },
+      digestiveSystem: { type: [String], default: null },
     },
     required: false,
   })
@@ -72,7 +72,7 @@ export class Consulting {
     bowelMovement: string | null;
     urineMovement: string | null;
     appetite: string | null;
-    digestiveSystem: string | null;
+    digestiveSystem: string[] | string | null;
   };
 
   @Prop([
