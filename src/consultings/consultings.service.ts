@@ -18,6 +18,7 @@ import configuration from 'src/config/configuration';
 import { TherapyService } from 'src/therapy/therapy.service';
 import { TreatmentService } from 'src/treatment/treatment.service';
 import { TreatmentType } from 'src/treatment/schemas/treatment.schema';
+import { normalizeDigestiveSystem } from './digestive-system';
 
 @Injectable()
 export class ConsultingsService {
@@ -221,7 +222,7 @@ export class ConsultingsService {
       .populate('therapy')
       .sort({ createdAt: -1 })
       .lean();
-    return data;
+    return data.map((row) => presentDigestiveSystem(row));
   }
 
   async updateTherapyStatus(id: string, completed: boolean) {
@@ -232,7 +233,7 @@ export class ConsultingsService {
       .findByIdAndUpdate(id, { therapyCompleted: completed }, { new: true })
       .populate('therapy')
       .lean();
-    return data;
+    return presentDigestiveSystem(data);
   }
 
   async updateProcedureStatus(id: string, completed: boolean) {
@@ -242,6 +243,23 @@ export class ConsultingsService {
     const data = await this.consultingModel
       .findByIdAndUpdate(id, { procedureCompleted: completed }, { new: true })
       .lean();
-    return data;
+    return presentDigestiveSystem(data);
   }
+}
+
+function presentDigestiveSystem<
+  T extends {
+    medicalParameters?: { digestiveSystem?: unknown } | null;
+  },
+>(doc: T | null): T | null {
+  if (!doc?.medicalParameters) return doc;
+  return {
+    ...doc,
+    medicalParameters: {
+      ...doc.medicalParameters,
+      digestiveSystem: normalizeDigestiveSystem(
+        doc.medicalParameters.digestiveSystem,
+      ),
+    },
+  };
 }

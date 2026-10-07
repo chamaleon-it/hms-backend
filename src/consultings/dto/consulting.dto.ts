@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import mongoose from 'mongoose';
+import { normalizeDigestiveSystem } from '../digestive-system';
 
 class ConsultationNotesDto {
   @IsOptional()
@@ -156,8 +157,11 @@ class MedicalParametersDto {
   appetite?: null | string;
 
   @IsOptional()
-  @IsString()
-  digestiveSystem?: null | string;
+  @IsOptional()
+  @Transform(({ value }) => normalizeDigestiveSystem(value))
+  @IsArray({ message: 'Digestive system must be a list of values.' })
+  @IsString({ each: true })
+  digestiveSystem?: string[] | null;
 }
 
 export class ConsultingDto {
