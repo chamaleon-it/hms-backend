@@ -1,13 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PurchaseEntryService } from './purchase_entry.service';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { RecordSupplierPaymentDto } from './dto/record-supplier-payment.dto';
+import { ListSupplierPaymentsDto } from './dto/list-supplier-payments.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 
 @Controller('purchase_entry')
 @UseGuards(JwtAuthGuard)
 export class PurchaseEntryController {
-  constructor(private readonly purchaseEntryService: PurchaseEntryService) { }
+  constructor(private readonly purchaseEntryService: PurchaseEntryService) {}
 
   @Post()
   async create(@Body() createPurchaseEntryDto: CreatePurchaseEntryDto) {
@@ -31,6 +42,36 @@ export class PurchaseEntryController {
     return {
       data: await this.purchaseEntryService.findBySupplier(id),
       message: 'Purchase Entry Found Successfully',
+    };
+  }
+
+  @Get('/supplier/:id/dues')
+  async listOpenInvoices(@Param('id') id: string) {
+    return {
+      data: await this.purchaseEntryService.listOpenInvoices(id),
+      message: 'Open purchase invoices retrieved successfully',
+    };
+  }
+
+  @Get('/supplier/:id/payments')
+  async listSupplierPayments(
+    @Param('id') id: string,
+    @Query() query: ListSupplierPaymentsDto,
+  ) {
+    return {
+      data: await this.purchaseEntryService.listSupplierPayments(id, query),
+      message: 'Supplier payments retrieved successfully',
+    };
+  }
+
+  @Post('/supplier/:id/payment')
+  async recordSupplierPayment(
+    @Param('id') id: string,
+    @Body() dto: RecordSupplierPaymentDto,
+  ) {
+    return {
+      data: await this.purchaseEntryService.recordSupplierPayment(id, dto),
+      message: 'Payment recorded successfully',
     };
   }
 
