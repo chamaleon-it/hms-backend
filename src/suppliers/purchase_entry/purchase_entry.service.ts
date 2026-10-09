@@ -12,6 +12,7 @@ import { ItemsService } from 'src/pharmacy/items/items.service';
 import { Supplier } from '../schemas/supplier.schema';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { RecordSupplierPaymentDto } from './dto/record-supplier-payment.dto';
+import { ListSupplierPaymentsDto } from './dto/list-supplier-payments.dto';
 import { SupplierPayment } from './schemas/supplier-payment.schema';
 import {
   SupplierPaymentError,
@@ -20,6 +21,9 @@ import {
   compareOpenInvoices,
   planSupplierPayment,
 } from './supplier-payment.allocation';
+
+/** Payments shown per page in the supplier payment history modal. */
+export const SUPPLIER_PAYMENT_PAGE_SIZE = 5;
 
 @Injectable()
 export class PurchaseEntryService {
@@ -312,6 +316,35 @@ export class PurchaseEntryService {
       }
       throw error;
     }
+  }
+
+  async listSupplierPayments(
+    supplierId: string,
+    query?: ListSupplierPaymentsDto,
+  ) {
+    await this.requireSupplier(supplierId);
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, Number(query?.limit) || SUPPLIER_PAYMENT_PAGE_SIZE),
+    );
+    const filter = { supplier: supplierId };
+    const total = await this.supplierPaymentModel.countDocuments(filter).exec();
+    const payments = await this.supplierPaymentModel
+      .find(filter)
+      .sort({ date: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select('date cash card upi total allocations')
+      .exec();
+
+    return {
+      payments,
+      total,
+      page,
+      limit,
+      totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+    };
   }
 
   private async requireSupplier(supplierId: string) {
