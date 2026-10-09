@@ -70,10 +70,16 @@ export class Return {
     name: mongoose.Types.ObjectId;
     quantity: number;
     reason: ReturnReason;
+    unitPrice?: number;
   }[];
 
+  /** This return's own bill number. Not the original sale bill. */
   @Prop({ default: '-' })
   billNo: string;
+
+  /** Sale bill this return was raised against, when the order had one. */
+  @Prop({ required: false })
+  saleBillNo?: string;
 }
 
 export const ReturnSchema = SchemaFactory.createForClass(Return);
