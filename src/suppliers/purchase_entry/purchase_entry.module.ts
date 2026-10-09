@@ -6,6 +6,10 @@ import {
   PurchaseEntry,
   PurchaseEntrySchema,
 } from './schemas/purchase-entry.schema';
+import {
+  SupplierPayment,
+  SupplierPaymentSchema,
+} from './schemas/supplier-payment.schema';
 import { ItemsModule } from 'src/pharmacy/items/items.module';
 import { Supplier, SupplierSchema } from '../schemas/supplier.schema';
 
@@ -15,6 +19,7 @@ import { Supplier, SupplierSchema } from '../schemas/supplier.schema';
   imports: [
     MongooseModule.forFeature([
       { name: PurchaseEntry.name, schema: PurchaseEntrySchema },
+      { name: SupplierPayment.name, schema: SupplierPaymentSchema },
     ]),
     ItemsModule,
     MongooseModule.forFeature([
