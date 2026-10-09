@@ -1,11 +1,25 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { PaymentStatus, PurchaseEntry } from './schemas/purchase-entry.schema';
 import { CreatePurchaseEntryDto } from './dto/create-purchase-entry.dto';
 import { ItemsService } from 'src/pharmacy/items/items.service';
 import { Supplier } from '../schemas/supplier.schema';
 import { AddPaymentDto } from './dto/add-payment.dto';
+import { RecordSupplierPaymentDto } from './dto/record-supplier-payment.dto';
+import { SupplierPayment } from './schemas/supplier-payment.schema';
+import {
+  SupplierPaymentError,
+  SupplierPaymentPlan,
+  dueAmount,
+  compareOpenInvoices,
+  planSupplierPayment,
+} from './supplier-payment.allocation';
 
 @Injectable()
 export class PurchaseEntryService {
@@ -14,6 +28,8 @@ export class PurchaseEntryService {
     private purchaseEntryModel: Model<PurchaseEntry>,
     private readonly itemsService: ItemsService,
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
+    @InjectModel(SupplierPayment.name)
+    private supplierPaymentModel: Model<SupplierPayment>,
   ) {}
 
   async create(createPurchaseEntryDto: CreatePurchaseEntryDto) {
@@ -181,5 +197,131 @@ export class PurchaseEntryService {
       data.paymentStatus = PaymentStatus.PARTIALLY_PAID;
     }
     return await data.save();
+  }
+
+  async listOpenInvoices(supplierId: string) {
+    await this.requireSupplier(supplierId);
+    const entries = await this.purchaseEntryModel
+      .find({ supplier: supplierId })
+      .select('invoiceNumber invoiceDate total paidAmount paymentStatus')
+      .exec();
+
+    const invoices = entries
+      .map((entry) => ({
+        _id: String(entry._id),
+        invoiceNumber: entry.invoiceNumber,
+        invoiceDate: entry.invoiceDate,
+        total: entry.total,
+        paidAmount: entry.paidAmount || 0,
+        dueAmount: dueAmount(entry.total, entry.paidAmount || 0),
+      }))
+      .filter((entry) => entry.dueAmount > 0)
+      .sort(compareOpenInvoices);
+
+    const totalDue =
+      invoices.reduce(
+        (sum, entry) => sum + Math.round(entry.dueAmount * 100),
+        0,
+      ) / 100;
+
+    return { invoices, totalDue };
+  }
+
+  /**
+   * Stores one supplier payment and applies it to open purchase bills.
+   * Supplier Total Due is the sum of bill totals minus paid amounts, so
+   * only those bill fields change. Purchase totals stay as recorded.
+   */
+  async recordSupplierPayment(
+    supplierId: string,
+    dto: RecordSupplierPaymentDto,
+  ) {
+    await this.requireSupplier(supplierId);
+    const entries = await this.purchaseEntryModel
+      .find({ supplier: supplierId })
+      .exec();
+
+    let plan: SupplierPaymentPlan;
+    try {
+      plan = planSupplierPayment(
+        entries.map((entry) => ({
+          id: String(entry._id),
+          invoiceNumber: entry.invoiceNumber,
+          invoiceDate: entry.invoiceDate,
+          total: entry.total,
+          paidAmount: entry.paidAmount || 0,
+          paymentStatus: entry.paymentStatus,
+        })),
+        {
+          cash: dto.cash ?? 0,
+          card: dto.card ?? 0,
+          upi: dto.upi ?? 0,
+        },
+      );
+    } catch (error) {
+      if (error instanceof SupplierPaymentError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+
+    const applied: typeof plan.updates = [];
+    try {
+      for (const update of plan.updates) {
+        const result = await this.purchaseEntryModel.updateOne(
+          { _id: update.id, paidAmount: update.previousPaidAmount },
+          {
+            $set: {
+              paidAmount: update.paidAmount,
+              paymentStatus: update.paymentStatus,
+            },
+          },
+        );
+        if (result.matchedCount !== 1) {
+          throw new ConflictException(
+            'An invoice changed while recording this payment. Please try again.',
+          );
+        }
+        applied.push(update);
+      }
+
+      return await this.supplierPaymentModel.create({
+        supplier: supplierId,
+        cash: plan.cash,
+        card: plan.card,
+        upi: plan.upi,
+        total: plan.total,
+        date: new Date(),
+        allocations: plan.allocations.map((allocation) => ({
+          purchaseEntry: allocation.purchaseEntryId,
+          invoiceNumber: allocation.invoiceNumber,
+          amount: allocation.amount,
+        })),
+      });
+    } catch (error) {
+      for (const update of [...applied].reverse()) {
+        await this.purchaseEntryModel.updateOne(
+          { _id: update.id, paidAmount: update.paidAmount },
+          {
+            $set: {
+              paidAmount: update.previousPaidAmount,
+              paymentStatus: update.previousPaymentStatus,
+            },
+          },
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async requireSupplier(supplierId: string) {
+    if (!mongoose.isValidObjectId(supplierId)) {
+      throw new BadRequestException('Invalid supplier');
+    }
+    const supplier = await this.supplierModel.findById(supplierId).exec();
+    if (!supplier || supplier.isDeleted) {
+      throw new NotFoundException('Supplier not found');
+    }
+    return supplier;
   }
 }
