@@ -18,6 +18,7 @@ import {
   SourceModule,
   TransactionType,
 } from 'src/accounts/enums/account-transaction.enum';
+import { nextReturnBillNumber } from './return-bill-no';
 
 @Injectable()
 export class ReturnService {
@@ -29,42 +30,55 @@ export class ReturnService {
   ) {}
 
   async create(createReturnDto: CreateReturnDto) {
-    createReturnDto.billNo = `R-${createReturnDto.billNo}`;
-    const existingBilling = await this.billingModel.exists({
-      mrn: createReturnDto.billNo,
-    });
-    if (existingBilling) {
-      throw new BadRequestException(
-        'A return with this bill number already exists. Please use a unique bill number.',
-      );
-    }
-    const data = await this.returnModel.create(createReturnDto);
-
+    const saleBillNo = saleBillNumber(createReturnDto.billNo);
     const returnTotal = createReturnDto.items.reduce(
       (acc, item) => acc + Number(item.unitPrice) * Number(item.quantity),
       0,
     );
+    const billItems = await Promise.all(
+      createReturnDto.items.map(async (e) => {
+        const item = await this.itemsService.getItem(e.name);
+        const quantity = e.quantity;
+        const total = e.unitPrice * quantity;
+        return {
+          name: item.name,
+          quantity,
+          unitPrice: e.unitPrice,
+          total,
+        };
+      }),
+    );
 
-    await this.billingModel.create({
-      patient: createReturnDto.patient,
-      user: configuration().in_house_pharmacy_id,
-      items: await Promise.all(
-        createReturnDto.items.map(async (e) => {
-          const item = await this.itemsService.getItem(e.name);
-          const quantity = e.quantity;
-          const total = e.unitPrice * quantity;
-          return {
-            name: item.name,
-            quantity,
-            unitPrice: e.unitPrice,
-            total,
-          };
-        }),
-      ),
-      mrn: createReturnDto.billNo,
-      transactionType: 'Return',
-      cash: returnTotal,
-    });
+    let data: Return | undefined;
+    let billNo = '';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      billNo = await this.allocateReturnBillNo();
+      try {
+        data = await this.returnModel.create({
+          ...createReturnDto,
+          billNo,
+          saleBillNo,
+        });
+        await this.billingModel.create({
+          patient: createReturnDto.patient,
+          user: configuration().in_house_pharmacy_id,
+          items: billItems,
+          mrn: billNo,
+          salesMRN: saleBillNo,
+          transactionType: 'Return',
+          cash: returnTotal,
+        });
+        break;
+      } catch (error) {
+        if (data && '_id' in data) {
+          await this.returnModel.deleteOne({ _id: data._id });
+          data = undefined;
+        }
+        if (!isDuplicateKey(error) || attempt === 4) {
+          throw error;
+        }
+      }
+    }
 
     // Auto record Expense transaction in Accounts for Pharmacy Return
     try {
@@ -72,7 +86,7 @@ export class ReturnService {
         type: TransactionType.Expense,
         category: ExpenseCategory.SalesReturn,
         amount: returnTotal,
-        description: `Pharmacy Sales Return Bill #${createReturnDto.billNo}`,
+        description: `Pharmacy Sales Return Bill #${billNo}`,
         paymentMethod: PaymentMethod.Cash,
         sourceModule: SourceModule.Pharmacy,
         createdBy: configuration().in_house_pharmacy_id,
@@ -96,9 +110,9 @@ export class ReturnService {
     const items = createReturnDto.items.filter(
       (item) => validReasonForQuantityAdd.includes(item.reason) || !item.reason,
     );
-    items.forEach(async (item) => {
+    for (const item of items) {
       await this.itemsService.increaseItem(item.name, item.quantity);
-    });
+    }
 
     return data;
   }
@@ -106,6 +120,7 @@ export class ReturnService {
   async findAll() {
     const data = await this.returnModel
       .find()
+      .sort({ createdAt: -1 })
       .populate('patient', 'name phoneNumber email address mrn')
       .populate('order', 'mrn')
       .populate(
@@ -157,4 +172,38 @@ export class ReturnService {
 
     return data;
   }
+
+  private async allocateReturnBillNo() {
+    const [bills, returns] = await Promise.all([
+      this.billingModel
+        .find({ mrn: /^R-\d+$/ })
+        .select('mrn')
+        .lean()
+        .exec(),
+      this.returnModel
+        .find({ billNo: /^R-\d+$/ })
+        .select('billNo')
+        .lean()
+        .exec(),
+    ]);
+    return nextReturnBillNumber([
+      ...bills.map((bill) => bill.mrn),
+      ...returns.map((entry) => entry.billNo),
+    ]);
+  }
+}
+
+function saleBillNumber(billNo?: string) {
+  const value = String(billNo ?? '').trim();
+  if (!value || value === '-' || value === 'undefined') return undefined;
+  return value;
+}
+
+function isDuplicateKey(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: number }).code === 11000
+  );
 }
