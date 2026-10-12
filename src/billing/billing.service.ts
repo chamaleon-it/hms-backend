@@ -572,12 +572,33 @@ export class BillingService {
     addPaymentDto: AddPaymentDto,
     user: mongoose.Types.ObjectId,
   ) {
+    const bill = await this.billingModel.findById(id);
+    if (!bill) throw new NotFoundException('Bill is not found.');
+
+    const subtotal = (bill.items || []).reduce(
+      (sum, item) => sum + (Number(item.total) || 0),
+      0,
+    );
+    const discount = addPaymentDto.discount ?? bill.discount ?? 0;
+    const card = addPaymentDto.card ?? bill.card ?? 0;
+    if (discount < 0 || discount > subtotal) {
+      throw new BadRequestException('Discount must be between 0 and the bill total.');
+    }
+    if (addPaymentDto.cash < 0 || addPaymentDto.online < 0) {
+      throw new BadRequestException('Payment amounts cannot be negative.');
+    }
+    if (addPaymentDto.cash + addPaymentDto.online + card > subtotal - discount) {
+      throw new BadRequestException('Payment cannot exceed the bill total after discount.');
+    }
+
     const data = await this.billingModel.findOneAndUpdate(
       { _id: id },
       {
         $set: {
           cash: addPaymentDto.cash,
           online: addPaymentDto.online,
+          card,
+          discount,
         },
       },
       { new: true },

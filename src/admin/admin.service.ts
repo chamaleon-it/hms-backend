@@ -20,6 +20,7 @@ import {
 import {
   PurchaseEntry,
 } from '../suppliers/purchase_entry/schemas/purchase-entry.schema';
+import { CreateStaffAccountDto } from './dto/create-staff-account.dto';
 
 @Injectable()
 export class AdminService {
@@ -207,6 +208,27 @@ export class AdminService {
       throw new NotFoundException('Doctor not found');
     }
     return doctor;
+  }
+
+  async createStaffAccount(dto: CreateStaffAccountDto) {
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.userModel.findOne({ email }).lean().exec();
+    if (existing) {
+      throw new BadRequestException('A user with this email already exists.');
+    }
+
+    const user = await this.userModel.create({
+      name: dto.name.trim(),
+      email,
+      password: await bcrypt.hash(dto.password, 10),
+      role: dto.role,
+      status: UserStatus.ACTIVE,
+      emailVerified: true,
+    });
+    const safeUser = user.toObject();
+    delete (safeUser as any).password;
+    delete (safeUser as any).refreshToken;
+    return safeUser;
   }
 
   async createDoctor(body: any) {

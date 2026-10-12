@@ -71,6 +71,9 @@ export class Billing {
   online: number;
 
   @Prop({ type: Number, default: 0 })
+  card: number;
+
+  @Prop({ type: Number, default: 0 })
   discount: number;
 
   @Prop({ type: String, required: false })

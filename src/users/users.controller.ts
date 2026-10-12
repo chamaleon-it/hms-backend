@@ -8,7 +8,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
@@ -20,17 +19,6 @@ import mongoose from 'mongoose';
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  //create
-  @Post()
-  async createUser(@Body() createUserDto: CreateUserDto) {
-    const data = await this.usersService.createUser(createUserDto);
-    return {
-      data,
-      message:
-        'Your account has been created successfully. Please wait while we review your profile — this process may take up to 24 hours.',
-    };
-  }
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
@@ -44,12 +32,12 @@ export class UsersController {
   }
 
   @Post('forgot_password')
-  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    const data = await this.usersService.forgotPassword(forgotPasswordDto);
+  async forgotPassword(@Body() _forgotPasswordDto: ForgotPasswordDto) {
+    await this.usersService.forgotPassword();
     return {
-      data,
+      data: null,
       message:
-        'The password reset link has been successfully sent to your email address.',
+        'Password reset is not configured yet. Please contact your administrator.',
     };
   }
 

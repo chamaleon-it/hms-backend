@@ -115,6 +115,12 @@ export class CreateBillingDto {
   @Type(() => Number)
   @Min(0)
   @IsOptional()
+  card?: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @IsOptional()
   discount?: number;
 
   @IsString()

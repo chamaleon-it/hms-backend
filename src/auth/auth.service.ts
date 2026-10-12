@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserStatus } from 'src/users/schemas/user.schema';
+import { User, UserRole, UserStatus } from 'src/users/schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -29,18 +29,18 @@ export class AuthService {
         'No user record found. Kindly register to proceed.',
       );
     }
-    // if ((user.status as UserStatus) === UserStatus.PENDING) {
-    //   throw new BadRequestException(
-    //     'Your profile is under review. The verification process usually takes up to 24 hours.',
-    //   );
-    // } else if ((user.status as UserStatus) === UserStatus.INACTIVE) {
-    //   throw new BadRequestException(
-    //     'This profile is inactive. Please contact the administrator for further assistance.',
-    //   );
-    // } else 
-      if ((user.status as UserStatus) === UserStatus.BLOCKED) {
+    if ((user.status as UserStatus) !== UserStatus.ACTIVE) {
       throw new BadRequestException(
-        'This profile is blocked. Please contact the administrator for further assistance.',
+        'This profile is not active. Please contact the administrator for assistance.',
+      );
+    }
+    if (
+      ![UserRole.ADMIN, UserRole.PHARMACY, UserRole.LAB].includes(
+        user.role as UserRole,
+      )
+    ) {
+      throw new BadRequestException(
+        'This account type cannot sign in. Contact an administrator for assistance.',
       );
     }
     const isPasswordMatched = await bcrypt.compare(
@@ -89,7 +89,15 @@ export class AuthService {
       const { id } = decoded;
       const user = await this.userModel.findById(id).select('+refreshToken');
       if (!user) {
-        throw new BadRequestException('User not found');
+        throw new UnauthorizedException('Refresh token is invalid.');
+      }
+
+      if (
+        user.status !== UserStatus.ACTIVE ||
+        !user.refreshToken ||
+        user.refreshToken !== getRefreshTokenDto.refreshToken
+      ) {
+        throw new UnauthorizedException('Refresh token is invalid or revoked.');
       }
 
       // const isRefreshTokenMatching =
@@ -125,5 +133,11 @@ export class AuthService {
     } catch (error) {
       throw error;
     }
+  }
+
+  async logout(id: mongoose.Types.ObjectId) {
+    await this.userModel
+      .findByIdAndUpdate(id, { $unset: { refreshToken: 1 } })
+      .exec();
   }
 }

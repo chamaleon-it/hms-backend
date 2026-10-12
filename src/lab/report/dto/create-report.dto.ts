@@ -16,4 +16,5 @@ export class CreateReportDto {
   sampleType: string;
   status: ReportStatus;
   technician?: string;
+  discount?: number;
 }

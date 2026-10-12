@@ -32,7 +32,6 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
   UserRole.PHARMACY,
   UserRole.ADMIN,
   UserRole.SUPER_ADMIN,
-  UserRole.DOCTOR,
 )
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}

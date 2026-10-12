@@ -137,6 +137,9 @@ export class ReportService implements OnModuleInit {
           ...dto.groups.filter((g) => !userReport.groups.includes(g))
         );
       }
+      if (dto.discount !== undefined) {
+        userReport.discount = Math.max(0, Number(dto.discount) || 0);
+      }
       await userReport.save();
       await this.createOrUpdateDraftBill(userReport);
       return userReport;
@@ -227,12 +230,14 @@ export class ReportService implements OnModuleInit {
 
     if (existingBill) {
       if (existingBill.status === 'Draft') {
-        // Update items only if it is a draft
+        const discount = Math.min(total, Math.max(0, Number(report.discount) || 0));
         await this.billingService.updateBill(existingBill._id, {
           items,
+          discount,
         });
       }
     } else {
+      const discount = Math.min(total, Math.max(0, Number(report.discount) || 0));
       await this.billingService.generateBill({
         patient: report.patient,
         user: report.lab,
@@ -240,7 +245,7 @@ export class ReportService implements OnModuleInit {
         items,
         cash: 0,
         online: 0,
-        discount: 0,
+        discount,
         reportId: report._id,
         status: 'Draft',
       });

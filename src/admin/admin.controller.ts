@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
+import { CreateStaffAccountDto } from './dto/create-staff-account.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -59,6 +60,12 @@ export class AdminController {
       data,
       message: 'Doctor retrieved successfully',
     };
+  }
+
+  @Post('accounts')
+  async createStaffAccount(@Body() dto: CreateStaffAccountDto) {
+    const data = await this.adminService.createStaffAccount(dto);
+    return { data, message: `${dto.role} account created successfully.` };
   }
 
   @Post('doctors')

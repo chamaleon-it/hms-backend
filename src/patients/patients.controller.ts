@@ -26,7 +26,6 @@ import { CheckPatientAlreadyExistsDto } from './dto/check-patient-already-exists
 const PATIENT_ROLES = [
   UserRole.PHARMACY,
   UserRole.LAB,
-  UserRole.DOCTOR,
   UserRole.ADMIN,
   UserRole.SUPER_ADMIN,
 ] as const;

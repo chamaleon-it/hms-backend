@@ -5,15 +5,11 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/createUser.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserRole } from './schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JWTUserInterface } from 'src/interface/jwt-user.interface';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { JwtService } from '@nestjs/jwt';
-import configuration from 'src/config/configuration';
 import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
 import { sanitizeUser } from 'src/auth/sanitize-user';
@@ -24,7 +20,6 @@ export class UsersService implements OnModuleInit {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    private jwtService: JwtService,
   ) {}
 
   /**
@@ -72,20 +67,6 @@ export class UsersService implements OnModuleInit {
     }
   }
 
-  async createUser(createUserDto: CreateUserDto) {
-    const isUserExist = await this.userModel.findOne({
-      email: createUserDto.email,
-    });
-    if (isUserExist) {
-      throw new BadRequestException(
-        'This email address is already registered with us.',
-      );
-    }
-    createUserDto.password = await bcrypt.hash(createUserDto.password, 10);
-    const user = await this.userModel.create(createUserDto);
-    return sanitizeUser(user);
-  }
-
   async getProfile(user: JWTUserInterface) {
     const data = await this.userModel.findById(user.id).lean();
 
@@ -129,23 +110,10 @@ export class UsersService implements OnModuleInit {
     return user.pharmacy.billing;
   }
 
-  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-    const user = await this.userModel.findOne({
-      email: forgotPasswordDto.email,
-    });
-    if (!user) {
-      throw new BadRequestException('Sorry, User not exist.');
-    }
-    const token = await this.jwtService.signAsync(
-      { id: user._id },
-      {
-        secret: configuration().secret.forgotPassword,
-        expiresIn: '7d',
-      },
-    );
-    console.log(`${forgotPasswordDto.email} is requaest for reset link.`);
-    console.log(`https://hms.com/reset-passsword?token=${token}`);
-    return token;
+  async forgotPassword() {
+    // Reset delivery and redemption are not implemented. Return no credential
+    // until a verified email delivery flow exists.
+    return null;
   }
 
   async getAllDoctors() {

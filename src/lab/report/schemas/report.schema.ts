@@ -102,6 +102,9 @@ export class Report {
   @Prop({ type: String, default: null })
   technician: string;
 
+  @Prop({ type: Number, default: 0, min: 0 })
+  discount: number;
+
   @Prop({ type: String, default: '' })
   note: string;
 
