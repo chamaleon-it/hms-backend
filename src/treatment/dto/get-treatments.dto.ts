@@ -36,6 +36,11 @@ export class GetTreatmentsDto {
   @IsString()
   endDate?: string;
 
+  /** Treatments created strictly after this instant (createdAt, not treatmentDate). */
+  @IsOptional()
+  @IsString()
+  since?: string;
+
   @IsOptional()
   @IsString()
   date?: string;
