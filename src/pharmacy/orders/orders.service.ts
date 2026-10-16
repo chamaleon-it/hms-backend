@@ -10,6 +10,7 @@ import mongoose, { Model } from 'mongoose';
 import { ItemsService, SaleContext } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
+import { CreateBillingItemDto } from 'src/billing/dto/create-billing.dto';
 import { UsersService } from 'src/users/users.service';
 import { getInHouseObjectId, requireInHouseId } from 'src/config/in-house';
 import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
@@ -172,9 +173,24 @@ export class OrdersService {
       }
     }
 
+    // Only these fields may be persisted on creation. In particular, callers
+    // cannot supply Completed, payment state, or a bill number.
+    const newOrder = {
+      clientRequestId: order.clientRequestId,
+      mrn,
+      patient: order.patient,
+      doctor: order.doctor,
+      doctorName: order.doctorName,
+      items: order.items,
+      priority: order.priority,
+      status: OrderStatus.Pending,
+      discount: order.discount ?? 0,
+      assignedTo: order.assignedTo,
+      pharmacist: order.pharmacist,
+    };
     let data: any;
     try {
-      data = await this.orderModel.create(order);
+      data = await this.orderModel.create(newOrder);
     } catch (error: any) {
       if (error?.code === 11000 && order.clientRequestId) {
         const existing = await this.orderModel.findOne({ clientRequestId: order.clientRequestId }).exec();
@@ -186,51 +202,6 @@ export class OrdersService {
         }
       }
       throw error;
-    }
-    const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
-      requireInHouseId('pharmacy'),
-    );
-    if (autoGenerateBill) {
-      const items = await Promise.all(
-        order.items.map(async (item) => {
-          const itemData = (await this.itemsService.getItem(item.name)) as any;
-
-          const unitPrice =
-            item.batchSellingPrice ??
-            this.itemsService.resolveItemUnitPrice(itemData);
-          const quantity = item.quantity;
-
-          return {
-            name: itemData.name,
-            unitPrice,
-            quantity,
-            discount: 0,
-            total: unitPrice * quantity,
-            itemId: item.name,
-            batchId: item.batchId || undefined,
-            batchNumber: item.batchNumber || undefined,
-            expiryDate: item.batchExpiryDate || undefined,
-            mrp: item.batchMrp ?? itemData.mrp,
-            purchasePrice:
-              item.batchPurchasePrice ?? itemData.purchasePrice ?? 0,
-            gst: item.batchGst ?? 0,
-            supplier: item.batchSupplier || itemData.supplier || undefined,
-            packing: item.batchPacking ?? itemData.packing ?? 1,
-          };
-        }),
-      );
-
-      const bill = await this.billingService.generateBill({
-        patient: order.patient,
-        items,
-        user: getInHouseObjectId('pharmacy'),
-        discount: order.discount ?? 0,
-        doctor: order.doctorName || "Self",
-      });
-
-      data.billNo = bill.mrn;
-
-      await data.save();
     }
     return data;
   }
@@ -742,6 +713,10 @@ export class OrdersService {
       await this.itemsService.ensurePersistedBatchIds(line.name);
     }
 
+    const autoGenerateBill = userId
+      ? (await this.usersService.getPharmacyBilling(requireInHouseId('pharmacy'))).autoGenerateBill
+      : false;
+
     let order: OrderDocument | null = null;
     const session = await this.orderModel.db.startSession();
     try {
@@ -796,6 +771,46 @@ export class OrdersService {
           if (resolved) {
             line.batchId = resolved.batchId;
             line.batchNumber = resolved.batchNumber;
+          }
+        }
+        if (autoGenerateBill || (order.billNo && order.billNo !== '-')) {
+          const billItems: CreateBillingItemDto[] = [];
+          for (const line of order.items) {
+            const itemData = await this.itemsService.getItem(line.name);
+            const unitPrice = line.batchSellingPrice ?? this.itemsService.resolveItemUnitPrice(itemData);
+            billItems.push({
+              name: itemData.name,
+              unitPrice,
+              quantity: line.quantity,
+              discount: 0,
+              total: unitPrice * line.quantity,
+              itemId: line.name,
+              batchId: line.batchId || undefined,
+              batchNumber: line.batchNumber || undefined,
+              expiryDate: line.batchExpiryDate || undefined,
+              mrp: line.batchMrp ?? undefined,
+              purchasePrice: line.batchPurchasePrice ?? undefined,
+              gst: line.batchGst ?? undefined,
+              supplier: line.batchSupplier || undefined,
+              packing: line.batchPacking ?? undefined,
+            });
+          }
+          if (order.billNo && order.billNo !== '-') {
+            const bill = await this.billingModel.findOneAndUpdate(
+              { mrn: order.billNo, transactionType: 'Sale' },
+              { $set: { items: billItems, discount: order.discount, doctor: order.doctorName || 'Self' } },
+              { new: true, runValidators: true, session },
+            );
+            if (!bill) throw new BadRequestException('Linked order bill was not found.');
+          } else {
+            const bill = await this.billingService.generateBill({
+              patient: order.patient,
+              items: billItems,
+              user: getInHouseObjectId('pharmacy'),
+              discount: order.discount ?? 0,
+              doctor: order.doctorName || 'Self',
+            }, session);
+            order.billNo = bill.mrn;
           }
         }
         await order.save({ session });

@@ -1,17 +1,43 @@
 import {
   BadRequestException,
   Controller,
+  Get,
+  NotFoundException,
+  Param,
   Post,
+  Res,
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
+import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { UPLOADS_DIR } from './multer.config';
+import { existsSync, statSync } from 'fs';
+import { join } from 'path';
+import type { Response } from 'express';
 
 @Controller('uploads')
+@UseGuards(JwtAuthGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
+
+  @Get(':filename')
+  getFile(@Param('filename') filename: string, @Res() response: Response) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(filename) || filename.includes('..')) {
+      throw new BadRequestException('Invalid upload filename');
+    }
+    const filePath = join(UPLOADS_DIR, filename);
+    if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+      throw new NotFoundException('Upload not found');
+    }
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', 'sandbox');
+    return response.sendFile(filename, { root: UPLOADS_DIR, dotfiles: 'deny' });
+  }
 
   @Post()
   @UseInterceptors(FileInterceptor('file')) // uses module-registered Multer config

@@ -10,6 +10,7 @@ import {
   ValidateNested,
   IsNumber,
   IsInt,
+  Equals,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -108,9 +109,8 @@ export class CreateOrderDto {
   })
   priority: OrderPriority = OrderPriority.Normal;
 
-  @IsEnum(OrderStatus, {
-    message: `Status must be one of: ${Object.values(OrderStatus).join(', ')}`,
-  })
+  @Equals(OrderStatus.Pending, { message: 'New orders must start as Pending' })
+  @IsOptional()
   status: OrderStatus = OrderStatus.Pending;
 
   @IsNumber()

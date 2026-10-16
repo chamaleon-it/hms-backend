@@ -5,14 +5,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Return, ReturnSchema } from './schemas/return.schema';
 import { ItemsModule } from '../items/items.module';
 import { Billing, BillingSchema } from 'src/billing/schemas/billing.schema';
-import { UsersModule } from 'src/users/users.module';
+import { Order, OrderSchema } from '../orders/schemas/order.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Return.name, schema: ReturnSchema }]),
     MongooseModule.forFeature([{ name: Billing.name, schema: BillingSchema }]),
+    MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
     ItemsModule,
-    UsersModule,
   ],
   controllers: [ReturnController],
   providers: [ReturnService],

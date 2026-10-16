@@ -9,51 +9,30 @@ import { Return, ReturnReason } from './schemas/return.schema';
 import mongoose, { Model } from 'mongoose';
 import { ItemsService } from '../items/items.service';
 import { Billing } from 'src/billing/schemas/billing.schema';
-import { UsersService } from 'src/users/users.service';
-import { requireInHouseId } from 'src/config/in-house';
+import { Order, OrderStatus } from '../orders/schemas/order.schema';
 
 @Injectable()
 export class ReturnService {
   constructor(
     @InjectModel(Return.name) private returnModel: Model<Return>,
     @InjectModel(Billing.name) private billingModel: Model<Billing>,
+    @InjectModel(Order.name) private orderModel: Model<Order>,
     private readonly itemsService: ItemsService,
-    private readonly usersService: UsersService,
   ) { }
 
   async create(createReturnDto: CreateReturnDto) {
-    createReturnDto.billNo = `R-${createReturnDto.billNo}`;
-    const existingBilling = await this.billingModel.exists({
-      mrn: createReturnDto.billNo,
-    });
-    if (existingBilling) {
-      throw new BadRequestException(
-        'A return with this bill number already exists. Please use a unique bill number.',
-      );
+    if (!createReturnDto.items?.length) {
+      throw new BadRequestException('Select at least one item to return.');
     }
-    const data = await this.returnModel.create(createReturnDto);
-
-    await this.billingModel.create({
-      patient: createReturnDto.patient,
-      user: requireInHouseId('pharmacy'),
-      items: await Promise.all(
-        createReturnDto.items.map(async (e) => {
-          const item = await this.itemsService.getItem(e.name);
-          const quantity = e.quantity;
-          const total = e.unitPrice * quantity;
-          return {
-            name: item.name,
-            quantity,
-            unitPrice: e.unitPrice,
-            total,
-          };
-        }),
-      ),
-      mrn: createReturnDto.billNo,
-      transactionType: 'Return',
-      cash: createReturnDto.items.reduce((acc, item) => acc + Number(item.unitPrice) * Number(item.quantity), 0),
-    });
-
+    for (const item of createReturnDto.items) {
+      if (!mongoose.isValidObjectId(item.name) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new BadRequestException('Return items require a valid medicine and positive whole quantity.');
+      }
+    }
+    // Legacy inventory can have batches without IDs. Heal before the transaction.
+    for (const itemId of new Set(createReturnDto.items.map((item) => String(item.name)))) {
+      await this.itemsService.ensurePersistedBatchIds(itemId);
+    }
     const validReasonForQuantityAdd = [
       ReturnReason.AdverseReaction,
       ReturnReason.DoctorChangedRx,
@@ -62,13 +41,84 @@ export class ReturnService {
       ReturnReason.QualityIssue,
       ReturnReason.WrongItem,
     ];
-    const items = createReturnDto.items.filter(
-      (item) => validReasonForQuantityAdd.includes(item.reason) || !item.reason,
-    );
-    for (const item of items) {
-      await this.itemsService.increaseItem(item.name, item.quantity);
-    }
+    const session = await this.returnModel.db.startSession();
+    let data: Return | undefined;
+    try {
+      await session.withTransaction(async () => {
+        const order = await this.orderModel.findById(createReturnDto.order).session(session);
+        if (!order || order.status !== OrderStatus.Completed || String(order.patient) !== String(createReturnDto.patient)) {
+          throw new BadRequestException('Only items from a completed order can be returned.');
+        }
+        if (!order.billNo || order.billNo === '-' || (createReturnDto.billNo && createReturnDto.billNo !== order.billNo)) {
+          throw new BadRequestException('The order bill number does not match.');
+        }
+        const originalBill = await this.billingModel.findOne({ mrn: order.billNo, transactionType: 'Sale' }).session(session);
+        if (!originalBill) throw new BadRequestException('Original sale bill was not found.');
+        const returnBillNo = `R-${order.billNo}`;
+        if (await this.billingModel.exists({ mrn: returnBillNo }).session(session)) {
+          throw new BadRequestException('This bill has already been returned.');
+        }
 
+        const ordered = new Map<string, number>();
+        for (const line of order.items) {
+          const key = String(line.name);
+          ordered.set(key, (ordered.get(key) || 0) + line.quantity);
+        }
+        const returned = new Map<string, number>();
+        const billItems: { name: string; itemId: mongoose.Types.ObjectId; quantity: number; unitPrice: number; total: number }[] = [];
+        let refund = 0;
+        for (const line of createReturnDto.items) {
+          const key = String(line.name);
+          const nextQuantity = (returned.get(key) || 0) + line.quantity;
+          if (!ordered.has(key) || nextQuantity > ordered.get(key)!) {
+            throw new BadRequestException('Return quantity exceeds the completed order.');
+          }
+          returned.set(key, nextQuantity);
+          const originalLine = originalBill.items.find((entry) => String(entry.itemId) === key);
+          const orderLine = order.items.find((entry) => String(entry.name) === key);
+          const unitPrice = originalLine?.unitPrice ?? orderLine?.batchSellingPrice;
+          if (unitPrice == null || !Number.isFinite(unitPrice) || unitPrice < 0) {
+            throw new BadRequestException('The original sale price is unavailable for this item.');
+          }
+          const item = await this.itemsService.getItem(line.name);
+          const total = unitPrice * line.quantity;
+          refund += total;
+          billItems.push({ name: item.name, itemId: line.name, quantity: line.quantity, unitPrice, total });
+        }
+
+        const [created] = await this.returnModel.create([{
+          patient: order.patient,
+          order: order._id,
+          items: createReturnDto.items.map((line) => ({
+            ...line,
+            unitPrice: billItems.find((entry) => String(entry.itemId) === String(line.name))!.unitPrice,
+          })),
+          billNo: returnBillNo,
+        }], { session });
+        data = created;
+        await this.billingModel.create([{
+          patient: order.patient,
+          user: originalBill.user,
+          items: billItems,
+          mrn: returnBillNo,
+          salesMRN: order.billNo,
+          transactionType: 'Return',
+          cash: refund,
+        }], { session });
+        for (const line of createReturnDto.items) {
+          if (validReasonForQuantityAdd.includes(line.reason!) || !line.reason) {
+            await this.itemsService.increaseItem(line.name, line.quantity, session);
+          }
+        }
+      });
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        throw new BadRequestException('This bill has already been returned.');
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
     return data;
   }
 

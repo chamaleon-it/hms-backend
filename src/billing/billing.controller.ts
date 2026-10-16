@@ -74,8 +74,8 @@ export class BillingController {
 
   @Get('drop-down')
   @UseGuards(JwtAuthGuard)
-  async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {
-    const data = await this.billingService.getBillDropDown(getBillDropDownDto);
+  async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto, @GetUser() user: JWTUserInterface) {
+    const data = await this.billingService.getBillDropDown(getBillDropDownDto, user.id);
     return {
       data,
       message: 'Bill drop down retrived successfully',
@@ -84,8 +84,8 @@ export class BillingController {
 
   @Get('single')
   @UseGuards(JwtAuthGuard)
-  async getSingleCustomerBill(@Query('q') q: string) {
-    const data = await this.billingService.getSingleCustomerBill(q);
+  async getSingleCustomerBill(@Query('q') q: string, @GetUser() user: JWTUserInterface) {
+    const data = await this.billingService.getSingleCustomerBill(q, user.id);
     return {
       data,
       message: 'Single bill were retrived successfully',
@@ -157,8 +157,8 @@ export class BillingController {
 
   @Get('report/:reportId')
   @UseGuards(JwtAuthGuard)
-  async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId) {
-    const data = await this.billingService.getBillByReportId(reportId);
+  async getBillByReportId(@Param('reportId') reportId: mongoose.Types.ObjectId, @GetUser() user: JWTUserInterface) {
+    const data = await this.billingService.getBillByReportId(reportId, user.id);
     return {
       data,
       message: 'Bill retrieved successfully by report ID.',
@@ -185,8 +185,8 @@ export class BillingController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  async getBill(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.billingService.getBill(id);
+  async getBill(@Param('id') id: mongoose.Types.ObjectId, @GetUser() user: JWTUserInterface) {
+    const data = await this.billingService.getBill(id, user.id);
     return {
       data,
       message: 'Bill were retrived successfully.',
@@ -198,8 +198,9 @@ export class BillingController {
   async updateBill(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateBillDto: UpdateBillingDto,
+    @GetUser() user: JWTUserInterface,
   ) {
-    const data = await this.billingService.updateBill(id, updateBillDto);
+    const data = await this.billingService.updateBill(id, updateBillDto, user.id);
     return {
       data,
       message: 'Bill updated successfully.',
@@ -229,8 +230,9 @@ export class BillingController {
   async markAsPaid(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() markAsPaidDto: MarkAsPaidDto,
+    @GetUser() user: JWTUserInterface,
   ) {
-    const data = await this.billingService.markAsPaid(id, markAsPaidDto);
+    const data = await this.billingService.markAsPaid(id, markAsPaidDto, user.id);
     return {
       data,
       message: 'Bill is marked as paid successfully.',

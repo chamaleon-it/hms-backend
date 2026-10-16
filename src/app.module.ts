@@ -11,8 +11,6 @@ import { AuthModule } from './auth/auth.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { PatientsModule } from './patients/patients.module';
 import { UploadsModule } from './uploads/uploads.module';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { BillingModule } from './billing/billing.module';
 import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
@@ -36,10 +34,6 @@ import { CountersModule } from './counters/counters.module';
       load: [configuration],
     }),
     MongooseModule.forRoot(configuration().databaseUrl),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-    }),
     CountersModule,
     UsersModule,
     AuthModule,

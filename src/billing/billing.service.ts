@@ -15,7 +15,7 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
-import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
+import { Order, OrderStatus, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { Consulting } from 'src/consultings/schemas/consulting.schema';
@@ -120,13 +120,24 @@ export class BillingService {
     });
   }
 
-  async generateBill(createBill: CreateBillingDto) {
+  async generateBill(createBill: CreateBillingDto, session?: mongoose.ClientSession) {
+    if (createBill.rxId && !session) {
+      const order = await this.orderModel.findOne({ mrn: createBill.rxId }).lean();
+      if (!order || order.status !== OrderStatus.Completed) {
+        throw new BadRequestException('Complete the order before creating its bill.');
+      }
+      if (order.billNo && order.billNo !== '-') {
+        throw new BadRequestException('This order already has a bill.');
+      }
+    }
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
     createBill.mrn = await this.generateUniqueMRN(prefix);
-    const data = await this.billingModel.create(createBill);
-    if (createBill.rxId) {
+    const data = session
+      ? (await this.billingModel.create([createBill], { session }))[0]
+      : await this.billingModel.create(createBill);
+    if (createBill.rxId && !session) {
       const order: any = await this.orderModel
         .findOne({ mrn: createBill.rxId })
         .populate('items.name');
@@ -235,6 +246,25 @@ export class BillingService {
     }
 
     pipeline.push({ $match: match });
+
+    // Legacy installations may already have bills created before order completion.
+    // Keep linked bills out of totals until the order actually completes.
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'orders',
+          let: { billNumber: '$mrn' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$billNo', '$$billNumber'] }, status: { $ne: OrderStatus.Completed } } },
+            { $limit: 1 },
+            { $project: { _id: 1 } },
+          ],
+          as: 'pendingOrders',
+        },
+      },
+      { $match: { pendingOrders: { $size: 0 } } },
+      { $project: { pendingOrders: 0 } },
+    );
 
     // Add calculations for status filtering
     pipeline.push({
@@ -539,11 +569,11 @@ export class BillingService {
     };
   }
 
-  async getBill(id: mongoose.Types.ObjectId) {
+  async getBill(id: mongoose.Types.ObjectId, user: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('Please provide a valid bill id');
     const data = await this.billingModel
-      .findById(id)
+      .findOne({ _id: id, user })
       .populate('patient')
       .populate('items')
       .lean()
@@ -559,11 +589,11 @@ export class BillingService {
     return data;
   }
 
-  async getBillByReportId(reportId: mongoose.Types.ObjectId) {
+  async getBillByReportId(reportId: mongoose.Types.ObjectId, user: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(reportId))
       throw new BadRequestException('Please provide a valid report id');
     const data = await this.billingModel
-      .findOne({ reportId })
+      .findOne({ reportId, user })
       .populate('patient')
       .populate('items')
       .lean()
@@ -580,21 +610,23 @@ export class BillingService {
   }
 
 
-  async updateBill(id: mongoose.Types.ObjectId, updateBillDto: UpdateBillingDto) {
+  async updateBill(id: mongoose.Types.ObjectId, updateBillDto: UpdateBillingDto, user?: mongoose.Types.ObjectId) {
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('Please provide a valid bill id');
     
-    const existingBill = await this.billingModel.findById(id);
+    const filter = { _id: id, ...(user ? { user } : {}) };
+    const existingBill = await this.billingModel.findOne(filter);
     if (!existingBill) throw new NotFoundException('Bill is not found.');
     
     if (existingBill.status === 'Completed') {
       throw new BadRequestException('Cannot edit a completed bill');
     }
 
-    const data = await this.billingModel.findByIdAndUpdate(
-      id,
-      { $set: updateBillDto },
-      { new: true }
+    const { user: _ignoredUser, ...updates } = updateBillDto;
+    const data = await this.billingModel.findOneAndUpdate(
+      { ...filter, status: { $ne: 'Completed' } },
+      { $set: updates },
+      { new: true, runValidators: true }
     );
     return data;
   }
@@ -692,7 +724,7 @@ export class BillingService {
     addPaymentDto: AddPaymentDto,
     user: mongoose.Types.ObjectId,
   ) {
-    const bill = await this.billingModel.findById(id);
+    const bill = await this.billingModel.findOne({ _id: id, user });
     if (!bill) throw new NotFoundException('Bill is not found.');
 
     const subtotal = (bill.items || []).reduce(
@@ -705,15 +737,16 @@ export class BillingService {
     if (discount < 0 || discount > subtotal) {
       throw new BadRequestException('Discount must be between 0 and the bill total.');
     }
-    if (addPaymentDto.cash < 0 || addPaymentDto.online < 0) {
+    if (addPaymentDto.cash < 0 || addPaymentDto.online < 0 || card < 0 || refund < 0) {
       throw new BadRequestException('Payment amounts cannot be negative.');
     }
-    if (addPaymentDto.cash + addPaymentDto.online + card + refund > subtotal - discount) {
+    const grossPaid = addPaymentDto.cash + addPaymentDto.online + card;
+    if (refund > grossPaid || grossPaid - refund > subtotal - discount) {
       throw new BadRequestException('Payment cannot exceed the bill total after discount.');
     }
 
     const data = await this.billingModel.findOneAndUpdate(
-      { _id: id },
+      { _id: id, user },
       {
         $set: {
           cash: addPaymentDto.cash,
@@ -729,20 +762,53 @@ export class BillingService {
     return data;
   }
 
-  async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto) {
+  async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto, user: mongoose.Types.ObjectId) {
+    const amount = markAsPaidDto.amount;
+    if (!mongoose.isValidObjectId(id) || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('A valid bill and positive payment amount are required.');
+    }
     const data = await this.billingModel.findOneAndUpdate(
-      { _id: id },
-      { $inc: { cash: markAsPaidDto.amount } },
+      {
+        _id: id,
+        user,
+        transactionType: 'Sale',
+        $expr: {
+          $lte: [
+            {
+              $subtract: [
+                {
+                  $add: [
+                    { $ifNull: ['$cash', 0] },
+                    { $ifNull: ['$online', 0] },
+                    { $ifNull: ['$card', 0] },
+                    amount,
+                  ],
+                },
+                { $ifNull: ['$refund', 0] },
+              ],
+            },
+            {
+              $subtract: [
+                { $sum: '$items.total' },
+                { $ifNull: ['$discount', 0] },
+              ],
+            },
+          ],
+        },
+      },
+      { $inc: { cash: amount } },
       { new: true },
     );
-    if (!data) throw new NotFoundException('Bill is not found.');
+    if (!data) {
+      throw new BadRequestException('Bill not found or payment exceeds the remaining balance.');
+    }
     return data;
   }
 
-  async getBillDropDown(getBillDropDownDto: GetBillDropdownDto) {
+  async getBillDropDown(getBillDropDownDto: GetBillDropdownDto, user: mongoose.Types.ObjectId) {
     const { query = '', } = getBillDropDownDto;
 
-    const data = await this.billingModel.find({ mrn: new RegExp(query, 'i'), transactionType: "Sale" })
+    const data = await this.billingModel.find({ user, mrn: new RegExp(query, 'i'), transactionType: "Sale" })
       .limit(10).select("user patient mrn")
       .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
       .lean()
@@ -750,8 +816,8 @@ export class BillingService {
     return data;
   }
 
-  async getSingleCustomerBill(q: string) {
-    const data = await this.billingModel.find({ patient: q })
+  async getSingleCustomerBill(q: string, user: mongoose.Types.ObjectId) {
+    const data = await this.billingModel.find({ user, patient: q })
       .populate("patient", "name phoneNumber gender dateOfBirth mrn address")
       .lean()
       .exec();

@@ -18,7 +18,9 @@ export const storage = diskStorage({
   },
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-    cb(null, `${unique}${extname(file.originalname)}`);
+    const extension = extname(file.originalname).toLowerCase();
+    const safeExtension = /^\.[a-z0-9]{1,10}$/.test(extension) ? extension : '';
+    cb(null, `${unique}${safeExtension}`);
   },
 });
 

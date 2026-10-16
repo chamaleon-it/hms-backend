@@ -1199,16 +1199,30 @@ export class ItemsService {
     throw new BadRequestException('Stock changed while selling; please retry');
   }
 
-  async increaseItem(id: mongoose.Types.ObjectId, quantity: number) {
+  async increaseItem(id: mongoose.Types.ObjectId, quantity: number, session?: mongoose.ClientSession) {
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
     }
-    await this.ensurePersistedBatchIds(id);
+    if (!session) await this.ensurePersistedBatchIds(id);
     for (let attempt = 0; attempt < 5; attempt++) {
-      const item = await this.itemModel.findById(id);
+      const itemQuery = this.itemModel.findById(id);
+      const item = await (session ? itemQuery.session(session) : itemQuery);
       if (!item) throw new BadRequestException('Item is not available');
       const target = this.activeBatches(item)[0];
       if (!target) {
+        if (session) {
+          const opening = this.normalizeBatchInput({
+            batchNumber: 'OPENING', expiryDate: new Date('2099-12-31'),
+            quantity, startingQuantity: quantity, unitPrice: 0,
+            purchaseRate: 0, mrp: 0, supplier: '-',
+          });
+          const updated = await this.itemModel.findOneAndUpdate(
+            { _id: id }, { $push: { batches: opening } },
+            { new: true, runValidators: true, session },
+          );
+          if (updated) return updated;
+          continue;
+        }
         return this.addBatchItems(id, {
           batchNumber: 'OPENING',
           expiryDate: new Date('2099-12-31'),
@@ -1228,7 +1242,7 @@ export class ItemsService {
           [`batches.${index}.status`]: { $ne: BatchStatus.Inactive },
         },
         { $inc: { [`batches.${index}.quantity`]: quantity } },
-        { new: true },
+        { new: true, ...(session ? { session } : {}) },
       );
       if (updated) return updated;
     }
