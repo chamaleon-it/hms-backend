@@ -15,7 +15,7 @@ import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
-import { Order, OrderStatus, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
+import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { Consulting } from 'src/consultings/schemas/consulting.schema';
@@ -123,8 +123,8 @@ export class BillingService {
   async generateBill(createBill: CreateBillingDto, session?: mongoose.ClientSession) {
     if (createBill.rxId && !session) {
       const order = await this.orderModel.findOne({ mrn: createBill.rxId }).lean();
-      if (!order || order.status !== OrderStatus.Completed) {
-        throw new BadRequestException('Complete the order before creating its bill.');
+      if (!order) {
+        throw new BadRequestException('The linked order could not be found.');
       }
       if (order.billNo && order.billNo !== '-') {
         throw new BadRequestException('This order already has a bill.');
@@ -246,25 +246,6 @@ export class BillingService {
     }
 
     pipeline.push({ $match: match });
-
-    // Legacy installations may already have bills created before order completion.
-    // Keep linked bills out of totals until the order actually completes.
-    pipeline.push(
-      {
-        $lookup: {
-          from: 'orders',
-          let: { billNumber: '$mrn' },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$billNo', '$$billNumber'] }, status: { $ne: OrderStatus.Completed } } },
-            { $limit: 1 },
-            { $project: { _id: 1 } },
-          ],
-          as: 'pendingOrders',
-        },
-      },
-      { $match: { pendingOrders: { $size: 0 } } },
-      { $project: { pendingOrders: 0 } },
-    );
 
     // Add calculations for status filtering
     pipeline.push({
