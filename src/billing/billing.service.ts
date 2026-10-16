@@ -166,21 +166,11 @@ export class BillingService {
     return data;
   }
 
-  async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
-    const {
-      page = 1,
-      limit = 10,
-      q,
-      qEnd,
-      method,
-      status,
-      startDate,
-      endDate,
-      activeDate,
-      billingType,
-    } = getBillisDto;
-    const skip = (page - 1) * limit;
-
+  private async buildBillFilterPipeline(
+    user: mongoose.Types.ObjectId,
+    getBillisDto: GetBillisDto,
+  ): Promise<any[]> {
+    const { q, qEnd, method, status, startDate, endDate, billingType, doctor } = getBillisDto;
     const pipeline: any[] = [];
 
     const match: any = { user: new mongoose.Types.ObjectId(user) };
@@ -251,11 +241,15 @@ export class BillingService {
       $addFields: {
         itemsTotal: { $sum: '$items.total' },
         totalPaid: {
-          $add: [
-            { $ifNull: ['$cash', 0] },
-            { $ifNull: ['$online', 0] },
-            { $ifNull: ['$insurance', 0] },
-            { $ifNull: ['$discount', 0] },
+          $subtract: [
+            { $add: [
+              { $ifNull: ['$cash', 0] },
+              { $ifNull: ['$online', 0] },
+              { $ifNull: ['$card', 0] },
+              { $ifNull: ['$insurance', 0] },
+              { $ifNull: ['$discount', 0] },
+            ] },
+            { $ifNull: ['$refund', 0] },
           ],
         },
       },
@@ -295,7 +289,7 @@ export class BillingService {
       billingType &&
       ['Consultation', 'Clinical', 'Pharmacy', 'Dressing'].includes(billingType)
     ) {
-      const catalogue = await this.billingItemModel.find().select('item').lean();
+      const catalogue = await this.billingItemModel.find({ user }).select('item').lean();
       const catalogueNames = catalogue.map((c) => c.item).filter(Boolean);
       const clinicalKeywords = [
         'procedure',
@@ -311,7 +305,7 @@ export class BillingService {
         pipeline.push({
           $match: {
             items: {
-              $elemMatch: { name: { $regex: /consultation/i } },
+              $elemMatch: { name: { $regex: /consultation|(^|[^a-z])cf([^a-z]|$)/i } },
             },
           },
         });
@@ -366,6 +360,27 @@ export class BillingService {
       }
     }
 
+    if (doctor?.length) {
+      const doctorUsers = await this.userModel
+        .find({ name: { $in: doctor } })
+        .select('_id')
+        .lean();
+      pipeline.push({
+        $match: {
+          doctor: {
+            $in: [...doctor, ...doctorUsers.map((entry) => String(entry._id))],
+          },
+        },
+      });
+    }
+    return pipeline;
+  }
+
+  async getBills(user: mongoose.Types.ObjectId, getBillisDto: GetBillisDto) {
+    const { page = 1, limit = 10, activeDate } = getBillisDto;
+    const skip = (page - 1) * limit;
+    const pipeline = await this.buildBillFilterPipeline(user, getBillisDto);
+
     pipeline.push({
       $facet: {
         metadata: [{ $count: 'total' }],
@@ -417,6 +432,111 @@ export class BillingService {
     }
 
     return { data, total };
+  }
+
+  async getBillsSummary(user: mongoose.Types.ObjectId, filters: GetBillisDto) {
+    const pipeline = await this.buildBillFilterPipeline(user, filters);
+    const catalogue = await this.billingItemModel
+      .find({ user: new mongoose.Types.ObjectId(user) })
+      .select('item')
+      .lean();
+    const catalogueNames = catalogue
+      .map((entry) => String(entry.item || '').trim().toLowerCase())
+      .filter(Boolean);
+    const name = { $toLower: { $trim: { input: { $ifNull: ['$items.name', ''] } } } };
+    const isConsultation = {
+      $regexMatch: { input: name, regex: 'consultation|(^|[^a-z])cf([^a-z]|$)' },
+    };
+    const isProcedure = {
+      $or: [
+        { $in: [name, catalogueNames] },
+        { $regexMatch: { input: name, regex: 'procedure|injection|cannulation|extraction|catheterisation|enema|dressing' } },
+      ],
+    };
+    const paid = {
+      $subtract: [
+        {
+          $add: [
+            { $ifNull: ['$cash', 0] },
+            { $ifNull: ['$online', 0] },
+            { $ifNull: ['$card', 0] },
+            { $ifNull: ['$insurance', 0] },
+          ],
+        },
+        { $ifNull: ['$refund', 0] },
+      ],
+    };
+
+    pipeline.push(
+      { $unwind: { path: '$items', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          summarySign: { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+          summaryLineTotal: {
+            $ifNull: [
+              '$items.total',
+              { $multiply: [{ $ifNull: ['$items.unitPrice', 0] }, { $ifNull: ['$items.quantity', 0] }] },
+            ],
+          },
+          summaryCategory: {
+            $switch: {
+              branches: [
+                { case: { $ne: [{ $ifNull: ['$reportId', null] }, null] }, then: 'other' },
+                { case: isConsultation, then: 'consultationFee' },
+                { case: { $ne: [{ $ifNull: ['$items.itemId', null] }, null] }, then: 'medicineSold' },
+                { case: isProcedure, then: 'procedureCharge' },
+              ],
+              default: 'medicineSold',
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id',
+          total: { $sum: { $multiply: ['$summaryLineTotal', '$summarySign'] } },
+          paid: { $first: { $multiply: [paid, '$summarySign'] } },
+          consultationFee: {
+            $sum: { $cond: [{ $eq: ['$summaryCategory', 'consultationFee'] }, { $multiply: ['$summaryLineTotal', '$summarySign'] }, 0] },
+          },
+          medicineSold: {
+            $sum: { $cond: [{ $eq: ['$summaryCategory', 'medicineSold'] }, { $multiply: ['$summaryLineTotal', '$summarySign'] }, 0] },
+          },
+          procedureCharge: {
+            $sum: { $cond: [{ $eq: ['$summaryCategory', 'procedureCharge'] }, { $multiply: ['$summaryLineTotal', '$summarySign'] }, 0] },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' },
+          paid: { $sum: '$paid' },
+          consultationFee: { $sum: '$consultationFee' },
+          medicineSold: { $sum: '$medicineSold' },
+          procedureCharge: { $sum: '$procedureCharge' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          total: { $round: ['$total', 2] },
+          paid: { $round: ['$paid', 2] },
+          consultationFee: { $round: ['$consultationFee', 2] },
+          medicineSold: { $round: ['$medicineSold', 2] },
+          procedureCharge: { $round: ['$procedureCharge', 2] },
+        },
+      },
+    );
+
+    const [summary] = await this.billingModel.aggregate(pipeline).exec();
+    return summary ?? {
+      total: 0,
+      paid: 0,
+      consultationFee: 0,
+      medicineSold: 0,
+      procedureCharge: 0,
+    };
   }
 
   async getBill(id: mongoose.Types.ObjectId) {

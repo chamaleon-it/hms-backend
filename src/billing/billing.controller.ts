@@ -62,6 +62,16 @@ export class BillingController {
     };
   }
 
+  @Get('summary')
+  @UseGuards(JwtAuthGuard)
+  async getBillsSummary(
+    @GetUser() user: JWTUserInterface,
+    @Query() filters: GetBillisDto,
+  ) {
+    const data = await this.billingService.getBillsSummary(user.id, filters);
+    return { data };
+  }
+
   @Get('drop-down')
   @UseGuards(JwtAuthGuard)
   async getBillDropDown(@Query() getBillDropDownDto: GetBillDropdownDto) {

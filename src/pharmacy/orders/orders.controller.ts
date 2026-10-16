@@ -12,8 +12,6 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import mongoose from 'mongoose';
-import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -25,6 +23,7 @@ import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { CompleteOrderDto } from './dto/complete-order.dto';
 
 @Controller('pharmacy/orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,33 +74,6 @@ export class OrdersController {
     };
   }
 
-  @Post('packed')
-  async itemPacked(
-    @Body() packedDto: PackedDto,
-    @GetUser() user: JWTUserInterface,
-  ) {
-    const data = await this.ordersService.itemPacked(packedDto, user.id);
-    return {
-      message: 'Item is packed',
-      data,
-    };
-  }
-
-  @Post('mark_all_as_packed')
-  async markAllAsPacked(
-    @Body() markAllAsPackedDto: MarkAllAsPackedDto,
-    @GetUser() user: JWTUserInterface,
-  ) {
-    const data = await this.ordersService.markAllAsPacked(
-      markAllAsPackedDto,
-      user.id,
-    );
-    return {
-      message: 'All item is packed',
-      data,
-    };
-  }
-
   @Get('customers')
   async getCustomers(@Query() query: GetCustomersDto) {
     const { data, total } = await this.ordersService.getCustomers(query);
@@ -139,8 +111,9 @@ export class OrdersController {
   async completeOrder(
     @Param('id') id: mongoose.Types.ObjectId,
     @GetUser() user: JWTUserInterface,
+    @Body() dto: CompleteOrderDto,
   ) {
-    const data = await this.ordersService.completeOrder(id, user?.id);
+    const data = await this.ordersService.completeOrder(id, user?.id, dto);
     return {
       message: 'Order completed successfully',
       data,

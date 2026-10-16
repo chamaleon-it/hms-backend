@@ -83,6 +83,11 @@ export class CreateBatchDto {
 }
 
 export class UpdateBatchDto {
+  @Type(() => Number)
+  @IsInt()
+  @IsOptional()
+  expectedQuantity?: number;
+
   @IsOptional()
   @IsDateString({}, { message: 'Expiry date must be an ISO date.' })
   expiryDate?: string;

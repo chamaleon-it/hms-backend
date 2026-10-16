@@ -110,6 +110,7 @@ export class Item {
         customerName: { type: String },
         customerNumber: { type: String },
         customerPhone: { type: String },
+        saleKey: { type: String },
       },
     ],
     default: [],
@@ -128,6 +129,7 @@ export class Item {
     customerName?: string;
     customerNumber?: string;
     customerPhone?: string;
+    saleKey?: string;
   }[];
 
   @Prop({ type: String, default: '-' })

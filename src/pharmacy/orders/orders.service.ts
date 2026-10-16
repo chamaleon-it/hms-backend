@@ -5,10 +5,8 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderStatus } from './schemas/order.schema';
+import { Order, OrderDocument, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
-import { PackedDto } from './dto/packed.dto';
-import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
 import { ItemsService, SaleContext } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
@@ -18,6 +16,7 @@ import { Patient, PatientStatus } from 'src/patients/schemas/patient.schema';
 import { GetCustomersDto } from './dto/get-customers.dto';
 import { GetOrdersDto } from './dto/get-orders.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { CompleteOrderDto } from './dto/complete-order.dto';
 import { Billing } from 'src/billing/schemas/billing.schema';
 import {
   COUNTER_KEYS,
@@ -84,6 +83,15 @@ export class OrdersService {
   }
 
   async createOrder(order: CreateOrderDto) {
+    if (order.clientRequestId) {
+      const existing = await this.orderModel.findOne({ clientRequestId: order.clientRequestId }).exec();
+      if (existing) {
+        if (String(existing.patient) !== String(order.patient)) {
+          throw new BadRequestException('Order request ID is already in use');
+        }
+        return existing;
+      }
+    }
     const mrn = await this.generateUniqueMRN();
     order.mrn = mrn;
 
@@ -164,7 +172,21 @@ export class OrdersService {
       }
     }
 
-    const data = await this.orderModel.create(order);
+    let data: any;
+    try {
+      data = await this.orderModel.create(order);
+    } catch (error: any) {
+      if (error?.code === 11000 && order.clientRequestId) {
+        const existing = await this.orderModel.findOne({ clientRequestId: order.clientRequestId }).exec();
+        if (existing) {
+          if (String(existing.patient) !== String(order.patient)) {
+            throw new BadRequestException('Order request ID is already in use');
+          }
+          return existing;
+        }
+      }
+      throw error;
+    }
     const { autoGenerateBill } = await this.usersService.getPharmacyBilling(
       requireInHouseId('pharmacy'),
     );
@@ -308,99 +330,6 @@ export class OrdersService {
     }
 
     return data;
-  }
-
-  async itemPacked(
-    packedDto: PackedDto,
-    user: mongoose.Types.ObjectId,
-  ): Promise<void> {
-    const { order: orderId, item } = packedDto;
-
-    const order = await this.orderModel
-      .findOneAndUpdate(
-        { _id: orderId, items: { $elemMatch: { name: item, isPacked: false } } },
-        { $set: { 'items.$.isPacked': true } },
-        { new: true },
-      )
-      .exec();
-
-    if (!order) {
-      throw new NotFoundException(
-        'Order or item not found. Please check your details.',
-      );
-    }
-
-    let resolvedBatch: { batchId: string; batchNumber: string; index: number } | null = null;
-    try {
-      const line = order.items.find((e) => String(e.name) === String(item));
-      if (!line || !Number.isFinite(line.quantity) || line.quantity <= 0) {
-        throw new BadRequestException('Order item has an invalid quantity');
-      }
-      const sale = await this.saleContext(order);
-      resolvedBatch = await this.itemsService.resolveBatchForSale(
-        item,
-        line.batchId || null,
-        line.batchNumber || null,
-      );
-      await this.itemsService.decreaseItem(
-        item,
-        line.quantity,
-        user,
-        resolvedBatch?.batchId || line.batchId || null,
-        resolvedBatch?.batchNumber || line.batchNumber || null,
-        { ...sale, unitPrice: line?.batchSellingPrice ?? undefined },
-      );
-    } catch (error) {
-      await this.orderModel.updateOne(
-        { _id: orderId, 'items.name': item },
-        { $set: { 'items.$.isPacked': false } },
-      );
-      throw error;
-    }
-    if (resolvedBatch) {
-      await this.orderModel.updateOne(
-        { _id: orderId, 'items.name': item },
-        { $set: { 'items.$.batchId': resolvedBatch.batchId, 'items.$.batchNumber': resolvedBatch.batchNumber } },
-      );
-    }
-  }
-
-  async markAllAsPacked(
-    markAllAsPackedDto: MarkAllAsPackedDto,
-    user: mongoose.Types.ObjectId,
-  ): Promise<void> {
-    const orderId = markAllAsPackedDto.order;
-    const order = await this.orderModel.findById(orderId).lean().exec();
-    if (!order) {
-      throw new NotFoundException(
-        'Order not found. Please check your details.',
-      );
-    }
-    const unpacked = (order.items ?? [])
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => !item.isPacked);
-    if (unpacked.length > 0) {
-      const sale = await this.saleContext(order);
-      for (const { item: it, index } of unpacked) {
-        const resolved = await this.itemsService.resolveBatchForSale(
-          it.name,
-          it.batchId || null,
-          it.batchNumber || null,
-        );
-        await this.itemsService.decreaseItem(
-          it.name,
-          it.quantity,
-          user,
-          resolved?.batchId || it.batchId || null,
-          resolved?.batchNumber || it.batchNumber || null,
-          { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
-        );
-        await this.orderModel.updateOne(
-          { _id: orderId },
-          { $set: { [`items.${index}.isPacked`]: true } },
-        );
-      }
-    }
   }
 
   async getCustomers(query: GetCustomersDto) {
@@ -709,7 +638,15 @@ export class OrdersService {
   }
 
   async updateOrder(dto: UpdateOrderDto) {
-    const payload: any = { ...dto };
+    const current = await this.orderModel.findById(dto._id).lean().exec();
+    if (!current) throw new NotFoundException('Order not found');
+    if (current.status !== OrderStatus.Pending) {
+      throw new BadRequestException('Only pending orders can be edited');
+    }
+    const payload: Record<string, any> = {};
+    for (const field of ['doctor', 'doctorName', 'priority', 'assignedTo', 'pharmacist', 'discount'] as const) {
+      if ((dto as any)[field] !== undefined) payload[field] = (dto as any)[field];
+    }
 
     if (Array.isArray(dto.items)) {
       payload.items = [];
@@ -720,7 +657,6 @@ export class OrdersService {
         if (nameRef && typeof nameRef === 'object') {
           line.name = nameRef._id || nameRef.id;
         }
-
         if (line.batchId || line.batchNumber) {
           const itemId = line.name;
           const batchInfo = await this.itemsService.getItemBatches(
@@ -743,7 +679,7 @@ export class OrdersService {
               `Selected batch not found for item ${batchInfo.name}`,
             );
           }
-          // Re-bind to persisted batchId so pack/complete lookups stay stable
+          // Re-bind to persisted batchId so completion uses the selected batch.
           line.batchId = batch.batchId;
           line.batchNumber = line.batchNumber || batch.batchNumber;
           line.batchExpiryDate = line.batchExpiryDate || batch.expiryDate;
@@ -762,11 +698,20 @@ export class OrdersService {
       }
     }
 
+    const match: Record<string, unknown> = {
+      _id: dto._id,
+      status: OrderStatus.Pending,
+      ...((current as any).updatedAt ? { updatedAt: (current as any).updatedAt } : {}),
+    };
     const order = await this.orderModel
-      .findByIdAndUpdate(dto._id, payload, { new: true, runValidators: true })
+      .findOneAndUpdate(
+        match,
+        payload,
+        { new: true, runValidators: true },
+      )
       .lean();
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new BadRequestException('Order changed while editing. Refresh and retry');
     }
     return order;
   }
@@ -774,66 +719,91 @@ export class OrdersService {
   async completeOrder(
     id: mongoose.Types.ObjectId,
     userId?: mongoose.Types.ObjectId,
+    dto?: CompleteOrderDto,
   ) {
-    const order = await this.orderModel.findById(id).exec();
-    if (!order) {
-      throw new NotFoundException('Order not found');
+    let current = await this.orderModel.findById(id).exec();
+    if (!current) throw new NotFoundException('Order not found');
+    if (current.status === OrderStatus.Completed) return current;
+    if (current.status !== OrderStatus.Pending) {
+      throw new BadRequestException('Only pending orders can be completed');
     }
 
-    // If order was not completed yet, pack any unpacked items and reduce inventory
-    if (order.status !== OrderStatus.Completed) {
-      const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
-      if (unpacked.length > 0) {
-        const sale = await this.saleContext(order);
-        for (const it of unpacked) {
-          const itemId = it.name as any;
-          const resolved = await this.itemsService.resolveBatchForSale(
-            itemId,
-            (it as any).batchId || null,
-            (it as any).batchNumber || null,
-          );
-          if (!resolved) {
-            // No sellable batch and no match — still try FEFO decrease (no batch id)
-            // only when the line had no batch selection at all.
-            if (!(it as any).batchId && !(it as any).batchNumber) {
-              await this.itemsService.decreaseItem(
-                itemId,
-                it.quantity,
-                userId,
-                null,
-                null,
-                { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
-              );
-              it.isPacked = true;
-              await order.save();
-              continue;
-            }
-            throw new BadRequestException(
-              `Selected batch not found for item on order ${order.mrn}`,
-            );
+    // Save edits before the sale transaction. A failed sale leaves the order
+    // editable, while the transaction keeps stock and completion together.
+    if (dto?.items) {
+      await this.updateOrder({ _id: id, items: dto.items, discount: dto.discount } as UpdateOrderDto);
+      current = await this.orderModel.findById(id).exec();
+      if (!current) throw new NotFoundException('Order not found');
+    }
+
+    // Legacy imported batches may lack persistent subdocument IDs. Heal them
+    // before taking a transaction snapshot so the sale sees the same IDs.
+    for (const line of current.items || []) {
+      await this.itemsService.ensurePersistedBatchIds(line.name);
+    }
+
+    let order: OrderDocument | null = null;
+    const session = await this.orderModel.db.startSession();
+    try {
+      await session.withTransaction(async () => {
+        // Claim the pending order in the same transaction as all stock writes.
+        // Concurrent Complete requests cannot each make a sale.
+        order = await this.orderModel.findOneAndUpdate(
+          { _id: id, status: OrderStatus.Pending },
+          { $set: { status: OrderStatus.Completed } },
+          { new: true, session },
+        ).exec();
+        if (!order) {
+          const existing = await this.orderModel.findById(id).session(session).exec();
+          if (!existing) throw new NotFoundException('Order not found');
+          if (existing.status !== OrderStatus.Completed) {
+            throw new BadRequestException('Only pending orders can be completed');
           }
+          order = existing;
+          return;
+        }
 
-          // Persist stable refs on the order line so receipts/history stay correct
-          (it as any).batchId = resolved.batchId;
-          (it as any).batchNumber = resolved.batchNumber;
-
+        if (!order.items?.length) throw new BadRequestException('Order has no items');
+        const sale = await this.saleContext(order);
+        for (const [index, line] of order.items.entries()) {
+          if (!Number.isInteger(line.quantity) || line.quantity <= 0) {
+            throw new BadRequestException(`Item ${index + 1} has an invalid quantity`);
+          }
+          const itemId = line.name as mongoose.Types.ObjectId;
+          const resolved = await this.itemsService.resolveBatchForSale(
+            itemId, line.batchId || null, line.batchNumber || null,
+          );
+          if (!resolved && (line.batchId || line.batchNumber)) {
+            throw new BadRequestException(`Selected batch not found for item ${index + 1}`);
+          }
+          if (resolved && (
+            (line.batchNumber && resolved.batchNumber.toLowerCase() !== line.batchNumber.toLowerCase()) ||
+            (line.batchId && !line.batchNumber &&
+              resolved.batchId !== line.batchId &&
+              resolved.batchNumber.toLowerCase() !== line.batchId.toLowerCase())
+          )) {
+            throw new BadRequestException(`Selected batch changed for item ${index + 1}`);
+          }
           await this.itemsService.decreaseItem(
             itemId,
-            it.quantity,
+            line.quantity,
             userId,
-            resolved.batchId,
-            resolved.batchNumber,
-            { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
+            resolved?.batchId || null,
+            resolved?.batchNumber || null,
+            { ...sale, saleKey: `${order._id}:${index}`, unitPrice: line.batchSellingPrice ?? undefined },
+            session,
           );
-          it.isPacked = true;
-          await order.save();
+          if (resolved) {
+            line.batchId = resolved.batchId;
+            line.batchNumber = resolved.batchNumber;
+          }
         }
-      }
-
-      order.status = OrderStatus.Completed;
-      await order.save();
+        await order.save({ session });
+      });
+    } finally {
+      await session.endSession();
     }
-
+    if (!order) throw new NotFoundException('Order not found');
     return order;
   }
 
@@ -851,12 +821,7 @@ export class OrdersService {
     newOrder.patient = existOrder.patient;
     newOrder.doctor = existOrder.doctor;
     newOrder.doctorName = existOrder.doctorName;
-    newOrder.items = existOrder.items.map((item) => {
-      return {
-        ...item,
-        isPacked: false,
-      };
-    });
+    newOrder.items = existOrder.items;
     newOrder.priority = existOrder.priority;
     newOrder.discount = existOrder.discount;
     newOrder.assignedTo = existOrder.assignedTo;

@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { BatchStatus } from './schemas/item.schema';
+import mongoose from 'mongoose';
 
 describe('ItemsService batch helpers', () => {
   const service = Object.create(ItemsService.prototype) as ItemsService;
@@ -245,8 +246,6 @@ describe('ItemsService batch helpers', () => {
           unitPrice: 16,
         },
       ],
-      markModified: jest.fn(),
-      save: jest.fn().mockResolvedValue(true),
     };
 
     const svc: any = Object.create(ItemsService.prototype);
@@ -282,6 +281,14 @@ describe('ItemsService batch helpers', () => {
     });
     svc.itemModel = {
       findById: jest.fn().mockResolvedValue(item),
+      findOneAndUpdate: jest.fn().mockImplementation(async (_filter: any, update: any) => {
+        const batchPath = Object.keys(update.$inc).find((path) => path.startsWith('batches.'))!;
+        const index = Number(batchPath.split('.')[1]);
+        item.batches[index].quantity += update.$inc[batchPath];
+        item.soldQuantity += update.$inc.soldQuantity;
+        item.soldHistory.push(update.$push.soldHistory);
+        return item;
+      }),
     };
     svc.usersService = {
       getPharmacyInventoryAllowNegativeStock: jest
@@ -290,26 +297,27 @@ describe('ItemsService batch helpers', () => {
     };
 
     await expect(
-      svc.deductFromBatch('item1', 'b3', 1),
+      svc.deductFromBatch('item1', 'b3', 1, undefined, undefined, { saleKey: 's-expired' }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      svc.deductFromBatch('item1', 'b4', 1),
+      svc.deductFromBatch('item1', 'b4', 1, undefined, undefined, { saleKey: 's-inactive' }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      svc.deductFromBatch('item1', 'b2', 10),
+      svc.deductFromBatch('item1', 'b2', 10, undefined, undefined, { saleKey: 's-oversell' }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    await svc.deductFromBatch('item1', 'b2', 2);
+    await svc.deductFromBatch('item1', 'b2', 2, undefined, undefined, { saleKey: 's-1' });
     expect(item.batches[1].quantity).toBe(3);
     expect(service.sumActiveQuantity(item)).toBe(23);
     expect(item.quantity).toBeUndefined();
     expect(item.soldQuantity).toBe(2);
     expect(item.soldHistory[0].unitPrice).toBe(14);
-    expect(item.save).toHaveBeenCalled();
+    expect(svc.itemModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
 
     const sale = {
+      saleKey: 's-2',
       orderId: 'order-1',
       orderNumber: 'RX0000001',
       billNumber: 'BILL0001',
@@ -339,6 +347,86 @@ describe('ItemsService batch helpers', () => {
     expect(service.findBatchIndex(list, 'stale-oid', 'B0')).toBe(0);
     expect(service.findBatchIndex(list, 'missing', 'new')).toBe(1);
     expect(service.findBatchIndex(list, 'nope', 'nope')).toBe(-1);
+  });
+
+  it('deducts an order line once even when the sale request is repeated', async () => {
+    const itemId = new mongoose.Types.ObjectId();
+    const batchId = new mongoose.Types.ObjectId();
+    const item: any = {
+      name: 'M1',
+      soldQuantity: 0,
+      soldHistory: [],
+      batches: [{
+        _id: batchId,
+        batchNumber: 'B1',
+        quantity: 60,
+        status: BatchStatus.Active,
+        expiryDate: new Date('2030-01-01'),
+        unitPrice: 5,
+      }],
+    };
+    const svc: any = Object.create(ItemsService.prototype);
+    svc.usersService = {
+      getPharmacyInventoryAllowNegativeStock: jest.fn().mockResolvedValue(false),
+    };
+    svc.resolveBatchForSale = jest.fn().mockResolvedValue({
+      batchId: batchId.toString(), batchNumber: 'B1', index: 0,
+    });
+    svc.itemModel = {
+      findById: jest.fn().mockImplementation(async () => item),
+      findOneAndUpdate: jest.fn().mockImplementation(async (filter: any, update: any) => {
+        if (item.soldHistory.some((entry: any) => entry.saleKey === filter['soldHistory.saleKey'].$ne)) return null;
+        if (item.batches[0].quantity < update.$push.soldHistory.quantity) return null;
+        item.batches[0].quantity += update.$inc['batches.0.quantity'];
+        item.soldQuantity += update.$inc.soldQuantity;
+        item.soldHistory.push(update.$push.soldHistory);
+        return item;
+      }),
+    };
+    const sale = {
+      saleKey: `${new mongoose.Types.ObjectId()}:0`,
+      orderId: new mongoose.Types.ObjectId(),
+      orderNumber: 'RX1',
+      customerId: new mongoose.Types.ObjectId(),
+    };
+
+    await Promise.all([
+      svc.decreaseItem(itemId, 10, undefined, batchId.toString(), 'B1', sale),
+      svc.decreaseItem(itemId, 10, undefined, batchId.toString(), 'B1', sale),
+    ]);
+    expect(item.batches[0].quantity).toBe(50);
+    expect(item.soldQuantity).toBe(10);
+    expect(item.soldHistory).toHaveLength(1);
+
+    await expect(svc.decreaseItem(itemId, 20, undefined, batchId.toString(), 'B1', sale))
+      .rejects.toThrow(/different quantity/);
+    expect(item.batches[0].quantity).toBe(50);
+
+    await svc.decreaseItem(itemId, 10, undefined, batchId.toString(), 'B1', {
+      ...sale, saleKey: `${sale.orderId}:1`,
+    });
+    expect(item.batches[0].quantity).toBe(40);
+    expect(item.soldHistory).toHaveLength(2);
+  });
+
+  it('rejects a stale stock quantity entered in the batch editor', async () => {
+    const id = new mongoose.Types.ObjectId();
+    const batchId = new mongoose.Types.ObjectId();
+    const item: any = {
+      batches: [{ _id: batchId, batchNumber: 'B1', quantity: 50 }],
+    };
+    const svc: any = Object.create(ItemsService.prototype);
+    svc.ensurePersistedBatchIds = jest.fn().mockResolvedValue(false);
+    svc.itemModel = {
+      findById: jest.fn().mockResolvedValue(item),
+      findOneAndUpdate: jest.fn(),
+    };
+
+    await expect(svc.updateBatchByNumber(id, 'B1', {
+      quantity: 60,
+      expectedQuantity: 60,
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(svc.itemModel.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it('resolveBatchForSale falls back to B0 when batchId is stale', async () => {

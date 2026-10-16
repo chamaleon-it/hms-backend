@@ -137,16 +137,14 @@ export class ItemsController {
     @Body() dto: UpdateBatchDto,
     @GetUser() user: JWTUserInterface,
   ) {
-    // Pharmacy may update rates/expiry/supplier/status but must not bypass
-    // Admin-only stock quantity rules via batch PUT.
-    // if (
-    //   user.role === UserRole.PHARMACY &&
-    //   (dto.quantity != null || dto.startingQuantity != null)
-    // ) {
-    //   throw new ForbiddenException(
-    //     'Pharmacy cannot modify batch stock quantity. Use Purchase Entry to add stock, or ask an administrator.',
-    //   );
-    // }
+    if (
+      user.role === UserRole.PHARMACY &&
+      (dto.quantity != null || dto.startingQuantity != null)
+    ) {
+      throw new ForbiddenException(
+        'Pharmacy cannot modify batch stock quantity. Use Purchase Entry to add stock, or ask an administrator.',
+      );
+    }
 
     const data = await this.itemsService.updateBatchByNumber(
       id,

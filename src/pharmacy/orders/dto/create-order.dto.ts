@@ -9,6 +9,9 @@ import {
   ArrayMinSize,
   ValidateNested,
   IsNumber,
+  IsInt,
+  MaxLength,
+  Min,
 } from 'class-validator';
 import { OrderPriority, OrderStatus } from '../schemas/order.schema';
 import mongoose from 'mongoose';
@@ -33,8 +36,9 @@ export class OrderItemDto {
   @IsOptional()
   duration!: string;
 
-  @IsNumber()
-  @IsNotEmpty({ message: 'Duration cannot be empty.' })
+  @IsInt()
+  @Min(1)
+  @IsNotEmpty({ message: 'Quantity cannot be empty.' })
   quantity: number;
 
   @IsOptional()
@@ -78,6 +82,11 @@ export class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  clientRequestId?: string;
+
   @IsString({ message: 'MRN must be a string' })
   @IsOptional()
   mrn?: string;

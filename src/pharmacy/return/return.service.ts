@@ -65,9 +65,9 @@ export class ReturnService {
     const items = createReturnDto.items.filter(
       (item) => validReasonForQuantityAdd.includes(item.reason) || !item.reason,
     );
-    items.forEach(async (item) => {
+    for (const item of items) {
       await this.itemsService.increaseItem(item.name, item.quantity);
-    });
+    }
 
     return data;
   }

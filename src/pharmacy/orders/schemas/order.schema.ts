@@ -43,9 +43,6 @@ export class OrderItem {
   @Prop({ required: true })
   quantity: number;
 
-  @Prop({ required: true, default: false })
-  isPacked: boolean;
-
   /** Selected inventory batch subdocument id (manual pick; FEFO/FIFO is only a default). */
   @Prop({ type: String, default: null })
   batchId?: string | null;
@@ -81,6 +78,9 @@ export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 
 @Schema({ versionKey: false, timestamps: true })
 export class Order {
+  @Prop({ type: String, unique: true, sparse: true })
+  clientRequestId?: string;
+
   @Prop({ required: true, unique: true })
   mrn: string;
 

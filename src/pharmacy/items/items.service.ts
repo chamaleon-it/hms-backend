@@ -27,9 +27,11 @@ const ACTIVE_BATCH_COND = {
 const PRIVATE_SALE_FIELDS = [
   'orderId', 'orderNumber', 'billNumber', 'batchNumber',
   'customerId', 'customerName', 'customerNumber', 'customerPhone',
+  'saleKey',
 ];
 
 export type SaleContext = {
+  saleKey?: string;
   orderId: mongoose.Types.ObjectId;
   orderNumber: string;
   billNumber?: string;
@@ -94,12 +96,20 @@ export class ItemsService {
     const batches = (lean as any).batches || [];
     if (!batches.some((b: any) => !b?._id)) return false;
 
-    const healed = batches.map((b: any) => ({
-      ...b,
-      _id: b._id || new mongoose.Types.ObjectId(),
-    }));
-    await this.itemModel.updateOne({ _id: id }, { $set: { batches: healed } });
-    return true;
+    let healed = false;
+    for (const [index, batch] of batches.entries()) {
+      if (batch?._id) continue;
+      const result = await this.itemModel.updateOne(
+        {
+          _id: id,
+          [`batches.${index}._id`]: { $exists: false },
+          [`batches.${index}.batchNumber`]: batch.batchNumber,
+        },
+        { $set: { [`batches.${index}._id`]: new mongoose.Types.ObjectId() } },
+      );
+      healed = healed || result.modifiedCount > 0;
+    }
+    return healed;
   }
 
   /**
@@ -880,69 +890,96 @@ export class ItemsService {
     batchId?: string | null,
     batchNumber?: string | null,
     sale?: SaleContext,
+    session?: mongoose.ClientSession,
   ) {
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
     }
-    if (batchId || batchNumber) {
-      return this.deductFromBatch(id, batchId || batchNumber || '', quantity, user, batchNumber, sale);
+    if (!sale?.saleKey) {
+      throw new BadRequestException('A sale key is required to deduct stock');
     }
+    if (batchId || batchNumber) {
+      return this.deductFromBatch(id, batchId || batchNumber || '', quantity, user, batchNumber, sale, session);
+    }
+    return this.deductFromAvailableBatchesOnce(id, quantity, user, sale, session);
+  }
 
+  /** Atomically deduct an unselected legacy order line across FEFO batches. */
+  private async deductFromAvailableBatchesOnce(
+    id: mongoose.Types.ObjectId,
+    quantity: number,
+    user: mongoose.Types.ObjectId | undefined,
+    sale: SaleContext,
+    session?: mongoose.ClientSession,
+  ) {
+    await this.ensurePersistedBatchIds(id);
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
-
-    const item = await this.itemModel.findById(id);
-    if (!item) {
-      throw new BadRequestException('Item is not available');
-    }
-
-    const available = this.sumActiveQuantity(item);
-    if (!allowNegativeStock && available < quantity) {
-      throw new BadRequestException(
-        `Insufficient stock for ${item.name}. Available: ${available}, requested: ${quantity}`,
-      );
-    }
-
-    let remaining = quantity;
-    const fefo = this.sortBatches(item.batches || [], 'fefo');
-    for (const batch of fefo) {
-      if (remaining <= 0) break;
-      const q = Number(batch.quantity) || 0;
-      if (q <= 0) continue;
-      const take = Math.min(q, remaining);
-      (batch as any).quantity = q - take;
-      remaining -= take;
-    }
-
-    // Negative stock: put remainder on first active (incl. expired) batch
-    if (remaining > 0 && allowNegativeStock) {
-      const actives = this.activeBatches(item);
-      if (actives.length) {
-        const target = actives[0];
-        target.quantity = (Number(target.quantity) || 0) - remaining;
-        remaining = 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const itemQuery = this.itemModel.findById(id);
+      const item = await (session ? itemQuery.session(session) : itemQuery);
+      if (!item) throw new BadRequestException('Item is not available');
+      const priorSale = item.soldHistory.find((entry) => entry.saleKey === sale.saleKey);
+      if (priorSale) {
+        if (Number(priorSale.quantity) !== quantity) {
+          throw new BadRequestException('This order line was already sold with a different quantity');
+        }
+        return item;
       }
-    }
 
-    item.markModified('batches');
-    this.recalculateItemStockFromBatches(item);
+      const batches = this.sortBatches(item.batches || [], 'fefo');
+      const available = batches.reduce((sum, batch) => sum + Math.max(0, Number(batch.quantity) || 0), 0);
+      if (!allowNegativeStock && available < quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for ${item.name}. Available: ${available}, requested: ${quantity}`,
+        );
+      }
+      if (!batches.length) throw new BadRequestException(`No sellable batch for ${item.name}`);
 
-    if (quantity > 0) {
-      item.soldQuantity = (item.soldQuantity || 0) + quantity;
-      const rate = typeof sale?.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
+      let remaining = quantity;
+      const deductions = new Map<number, number>();
+      for (const batch of batches) {
+        if (remaining <= 0) break;
+        const take = Math.min(Math.max(0, Number(batch.quantity) || 0), remaining);
+        if (take <= 0) continue;
+        const index = item.batches.indexOf(batch);
+        deductions.set(index, take);
+        remaining -= take;
+      }
+      if (remaining > 0) {
+        const index = item.batches.indexOf(batches[0]);
+        deductions.set(index, (deductions.get(index) || 0) + remaining);
+      }
+
+      const filter: Record<string, unknown> = {
+        _id: id,
+        'soldHistory.saleKey': { $ne: sale.saleKey },
+      };
+      const increments: Record<string, number> = { soldQuantity: quantity };
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (const [index, take] of deductions) {
+        const batch = item.batches[index];
+        filter[`batches.${index}._id`] = (batch as any)._id;
+        filter[`batches.${index}.quantity`] = Number(batch.quantity) || 0;
+        filter[`batches.${index}.status`] = { $ne: BatchStatus.Inactive };
+        filter[`batches.${index}.expiryDate`] = { $gte: today };
+        increments[`batches.${index}.quantity`] = -take;
+      }
+      const rate = typeof sale.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
         ? sale.unitPrice
         : this.resolveItemUnitPrice(item);
-      item.soldHistory.push({
-        ...(sale || {}),
-        date: new Date(),
-        quantity,
-        unitPrice: rate,
-        total: rate * quantity,
-      });
+      const updated = await this.itemModel.findOneAndUpdate(
+        filter,
+        {
+          $inc: increments,
+          $push: { soldHistory: { ...sale, date: new Date(), quantity, unitPrice: rate, total: rate * quantity } },
+        },
+        { new: true, ...(session ? { session } : {}) },
+      );
+      if (updated) return updated;
     }
-
-    await item.save();
-    return item;
+    throw new BadRequestException('Stock changed while selling; please retry');
   }
 
   /**
@@ -1075,107 +1112,104 @@ export class ItemsService {
     user?: mongoose.Types.ObjectId,
     batchNumber?: string | null,
     sale?: SaleContext,
+    session?: mongoose.ClientSession,
   ) {
-    if (!quantity || quantity <= 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
     }
+    if (!sale?.saleKey) {
+      throw new BadRequestException('A sale key is required to deduct stock');
+    }
+    return this.deductFromBatchOnce(itemId, batchId, quantity, user, batchNumber, sale, session);
+  }
 
+  /** A sale key makes a stock deduction safe to retry after a timeout or double click. */
+  private async deductFromBatchOnce(
+    itemId: mongoose.Types.ObjectId,
+    batchId: string,
+    quantity: number,
+    user: mongoose.Types.ObjectId | undefined,
+    batchNumber: string | null | undefined,
+    sale: SaleContext,
+    session?: mongoose.ClientSession,
+  ) {
     const allowNegativeStock =
       await this.usersService.getPharmacyInventoryAllowNegativeStock(user);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const itemQuery = this.itemModel.findById(itemId);
+      const item = await (session ? itemQuery.session(session) : itemQuery);
+      if (!item) throw new BadRequestException('Item is not available');
+      const priorSale = item.soldHistory.find((entry) => entry.saleKey === sale.saleKey);
+      if (priorSale) {
+        if (Number(priorSale.quantity) !== quantity) {
+          throw new BadRequestException('This order line was already sold with a different quantity');
+        }
+        return item;
+      }
 
-    const resolved = await this.resolveBatchForSale(
-      itemId,
-      batchId,
-      batchNumber,
-    );
-    if (!resolved) {
-      throw new BadRequestException('Selected batch not found');
-    }
-
-    const item = await this.itemModel.findById(itemId);
-    if (!item) {
-      throw new BadRequestException('Item is not available');
-    }
-
-    const batchIndex = this.findBatchIndex(
-      item.batches || [],
-      resolved.batchId,
-      resolved.batchNumber,
-    );
-    const batch: any =
-      batchIndex >= 0 ? item.batches[batchIndex] : item.batches[resolved.index];
-    if (!batch) {
-      throw new BadRequestException('Selected batch not found');
-    }
-    if (!this.isBatchActive(batch)) {
-      throw new BadRequestException(
-        `Cannot sell from inactive batch ${batch.batchNumber}`,
-      );
-    }
-
-    if (batch.expiryDate) {
-      const exp = new Date(batch.expiryDate);
-      exp.setHours(0, 0, 0, 0);
+      const resolved = await this.resolveBatchForSale(itemId, batchId, batchNumber);
+      if (!resolved) throw new BadRequestException('Selected batch not found');
+      const index = this.findBatchIndex(item.batches, resolved.batchId, resolved.batchNumber);
+      const batch = item.batches[index];
+      if (!batch) throw new BadRequestException('Selected batch not found');
+      if (!this.isBatchActive(batch)) {
+        throw new BadRequestException(`Cannot sell from inactive batch ${batch.batchNumber}`);
+      }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (exp < today) {
+      if (new Date(batch.expiryDate) < today) {
+        throw new BadRequestException(`Cannot sell from expired batch ${batch.batchNumber}`);
+      }
+      const stock = Number(batch.quantity) || 0;
+      if (stock <= 0) throw new BadRequestException(`Batch ${batch.batchNumber} has zero stock`);
+      if (!allowNegativeStock && stock < quantity) {
         throw new BadRequestException(
-          `Cannot sell from expired batch ${batch.batchNumber}`,
+          `Insufficient batch stock for ${item.name} (${batch.batchNumber}). Available: ${stock}, requested: ${quantity}`,
         );
       }
-    }
-
-    const batchQty = Number(batch.quantity) || 0;
-    if (batchQty <= 0) {
-      throw new BadRequestException(
-        `Batch ${batch.batchNumber} has zero stock`,
+      const rate = typeof sale.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
+        ? sale.unitPrice
+        : this.resolveUnitPrice(batch);
+      const updated = await this.itemModel.findOneAndUpdate(
+        {
+          _id: itemId,
+          'soldHistory.saleKey': { $ne: sale.saleKey },
+          [`batches.${index}._id`]: (batch as any)._id,
+          [`batches.${index}.quantity`]: allowNegativeStock ? { $gt: 0 } : { $gte: quantity },
+          [`batches.${index}.status`]: { $ne: BatchStatus.Inactive },
+          [`batches.${index}.expiryDate`]: { $gte: today },
+        },
+        {
+          $inc: { [`batches.${index}.quantity`]: -quantity, soldQuantity: quantity },
+          $push: {
+            soldHistory: {
+              ...sale,
+              date: new Date(),
+              quantity,
+              unitPrice: rate,
+              total: rate * quantity,
+              batchNumber: batch.batchNumber,
+            },
+          },
+        },
+        { new: true, ...(session ? { session } : {}) },
       );
+      if (updated) return updated;
     }
-    if (!allowNegativeStock && batchQty < quantity) {
-      throw new BadRequestException(
-        `Insufficient batch stock for ${item.name} (${batch.batchNumber}). Available: ${batchQty}, requested: ${quantity}`,
-      );
-    }
-
-    batch.quantity = allowNegativeStock
-      ? batchQty - quantity
-      : Math.max(batchQty - quantity, 0);
-    item.markModified('batches');
-
-    this.recalculateItemStockFromBatches(item);
-
-    const unitPrice = typeof sale?.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
-      ? sale.unitPrice
-      : this.resolveUnitPrice(batch);
-    item.soldQuantity = (item.soldQuantity || 0) + quantity;
-    item.soldHistory.push({
-      ...(sale || {}),
-      date: new Date(),
-      quantity,
-      unitPrice,
-      total: unitPrice * quantity,
-      batchNumber: batch.batchNumber,
-    });
-
-    await item.save();
-    return item;
+    throw new BadRequestException('Stock changed while selling; please retry');
   }
 
   async increaseItem(id: mongoose.Types.ObjectId, quantity: number) {
-    const item = await this.itemModel.findById(id);
-    if (!item) {
-      throw new BadRequestException('Item is not available');
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('Quantity must be positive');
     }
-
-    const actives = this.activeBatches(item);
-    if (actives.length) {
-      const target = actives[0];
-      target.quantity = (Number(target.quantity) || 0) + quantity;
-      item.markModified('batches');
-    } else {
-      item.batches = item.batches || [];
-      item.batches.push(
-        this.normalizeBatchInput({
+    await this.ensurePersistedBatchIds(id);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const item = await this.itemModel.findById(id);
+      if (!item) throw new BadRequestException('Item is not available');
+      const target = this.activeBatches(item)[0];
+      if (!target) {
+        return this.addBatchItems(id, {
           batchNumber: 'OPENING',
           expiryDate: new Date('2099-12-31'),
           quantity,
@@ -1184,14 +1218,21 @@ export class ItemsService {
           purchaseRate: 0,
           mrp: 0,
           supplier: '-',
-        }) as any,
+        });
+      }
+      const index = item.batches.indexOf(target);
+      const updated = await this.itemModel.findOneAndUpdate(
+        {
+          _id: id,
+          [`batches.${index}._id`]: (target as any)._id,
+          [`batches.${index}.status`]: { $ne: BatchStatus.Inactive },
+        },
+        { $inc: { [`batches.${index}.quantity`]: quantity } },
+        { new: true },
       );
-      item.markModified('batches');
+      if (updated) return updated;
     }
-
-    this.recalculateItemStockFromBatches(item);
-    await item.save();
-    return item;
+    throw new BadRequestException('Stock changed while returning; please retry');
   }
 
   /**
@@ -1217,52 +1258,50 @@ export class ItemsService {
     unitPrice?: number,
     mrp?: number,
   ) {
-    const item = await this.itemModel.findById(id);
-    if (!item) {
-      throw new BadRequestException('Item is not available');
-    }
-
     const normalized = this.normalizeBatchInput({
       ...batchData,
       unitPrice: batchData.unitPrice ?? unitPrice,
       mrp: batchData.mrp ?? mrp,
     });
-
-    const existingIdx = (item.batches || []).findIndex(
-      (b: any) =>
-        String(b.batchNumber).toLowerCase() ===
-        normalized.batchNumber.toLowerCase(),
-    );
-
-    if (existingIdx >= 0) {
-      const existing: any = item.batches[existingIdx];
-      existing.quantity =
-        (Number(existing.quantity) || 0) + normalized.quantity;
-      existing.startingQuantity =
-        (Number(existing.startingQuantity) || 0) + normalized.quantity;
-      existing.expiryDate = normalized.expiryDate;
-      existing.mrp = normalized.mrp;
-      existing.purchaseRate = normalized.purchaseRate;
-      existing.unitPrice = normalized.unitPrice;
-      existing.supplier = normalized.supplier || existing.supplier;
-      if (normalized.packing != null) existing.packing = normalized.packing;
-      if (normalized.stripCount != null) {
-        existing.stripCount = normalized.stripCount;
-      }
-      if (normalized.gst != null) existing.gst = normalized.gst;
-      if (normalized.status) {
-        existing.status = normalized.status;
-      } else if (!existing.status) {
-        existing.status = BatchStatus.Active;
-      }
-    } else {
-      item.batches.push(normalized as any);
+    if (!Number.isInteger(normalized.quantity) || normalized.quantity < 0) {
+      throw new BadRequestException('Batch quantity must be a non-negative whole number');
     }
-
-    item.markModified('batches');
-    this.recalculateItemStockFromBatches(item);
-    await item.save();
-    return item;
+    await this.ensurePersistedBatchIds(id);
+    const batchPattern = new RegExp(`^${this.sanitizeSearchRegex(normalized.batchNumber)}$`, 'i');
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const item = await this.itemModel.findById(id);
+      if (!item) throw new BadRequestException('Item is not available');
+      const index = (item.batches || []).findIndex(
+        (batch) => String(batch.batchNumber).toLowerCase() === normalized.batchNumber.toLowerCase(),
+      );
+      if (index >= 0) {
+        const batch = item.batches[index];
+        const set: Record<string, unknown> = {};
+        for (const field of ['expiryDate', 'mrp', 'purchaseRate', 'unitPrice', 'supplier', 'packing', 'stripCount', 'gst', 'status'] as const) {
+          set[`batches.${index}.${field}`] = normalized[field];
+        }
+        const updated = await this.itemModel.findOneAndUpdate(
+          { _id: id, [`batches.${index}._id`]: (batch as any)._id },
+          {
+            $inc: {
+              [`batches.${index}.quantity`]: normalized.quantity,
+              [`batches.${index}.startingQuantity`]: normalized.quantity,
+            },
+            $set: set,
+          },
+          { new: true, runValidators: true },
+        );
+        if (updated) return updated;
+      } else {
+        const updated = await this.itemModel.findOneAndUpdate(
+          { _id: id, batches: { $not: { $elemMatch: { batchNumber: batchPattern } } } },
+          { $push: { batches: normalized } },
+          { new: true, runValidators: true },
+        );
+        if (updated) return updated;
+      }
+    }
+    throw new BadRequestException('Batch changed while adding stock; please retry');
   }
 
   async createBatch(id: mongoose.Types.ObjectId, dto: CreateBatchDto) {
@@ -1287,6 +1326,7 @@ export class ItemsService {
     batchNumber: string,
     dto: UpdateBatchDto,
   ) {
+    await this.ensurePersistedBatchIds(id);
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
@@ -1301,43 +1341,32 @@ export class ItemsService {
       throw new NotFoundException(`Batch ${batchNumber} not found`);
     }
 
-    const batch: any = item.batches[batchIndex];
-    if (dto.expiryDate != null) batch.expiryDate = new Date(dto.expiryDate);
-    if (dto.mrp != null) batch.mrp = Number(dto.mrp);
-    if (dto.purchaseRate != null) {
-      batch.purchaseRate = Number(dto.purchaseRate);
+    const batch = item.batches[batchIndex];
+    if (dto.quantity != null && dto.expectedQuantity == null) {
+      throw new BadRequestException('Expected quantity is required when changing stock');
     }
-    if (dto.unitPrice != null) {
-      batch.unitPrice = Number(dto.unitPrice);
+    if (dto.quantity != null && Number(batch.quantity) !== dto.expectedQuantity) {
+      throw new BadRequestException('Stock changed. Refresh the batch before saving');
     }
-    if (dto.quantity != null) batch.quantity = Number(dto.quantity);
-    if (dto.startingQuantity != null) {
-      batch.startingQuantity = Number(dto.startingQuantity);
+    const updates: Record<string, unknown> = {};
+    for (const field of ['mrp', 'purchaseRate', 'unitPrice', 'quantity', 'startingQuantity', 'supplier', 'packing', 'stripCount', 'gst', 'status'] as const) {
+      if (dto[field] != null) updates[`batches.${batchIndex}.${field}`] = dto[field];
     }
-    if (dto.supplier != null) batch.supplier = dto.supplier;
-    if (dto.packing != null) batch.packing = Number(dto.packing);
-    if (dto.stripCount != null) batch.stripCount = Number(dto.stripCount);
-    if (dto.gst != null) batch.gst = Number(dto.gst);
-    if (dto.status != null) batch.status = dto.status;
+    if (dto.expiryDate != null) updates[`batches.${batchIndex}.expiryDate`] = new Date(dto.expiryDate);
+    if (!Object.keys(updates).length) return item;
 
-    if (batch.purchaseRate == null) {
-      batch.purchaseRate = this.resolvePurchaseRate(batch);
-    }
-    if (batch.unitPrice == null) {
-      batch.unitPrice = this.resolveUnitPrice(batch);
-    }
-    if (batch.mrp == null) {
-      batch.mrp = this.resolveBatchMrp(batch);
-    }
-    if (batch.startingQuantity == null) {
-      batch.startingQuantity = Number(batch.quantity) || 0;
-    }
-    if (!batch.status) batch.status = BatchStatus.Active;
-
-    item.markModified('batches');
-    this.recalculateItemStockFromBatches(item);
-    await item.save();
-    return item;
+    const filter: Record<string, unknown> = {
+      _id: id,
+      [`batches.${batchIndex}._id`]: (batch as any)._id,
+    };
+    if (dto.quantity != null) filter[`batches.${batchIndex}.quantity`] = dto.expectedQuantity;
+    const updated = await this.itemModel.findOneAndUpdate(
+      filter,
+      { $set: updates },
+      { new: true, runValidators: true },
+    );
+    if (!updated) throw new BadRequestException('Stock changed. Refresh the batch before saving');
+    return updated;
   }
 
   async patchBatchStatus(
@@ -1353,6 +1382,7 @@ export class ItemsService {
     batchId: string,
     deductStock = false,
   ) {
+    await this.ensurePersistedBatchIds(id);
     const item = await this.itemModel.findById(id);
     if (!item) {
       throw new BadRequestException('Item is not available');
@@ -1364,15 +1394,14 @@ export class ItemsService {
       throw new BadRequestException('Batch not found');
     }
 
-    item.batches.splice(batchIndex, 1);
-    item.markModified('batches');
-
-    if (deductStock || (item.batches || []).length > 0) {
-      this.recalculateItemStockFromBatches(item);
-    }
-
-    await item.save();
-    return item;
+    const target = item.batches[batchIndex];
+    const updated = await this.itemModel.findOneAndUpdate(
+      { _id: id, [`batches.${batchIndex}._id`]: (target as any)._id },
+      { $pull: { batches: { _id: (target as any)._id } } },
+      { new: true },
+    );
+    if (!updated) throw new BadRequestException('Batch changed. Refresh and retry');
+    return updated;
   }
 
   async getSuppliers() {

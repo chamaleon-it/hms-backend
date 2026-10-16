@@ -5,12 +5,15 @@ import {
   IsArray,
   ValidateNested,
   IsNumber,
-  IsBoolean,
+  IsInt,
   IsMongoId,
   IsNotEmpty,
+  Min,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import mongoose from 'mongoose';
+import { OrderPriority } from '../schemas/order.schema';
 
 export class UpdateOrderItemNameDto {
   @IsMongoId()
@@ -63,13 +66,10 @@ export class UpdateOrderItemDto {
   @IsOptional()
   duration?: string;
 
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   @IsNotEmpty({ message: 'Quantity cannot be empty.' })
   quantity?: number;
-
-  @IsBoolean()
-  @IsOptional()
-  isPacked?: boolean;
 
   /** Selected inventory batch subdocument id */
   @IsOptional()
@@ -130,14 +130,27 @@ export class UpdateOrderDto {
   doctor?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => UpdateOrderItemDto)
   @IsOptional()
   items?: UpdateOrderItemDto[];
 
-  @IsEnum(['Normal', 'High', 'Critical'])
+  @IsEnum(OrderPriority)
   @IsOptional()
   priority?: string;
+
+  @IsNumber()
+  @IsOptional()
+  discount?: number;
+
+  @IsString()
+  @IsOptional()
+  doctorName?: string;
+
+  @IsString()
+  @IsOptional()
+  pharmacist?: string;
 
   @IsOptional()
   status?: string;

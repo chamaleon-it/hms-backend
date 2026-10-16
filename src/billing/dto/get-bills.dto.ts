@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
@@ -76,4 +77,10 @@ export class GetBillisDto {
     | 'Dressing'
     | 'Sale'
     | 'Return';
+
+  @IsOptional()
+  @Transform(({ value }) => value == null ? undefined : Array.isArray(value) ? value : [value])
+  @IsArray()
+  @IsString({ each: true })
+  doctor?: string[];
 }
