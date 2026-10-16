@@ -22,6 +22,9 @@ export class Report {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null })
   doctor: Types.ObjectId | null;
 
+  @Prop({ type: String, default: '' })
+  doctorName: string;
+
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

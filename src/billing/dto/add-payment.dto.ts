@@ -23,4 +23,10 @@ export class AddPaymentDto {
   @Min(0)
   @IsOptional()
   discount?: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @IsOptional()
+  refund?: number;
 }

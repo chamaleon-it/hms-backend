@@ -581,13 +581,14 @@ export class BillingService {
     );
     const discount = addPaymentDto.discount ?? bill.discount ?? 0;
     const card = addPaymentDto.card ?? bill.card ?? 0;
+    const refund = addPaymentDto.refund ?? bill.refund ?? 0;
     if (discount < 0 || discount > subtotal) {
       throw new BadRequestException('Discount must be between 0 and the bill total.');
     }
     if (addPaymentDto.cash < 0 || addPaymentDto.online < 0) {
       throw new BadRequestException('Payment amounts cannot be negative.');
     }
-    if (addPaymentDto.cash + addPaymentDto.online + card > subtotal - discount) {
+    if (addPaymentDto.cash + addPaymentDto.online + card + refund > subtotal - discount) {
       throw new BadRequestException('Payment cannot exceed the bill total after discount.');
     }
 
@@ -599,6 +600,7 @@ export class BillingService {
           online: addPaymentDto.online,
           card,
           discount,
+          refund,
         },
       },
       { new: true },

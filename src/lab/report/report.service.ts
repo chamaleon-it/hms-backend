@@ -140,6 +140,8 @@ export class ReportService implements OnModuleInit {
       if (dto.discount !== undefined) {
         userReport.discount = Math.max(0, Number(dto.discount) || 0);
       }
+      if (dto.doctor !== undefined) userReport.doctor = dto.doctor;
+      if (dto.doctorName !== undefined) userReport.doctorName = dto.doctorName;
       await userReport.save();
       await this.createOrUpdateDraftBill(userReport);
       return userReport;
@@ -234,6 +236,7 @@ export class ReportService implements OnModuleInit {
         await this.billingService.updateBill(existingBill._id, {
           items,
           discount,
+          doctor: report.doctor ? report.doctor.toString() : report.doctorName || 'Self',
         });
       }
     } else {
@@ -241,7 +244,7 @@ export class ReportService implements OnModuleInit {
       await this.billingService.generateBill({
         patient: report.patient,
         user: report.lab,
-        doctor: report.doctor ? report.doctor.toString() : 'Self',
+        doctor: report.doctor ? report.doctor.toString() : report.doctorName || 'Self',
         items,
         cash: 0,
         online: 0,

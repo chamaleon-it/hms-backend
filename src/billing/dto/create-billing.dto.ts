@@ -123,6 +123,12 @@ export class CreateBillingDto {
   @IsOptional()
   discount?: number;
 
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @IsOptional()
+  refund?: number;
+
   @IsString()
   @IsOptional()
   note?: string;
