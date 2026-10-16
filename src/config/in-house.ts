@@ -9,13 +9,11 @@ import configuration from './configuration';
 
 const logger = new Logger('InHouseConfig');
 
-export type InHouseKey = 'pharmacy' | 'lab' | 'reception' | 'doctor';
+export type InHouseKey = 'pharmacy' | 'lab';
 
 const ENV_NAMES: Record<InHouseKey, string> = {
   pharmacy: 'IN_HOUSE_PHARMACY_ID',
   lab: 'IN_HOUSE_LAB_ID',
-  reception: 'IN_HOUSE_RECEPTION',
-  doctor: 'IN_DOCTOR_ID',
 };
 
 function readRaw(key: InHouseKey): string | undefined {
@@ -25,10 +23,6 @@ function readRaw(key: InHouseKey): string | undefined {
       return cfg.in_house_pharmacy_id;
     case 'lab':
       return cfg.in_house_lab_id;
-    case 'reception':
-      return cfg.in_house_reception_id;
-    case 'doctor':
-      return cfg.in_doctor_id;
   }
 }
 

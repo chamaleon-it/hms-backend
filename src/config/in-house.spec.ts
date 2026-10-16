@@ -7,8 +7,6 @@ jest.mock('../config/configuration', () => ({
   default: () => ({
     in_house_pharmacy_id: process.env.__TEST_PHARM || '',
     in_house_lab_id: process.env.__TEST_LAB || '',
-    in_house_reception_id: process.env.__TEST_RECEPTION || '',
-    in_doctor_id: process.env.__TEST_DOCTOR || '',
   }),
 }));
 
@@ -18,8 +16,6 @@ describe('InHouse config helpers (H5)', () => {
   afterEach(() => {
     delete process.env.__TEST_PHARM;
     delete process.env.__TEST_LAB;
-    delete process.env.__TEST_RECEPTION;
-    delete process.env.__TEST_DOCTOR;
   });
 
   it('throws clear 400 when IN_HOUSE_* is missing', () => {
