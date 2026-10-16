@@ -102,6 +102,14 @@ export class Item {
         quantity: { type: Number, required: true },
         unitPrice: { type: Number, required: true },
         total: { type: Number, required: true },
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+        orderNumber: { type: String },
+        billNumber: { type: String },
+        batchNumber: { type: String },
+        customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient' },
+        customerName: { type: String },
+        customerNumber: { type: String },
+        customerPhone: { type: String },
       },
     ],
     default: [],
@@ -112,6 +120,14 @@ export class Item {
     quantity: number;
     unitPrice: number;
     total: number;
+    orderId?: mongoose.Types.ObjectId;
+    orderNumber?: string;
+    billNumber?: string;
+    batchNumber?: string;
+    customerId?: mongoose.Types.ObjectId;
+    customerName?: string;
+    customerNumber?: string;
+    customerPhone?: string;
   }[];
 
   @Prop({ type: String, default: '-' })

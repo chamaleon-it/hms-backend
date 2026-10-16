@@ -24,6 +24,22 @@ const ACTIVE_BATCH_COND = {
   ],
 };
 
+const PRIVATE_SALE_FIELDS = [
+  'orderId', 'orderNumber', 'billNumber', 'batchNumber',
+  'customerId', 'customerName', 'customerNumber', 'customerPhone',
+];
+
+export type SaleContext = {
+  orderId: mongoose.Types.ObjectId;
+  orderNumber: string;
+  billNumber?: string;
+  customerId: mongoose.Types.ObjectId;
+  customerName?: string;
+  customerNumber?: string;
+  customerPhone?: string;
+  unitPrice?: number;
+};
+
 @Injectable()
 export class ItemsService {
   constructor(
@@ -540,6 +556,11 @@ export class ItemsService {
     };
 
     const pipeline: any[] = [{ $match: match }, addComputed];
+    pipeline.push({
+      $project: Object.fromEntries(
+        PRIVATE_SALE_FIELDS.map((field) => [`soldHistory.${field}`, 0]),
+      ),
+    });
     if (Object.keys(postMatch).length) {
       pipeline.push({ $match: postMatch });
     }
@@ -770,13 +791,27 @@ export class ItemsService {
       throw new BadRequestException('Invalid item ID.');
     }
 
-    const data = await this.itemModel.findById(id).lean();
+    const data = await this.itemModel
+      .findById(id)
+      .select(PRIVATE_SALE_FIELDS.map((field) => `-soldHistory.${field}`).join(' '))
+      .lean();
 
     if (!data) {
       throw new NotFoundException('Item not found.');
     }
 
     return this.enrichItem(data);
+  }
+
+  async getSoldHistory(id: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid item ID.');
+    }
+    const item = await this.itemModel.findById(id).select('soldHistory').lean();
+    if (!item) {
+      throw new NotFoundException('Item not found.');
+    }
+    return item.soldHistory || [];
   }
 
   async updateItem(id: mongoose.Types.ObjectId, addItemDto: AddItemDto) {
@@ -844,9 +879,13 @@ export class ItemsService {
     user?: mongoose.Types.ObjectId,
     batchId?: string | null,
     batchNumber?: string | null,
+    sale?: SaleContext,
   ) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('Quantity must be positive');
+    }
     if (batchId || batchNumber) {
-      return this.deductFromBatch(id, batchId || batchNumber || '', quantity, user, batchNumber);
+      return this.deductFromBatch(id, batchId || batchNumber || '', quantity, user, batchNumber, sale);
     }
 
     const allowNegativeStock =
@@ -890,8 +929,11 @@ export class ItemsService {
 
     if (quantity > 0) {
       item.soldQuantity = (item.soldQuantity || 0) + quantity;
-      const rate = this.resolveItemUnitPrice(item);
+      const rate = typeof sale?.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
+        ? sale.unitPrice
+        : this.resolveItemUnitPrice(item);
       item.soldHistory.push({
+        ...(sale || {}),
         date: new Date(),
         quantity,
         unitPrice: rate,
@@ -1032,6 +1074,7 @@ export class ItemsService {
     quantity: number,
     user?: mongoose.Types.ObjectId,
     batchNumber?: string | null,
+    sale?: SaleContext,
   ) {
     if (!quantity || quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
@@ -1101,13 +1144,17 @@ export class ItemsService {
 
     this.recalculateItemStockFromBatches(item);
 
-    const unitPrice = this.resolveUnitPrice(batch);
+    const unitPrice = typeof sale?.unitPrice === 'number' && Number.isFinite(sale.unitPrice)
+      ? sale.unitPrice
+      : this.resolveUnitPrice(batch);
     item.soldQuantity = (item.soldQuantity || 0) + quantity;
     item.soldHistory.push({
+      ...(sale || {}),
       date: new Date(),
       quantity,
       unitPrice,
       total: unitPrice * quantity,
+      batchNumber: batch.batchNumber,
     });
 
     await item.save();

@@ -178,6 +178,14 @@ export class ItemsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Get(':id/sold-history')
+  async getSoldHistory(@Param('id') id: mongoose.Types.ObjectId) {
+    const data = await this.itemsService.getSoldHistory(id);
+    return { data, message: 'Sold history retrieved successfully' };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getItem(@Param('id') id: mongoose.Types.ObjectId) {

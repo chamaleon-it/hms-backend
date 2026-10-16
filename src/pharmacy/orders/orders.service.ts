@@ -9,7 +9,7 @@ import { Order, OrderStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { PackedDto } from './dto/packed.dto';
 import { MarkAllAsPackedDto } from './dto/markAllAsPacked.dto copy';
-import { ItemsService } from '../items/items.service';
+import { ItemsService, SaleContext } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
 import { BillingService } from 'src/billing/billing.service';
 import { UsersService } from 'src/users/users.service';
@@ -59,6 +59,28 @@ export class OrdersService {
       pad: 7,
       getInitialMax: () => this.maxOrderSeq(),
     });
+  }
+
+  private async saleContext(order: {
+    _id: mongoose.Types.ObjectId;
+    patient: mongoose.Types.ObjectId;
+    mrn: string;
+    billNo?: string;
+  }): Promise<SaleContext> {
+    const patient = await this.patientModel
+      .findById(order.patient)
+      .select('name mrn phoneNumber')
+      .lean()
+      .exec();
+    return {
+      orderId: order._id,
+      orderNumber: order.mrn,
+      billNumber: order.billNo && order.billNo !== '-' ? order.billNo : undefined,
+      customerId: order.patient,
+      customerName: patient?.name,
+      customerNumber: patient?.mrn,
+      customerPhone: patient?.phoneNumber,
+    };
   }
 
   async createOrder(order: CreateOrderDto) {
@@ -296,7 +318,7 @@ export class OrdersService {
 
     const order = await this.orderModel
       .findOneAndUpdate(
-        { _id: orderId, 'items.name': item },
+        { _id: orderId, items: { $elemMatch: { name: item, isPacked: false } } },
         { $set: { 'items.$.isPacked': true } },
         { new: true },
       )
@@ -308,26 +330,39 @@ export class OrdersService {
       );
     }
 
-    const qty =
-      order.items.find((e) => String(e.name) === String(item))?.quantity ?? 0;
-    const line = order.items.find((e) => String(e.name) === String(item));
-    const resolved = await this.itemsService.resolveBatchForSale(
-      item,
-      (line as any)?.batchId || null,
-      (line as any)?.batchNumber || null,
-    );
-    if (resolved && line) {
-      (line as any).batchId = resolved.batchId;
-      (line as any).batchNumber = resolved.batchNumber;
-      await order.save();
+    let resolvedBatch: { batchId: string; batchNumber: string; index: number } | null = null;
+    try {
+      const line = order.items.find((e) => String(e.name) === String(item));
+      if (!line || !Number.isFinite(line.quantity) || line.quantity <= 0) {
+        throw new BadRequestException('Order item has an invalid quantity');
+      }
+      const sale = await this.saleContext(order);
+      resolvedBatch = await this.itemsService.resolveBatchForSale(
+        item,
+        line.batchId || null,
+        line.batchNumber || null,
+      );
+      await this.itemsService.decreaseItem(
+        item,
+        line.quantity,
+        user,
+        resolvedBatch?.batchId || line.batchId || null,
+        resolvedBatch?.batchNumber || line.batchNumber || null,
+        { ...sale, unitPrice: line?.batchSellingPrice ?? undefined },
+      );
+    } catch (error) {
+      await this.orderModel.updateOne(
+        { _id: orderId, 'items.name': item },
+        { $set: { 'items.$.isPacked': false } },
+      );
+      throw error;
     }
-    await this.itemsService.decreaseItem(
-      item,
-      qty,
-      user,
-      resolved?.batchId || (line as any)?.batchId || null,
-      resolved?.batchNumber || (line as any)?.batchNumber || null,
-    );
+    if (resolvedBatch) {
+      await this.orderModel.updateOne(
+        { _id: orderId, 'items.name': item },
+        { $set: { 'items.$.batchId': resolvedBatch.batchId, 'items.$.batchNumber': resolvedBatch.batchNumber } },
+      );
+    }
   }
 
   async markAllAsPacked(
@@ -341,42 +376,30 @@ export class OrdersService {
         'Order not found. Please check your details.',
       );
     }
-    const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
-
+    const unpacked = (order.items ?? [])
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !item.isPacked);
     if (unpacked.length > 0) {
-      await Promise.all(
-        unpacked.map(async (it) => {
-          const resolved = await this.itemsService.resolveBatchForSale(
-            it.name,
-            (it as any).batchId || null,
-            (it as any).batchNumber || null,
-          );
-          return this.itemsService.decreaseItem(
-            it.name,
-            it.quantity,
-            user,
-            resolved?.batchId || (it as any).batchId || null,
-            resolved?.batchNumber || (it as any).batchNumber || null,
-          );
-        }),
-      );
-    }
-
-    const result = await this.orderModel
-      .updateOne(
-        { _id: orderId },
-        {
-          $set: {
-            'items.$[].isPacked': true,
-          },
-        },
-      )
-      .exec();
-
-    if (result.matchedCount === 0) {
-      throw new NotFoundException(
-        'Order not found. Please check your details.',
-      );
+      const sale = await this.saleContext(order);
+      for (const { item: it, index } of unpacked) {
+        const resolved = await this.itemsService.resolveBatchForSale(
+          it.name,
+          it.batchId || null,
+          it.batchNumber || null,
+        );
+        await this.itemsService.decreaseItem(
+          it.name,
+          it.quantity,
+          user,
+          resolved?.batchId || it.batchId || null,
+          resolved?.batchNumber || it.batchNumber || null,
+          { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
+        );
+        await this.orderModel.updateOne(
+          { _id: orderId },
+          { $set: { [`items.${index}.isPacked`]: true } },
+        );
+      }
     }
   }
 
@@ -761,6 +784,7 @@ export class OrdersService {
     if (order.status !== OrderStatus.Completed) {
       const unpacked = (order.items ?? []).filter((i) => !i.isPacked);
       if (unpacked.length > 0) {
+        const sale = await this.saleContext(order);
         for (const it of unpacked) {
           const itemId = it.name as any;
           const resolved = await this.itemsService.resolveBatchForSale(
@@ -778,7 +802,10 @@ export class OrdersService {
                 userId,
                 null,
                 null,
+                { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
               );
+              it.isPacked = true;
+              await order.save();
               continue;
             }
             throw new BadRequestException(
@@ -796,15 +823,13 @@ export class OrdersService {
             userId,
             resolved.batchId,
             resolved.batchNumber,
+            { ...sale, unitPrice: it.batchSellingPrice ?? undefined },
           );
+          it.isPacked = true;
+          await order.save();
         }
       }
 
-      order.items = (order.items ?? []).map((item) => ({
-        ...item,
-        isPacked: true,
-      })) as any;
-      order.markModified('items');
       order.status = OrderStatus.Completed;
       await order.save();
     }

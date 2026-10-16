@@ -308,6 +308,25 @@ describe('ItemsService batch helpers', () => {
     expect(item.soldQuantity).toBe(2);
     expect(item.soldHistory[0].unitPrice).toBe(14);
     expect(item.save).toHaveBeenCalled();
+
+    const sale = {
+      orderId: 'order-1',
+      orderNumber: 'RX0000001',
+      billNumber: 'BILL0001',
+      customerId: 'patient-1',
+      customerName: 'Asha',
+      customerNumber: 'PID0001',
+      customerPhone: '9876543210',
+      unitPrice: 12,
+    };
+    await svc.deductFromBatch('item1', 'b2', 1, undefined, undefined, sale);
+    expect(item.soldQuantity).toBe(3);
+    expect(item.soldHistory[1]).toEqual(expect.objectContaining({
+      ...sale,
+      batchNumber: 'NEW',
+      quantity: 1,
+      total: 12,
+    }));
   });
 
   it('findBatchIndex matches by _id, batchId-as-number, or batchNumber', () => {
