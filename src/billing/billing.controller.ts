@@ -19,7 +19,6 @@ import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { AddPaymentDto } from './dto/add-payment.dto';
-import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
@@ -229,10 +228,9 @@ export class BillingController {
   @UseGuards(JwtAuthGuard)
   async markAsPaid(
     @Param('id') id: mongoose.Types.ObjectId,
-    @Body() markAsPaidDto: MarkAsPaidDto,
     @GetUser() user: JWTUserInterface,
   ) {
-    const data = await this.billingService.markAsPaid(id, markAsPaidDto, user.id);
+    const data = await this.billingService.markAsPaid(id, user.id);
     return {
       data,
       message: 'Bill is marked as paid successfully.',

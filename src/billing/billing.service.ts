@@ -14,7 +14,6 @@ import { BillingItem } from './schemas/billingItem.schema';
 import { GetBillingItemDto } from './dto/get-billing-item.dto';
 import { UsersService } from 'src/users/users.service';
 import { AddPaymentDto } from './dto/add-payment.dto';
-import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
@@ -238,7 +237,7 @@ export class BillingService {
     }
 
     if (billingType === 'Sale') {
-      match.transactionType = 'Sale';
+      match.transactionType = { $ne: 'Return' };
     } else if (billingType === 'Return') {
       match.transactionType = 'Return';
     } else if (billingType === 'Lab') {
@@ -250,17 +249,33 @@ export class BillingService {
     // Add calculations for status filtering
     pipeline.push({
       $addFields: {
-        itemsTotal: { $sum: '$items.total' },
+        itemsTotal: {
+          $round: [
+            {
+              $subtract: [
+                { $sum: '$items.total' },
+                { $ifNull: ['$discount', 0] },
+              ],
+            },
+            2,
+          ],
+        },
         totalPaid: {
-          $subtract: [
-            { $add: [
-              { $ifNull: ['$cash', 0] },
-              { $ifNull: ['$online', 0] },
-              { $ifNull: ['$card', 0] },
-              { $ifNull: ['$insurance', 0] },
-              { $ifNull: ['$discount', 0] },
-            ] },
-            { $ifNull: ['$refund', 0] },
+          $round: [
+            {
+              $subtract: [
+                {
+                  $add: [
+                    { $ifNull: ['$cash', 0] },
+                    { $ifNull: ['$online', 0] },
+                    { $ifNull: ['$card', 0] },
+                    { $ifNull: ['$insurance', 0] },
+                  ],
+                },
+                { $ifNull: ['$refund', 0] },
+              ],
+            },
+            2,
           ],
         },
       },
@@ -268,11 +283,17 @@ export class BillingService {
 
     if (status) {
       if (status === 'Unpaid') {
-        pipeline.push({ $match: { totalPaid: 0, transactionType: 'Sale' } });
+        pipeline.push({
+          $match: {
+            totalPaid: { $lte: 0 },
+            transactionType: { $ne: 'Return' },
+            $expr: { $gt: ['$itemsTotal', '$totalPaid'] },
+          },
+        });
       } else if (status === 'Paid') {
         pipeline.push({
           $match: {
-            transactionType: 'Sale',
+            transactionType: { $ne: 'Return' },
             $expr: {
               $lte: ['$itemsTotal', '$totalPaid'],
             },
@@ -281,7 +302,7 @@ export class BillingService {
       } else if (status === 'Partial') {
         pipeline.push({
           $match: {
-            transactionType: 'Sale',
+            transactionType: { $ne: 'Return' },
             $and: [
               {
                 $expr: {
@@ -743,45 +764,61 @@ export class BillingService {
     return data;
   }
 
-  async markAsPaid(id: mongoose.Types.ObjectId, markAsPaidDto: MarkAsPaidDto, user: mongoose.Types.ObjectId) {
-    const amount = markAsPaidDto.amount;
-    if (!mongoose.isValidObjectId(id) || !Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('A valid bill and positive payment amount are required.');
+  async markAsPaid(id: mongoose.Types.ObjectId, user: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) {
+      throw new BadRequestException('A valid bill is required.');
     }
-    const data = await this.billingModel.findOneAndUpdate(
-      {
-        _id: id,
-        user,
-        transactionType: 'Sale',
-        $expr: {
-          $lte: [
+    // Calculate the outstanding balance in MongoDB so a stale table cannot
+    // submit an incorrect amount. The update and balance check are atomic.
+    const balance = {
+      $round: [
+        {
+          $subtract: [
+            { $add: [{ $sum: '$items.total' }, { $ifNull: ['$refund', 0] }] },
             {
-              $subtract: [
-                {
-                  $add: [
-                    { $ifNull: ['$cash', 0] },
-                    { $ifNull: ['$online', 0] },
-                    { $ifNull: ['$card', 0] },
-                    amount,
-                  ],
-                },
-                { $ifNull: ['$refund', 0] },
-              ],
-            },
-            {
-              $subtract: [
-                { $sum: '$items.total' },
+              $add: [
                 { $ifNull: ['$discount', 0] },
+                { $ifNull: ['$cash', 0] },
+                { $ifNull: ['$online', 0] },
+                { $ifNull: ['$card', 0] },
+                { $ifNull: ['$insurance', 0] },
               ],
             },
           ],
         },
+        2,
+      ],
+    };
+    const data = await this.billingModel.findOneAndUpdate(
+      {
+        _id: id,
+        user,
+        transactionType: { $ne: 'Return' },
+        $expr: { $gt: [balance, 0] },
       },
-      { $inc: { cash: amount } },
+      [
+        {
+          $set: {
+            cash: {
+              $round: [
+                { $add: [{ $ifNull: ['$cash', 0] }, balance] },
+                2,
+              ],
+            },
+          },
+        },
+      ],
       { new: true },
     );
     if (!data) {
-      throw new BadRequestException('Bill not found or payment exceeds the remaining balance.');
+      const bill = await this.billingModel.findOne({ _id: id, user });
+      if (!bill) throw new NotFoundException('Bill is not found.');
+      if (bill.transactionType === 'Return') {
+        throw new BadRequestException('Return bills cannot be marked as paid.');
+      }
+      throw new BadRequestException(
+        'This bill has no remaining balance. Refresh the billing list.',
+      );
     }
     return data;
   }
