@@ -32,8 +32,8 @@ export class GetBillisDto {
 
   @IsOptional()
   @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsEnum(['Cash', 'Online', 'Insurance'])
-  method?: 'Cash' | 'Online' | 'Insurance';
+  @IsEnum(['Cash', 'Online'])
+  method?: 'Cash' | 'Online';
 
   @IsOptional()
   @Transform(({ value }) => (value === '' ? undefined : value))

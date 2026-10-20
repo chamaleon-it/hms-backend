@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateBillingDto } from './dto/create-billing.dto';
+import { CreateBillingDto, CreateBillingItemDto } from './dto/create-billing.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
@@ -37,6 +38,88 @@ export class BillingService {
   ) {
     // Discover pharmacy/lab invoice prefixes and seed each missing counter once.
     this.countersService.registerBootSeedJob(() => this.seedInvoiceCounters());
+  }
+
+  private roundMoney(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private normalizeItems(items?: CreateBillingItemDto[]): CreateBillingItemDto[] {
+    if (!items?.length) throw new BadRequestException('A bill requires at least one item.');
+    return items.map((item, index) => {
+      const quantity = item.quantity ?? 1;
+      const unitPrice = item.unitPrice ?? 0;
+      const discount = item.discount ?? 0;
+      if (!item.name?.trim() || !Number.isFinite(quantity) || quantity <= 0 ||
+          !Number.isFinite(unitPrice) || unitPrice < 0 ||
+          !Number.isFinite(discount) || discount < 0) {
+        throw new BadRequestException(`Item ${index + 1} has an invalid name, quantity, price or discount.`);
+      }
+      const base = this.roundMoney(quantity * unitPrice);
+      const roundedDiscount = this.roundMoney(discount);
+      if (roundedDiscount > base) {
+        throw new BadRequestException(`Item ${index + 1} discount exceeds its price.`);
+      }
+      const total = this.roundMoney(base - roundedDiscount);
+      if (item.total != null && (!Number.isFinite(item.total) || Math.abs(item.total - total) > 0.01)) {
+        throw new BadRequestException(`Item ${index + 1} total does not match its price and discount.`);
+      }
+      return { ...item, name: item.name.trim(), quantity, unitPrice, discount: roundedDiscount, total };
+    });
+  }
+
+  private validatePaymentTotals(
+    items: Pick<CreateBillingItemDto, 'total'>[],
+    payment: { cash?: number; online?: number; card?: number; refund?: number; discount?: number },
+  ) {
+    const subtotal = this.roundMoney(items.reduce((sum, item) => sum + (item.total ?? 0), 0));
+    const submitted = {
+      cash: payment.cash ?? 0,
+      online: payment.online ?? 0,
+      card: payment.card ?? 0,
+      refund: payment.refund ?? 0,
+      discount: payment.discount ?? 0,
+    };
+    for (const [name, amount] of Object.entries(submitted)) {
+      if (!Number.isFinite(amount) || amount < 0) {
+        throw new BadRequestException(`${name} must be a non-negative amount.`);
+      }
+    }
+    const { cash, online, card, refund, discount } = Object.fromEntries(
+      Object.entries(submitted).map(([name, amount]) => [name, this.roundMoney(amount)]),
+    ) as typeof submitted;
+    if (discount > subtotal) throw new BadRequestException('Discount exceeds the bill total.');
+    const grossPaid = this.roundMoney(cash + online + card);
+    if (refund > grossPaid) throw new BadRequestException('Refund exceeds the amount collected.');
+    if (this.roundMoney(grossPaid - refund) > this.roundMoney(subtotal - discount)) {
+      throw new BadRequestException('Payment exceeds the bill total after discount.');
+    }
+    return { cash, online, card, refund, discount, subtotal };
+  }
+
+  private initialPaymentEvent(payment: { cash: number; online: number; card: number; refund: number }, at: Date) {
+    return {
+      at,
+      cashDelta: payment.cash,
+      onlineDelta: payment.online,
+      cardDelta: payment.card,
+      refundDelta: payment.refund,
+    };
+  }
+
+  private async syncLinkedOrderPayment(bill: Billing, session?: mongoose.ClientSession) {
+    if (bill.transactionType === 'Return') return;
+    const total = this.roundMoney((bill.items || []).reduce((sum, item) => sum + (item.total || 0), 0));
+    const payable = this.roundMoney(total - (bill.discount || 0));
+    const paid = this.roundMoney((bill.cash || 0) + (bill.online || 0) +
+      (bill.card || 0) - (bill.refund || 0));
+    const paymentStatus = paid <= 0 ? PaymentStatus.Pending :
+      paid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
+    await this.orderModel.findOneAndUpdate(
+      { billNo: bill.mrn },
+      { $set: { paidAmount: paid, paymentStatus } },
+      { session },
+    );
   }
 
   /** Leading letter prefix from bill MRNs like INV0042 → INV. */
@@ -120,60 +203,74 @@ export class BillingService {
   }
 
   async generateBill(createBill: CreateBillingDto, session?: mongoose.ClientSession) {
-    if (createBill.rxId && !session) {
-      const order = await this.orderModel.findOne({ mrn: createBill.rxId }).lean();
-      if (!order) {
-        throw new BadRequestException('The linked order could not be found.');
-      }
-      if (order.billNo && order.billNo !== '-') {
-        throw new BadRequestException('This order already has a bill.');
-      }
+    if (createBill.clientRequestId) {
+      const previous = await this.billingModel.findOne({
+        user: createBill.user,
+        clientRequestId: createBill.clientRequestId,
+      }).session(session || null);
+      if (previous) return previous;
     }
+    if (!mongoose.isValidObjectId(createBill.patient)) {
+      throw new BadRequestException('A valid patient is required.');
+    }
+    const patient = await this.billingModel.db.collection('patients').findOne(
+      { _id: new mongoose.Types.ObjectId(String(createBill.patient)) },
+      session ? { session } : undefined,
+    );
+    if (!patient) throw new BadRequestException('Patient was not found.');
+    const items = this.normalizeItems(createBill.items);
+    const payment = this.validatePaymentTotals(items, createBill);
+    const preparedBill = {
+      ...createBill,
+      items,
+      cash: payment.cash,
+      online: payment.online,
+      card: payment.card,
+      refund: payment.refund,
+      discount: payment.discount,
+      paymentEvents: [this.initialPaymentEvent(payment, new Date())],
+    };
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
-    createBill.mrn = await this.generateUniqueMRN(prefix);
-    const data = session
-      ? (await this.billingModel.create([createBill], { session }))[0]
-      : await this.billingModel.create(createBill);
-    if (createBill.rxId && !session) {
-      const order: any = await this.orderModel
-        .findOne({ mrn: createBill.rxId })
-        .populate('items.name');
-      if (order) {
-        order.billNo = data.mrn;
-        const paidAmount =
-          (createBill.cash ?? 0) +
-          (createBill.online ?? 0) +
-          (createBill.discount ?? 0);
-        // Prefer bill line totals; fall back to order batch snapshot (Item has no unitPrice)
-        const orderTotal =
-          (createBill.items ?? []).reduce(
-            (total, item) =>
-              total +
-              (Number(item.total) ||
-                (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)),
-            0,
-          ) ||
-          (order.items ?? []).reduce((total, item) => {
-            const unit =
-              item.batchSellingPrice ??
-              item.name?.unitPrice ??
-              0;
-            return total + (Number(item.quantity) || 0) * (Number(unit) || 0);
-          }, 0);
-        order.paidAmount = paidAmount >= orderTotal ? orderTotal : paidAmount;
-        if (paidAmount === 0) {
-          order.paymentStatus = PaymentStatus.Pending;
-        } else if (paidAmount < orderTotal) {
-          order.paymentStatus = PaymentStatus.Partial;
-        } else {
-          order.paymentStatus = PaymentStatus.Paid;
-        }
-        await order.save();
+    preparedBill.mrn = await this.generateUniqueMRN(prefix);
+    try {
+      if (session) return (await this.billingModel.create([preparedBill], { session }))[0];
+      if (!createBill.rxId) return await this.billingModel.create(preparedBill);
+
+      const localSession = await this.billingModel.db.startSession();
+      try {
+        let created: Billing | undefined;
+        await localSession.withTransaction(async () => {
+          const order = await this.orderModel.findOneAndUpdate(
+            {
+              mrn: createBill.rxId,
+              $or: [{ billNo: '-' }, { billNo: null }, { billNo: { $exists: false } }],
+            },
+            { $set: { billNo: preparedBill.mrn } },
+            { new: true, session: localSession },
+          );
+          if (!order) throw new BadRequestException('Order not found or already billed.');
+          if (String(order.patient) !== String(createBill.patient)) {
+            throw new BadRequestException('The bill patient does not match the order.');
+          }
+          created = (await this.billingModel.create([preparedBill], { session: localSession }))[0];
+          await this.syncLinkedOrderPayment(created, localSession);
+        });
+        return created!;
+      } finally {
+        await localSession.endSession();
       }
+    } catch (error: any) {
+      if (error?.code === 11000 && createBill.clientRequestId) {
+        const previous = await this.billingModel.findOne({
+          user: createBill.user,
+          clientRequestId: createBill.clientRequestId,
+        });
+        if (previous) return previous;
+      }
+      throw error;
     }
-    return data;
   }
 
   private async buildBillFilterPipeline(
@@ -229,8 +326,6 @@ export class BillingService {
     if (method) {
       if (method === 'Cash') {
         match.cash = { $ne: 0 };
-      } else if (method === 'Insurance') {
-        match.insurance = { $ne: 0 };
       } else if (method === 'Online') {
         match.online = { $ne: 0 };
       }
@@ -269,7 +364,6 @@ export class BillingService {
                     { $ifNull: ['$cash', 0] },
                     { $ifNull: ['$online', 0] },
                     { $ifNull: ['$card', 0] },
-                    { $ifNull: ['$insurance', 0] },
                   ],
                 },
                 { $ifNull: ['$refund', 0] },
@@ -492,7 +586,6 @@ export class BillingService {
             { $ifNull: ['$cash', 0] },
             { $ifNull: ['$online', 0] },
             { $ifNull: ['$card', 0] },
-            { $ifNull: ['$insurance', 0] },
           ],
         },
         { $ifNull: ['$refund', 0] },
@@ -726,42 +819,58 @@ export class BillingService {
     addPaymentDto: AddPaymentDto,
     user: mongoose.Types.ObjectId,
   ) {
-    const bill = await this.billingModel.findOne({ _id: id, user });
-    if (!bill) throw new NotFoundException('Bill is not found.');
-
-    const subtotal = (bill.items || []).reduce(
-      (sum, item) => sum + (Number(item.total) || 0),
-      0,
-    );
-    const discount = addPaymentDto.discount ?? bill.discount ?? 0;
-    const card = addPaymentDto.card ?? bill.card ?? 0;
-    const refund = addPaymentDto.refund ?? bill.refund ?? 0;
-    if (discount < 0 || discount > subtotal) {
-      throw new BadRequestException('Discount must be between 0 and the bill total.');
+    if (!mongoose.isValidObjectId(id)) throw new BadRequestException('Invalid bill ID.');
+    const session = await this.billingModel.db.startSession();
+    try {
+      let updated: Billing | null = null;
+      await session.withTransaction(async () => {
+        const bill = await this.billingModel.findOne({ _id: id, user }).session(session);
+        if (!bill) throw new NotFoundException('Bill is not found.');
+        if (bill.transactionType === 'Return') {
+          throw new BadRequestException('Return bills cannot receive payments.');
+        }
+        const payment = this.validatePaymentTotals(bill.items, {
+          ...addPaymentDto,
+          card: addPaymentDto.card ?? bill.card,
+          refund: addPaymentDto.refund ?? bill.refund,
+          discount: addPaymentDto.discount ?? bill.discount,
+        });
+        const old = {
+          cash: bill.cash || 0,
+          online: bill.online || 0,
+          card: bill.card || 0,
+          refund: bill.refund || 0,
+        };
+        const delta = this.initialPaymentEvent({
+          cash: this.roundMoney(payment.cash - old.cash),
+          online: this.roundMoney(payment.online - old.online),
+          card: this.roundMoney(payment.card - old.card),
+          refund: this.roundMoney(payment.refund - old.refund),
+        }, new Date());
+        const oldEvents = bill.paymentEvents?.length ? [] : [
+          this.initialPaymentEvent(old, (bill as any).createdAt || new Date()),
+        ];
+        updated = await this.billingModel.findOneAndUpdate(
+          { _id: id, user, updatedAt: (bill as any).updatedAt },
+          {
+            $set: {
+              cash: payment.cash,
+              online: payment.online,
+              card: payment.card,
+              discount: payment.discount,
+              refund: payment.refund,
+            },
+            $push: { paymentEvents: { $each: [...oldEvents, delta] } },
+          },
+          { new: true, session },
+        );
+        if (!updated) throw new ConflictException('Bill changed. Refresh and retry the payment.');
+        await this.syncLinkedOrderPayment(updated, session);
+      });
+      return updated;
+    } finally {
+      await session.endSession();
     }
-    if (addPaymentDto.cash < 0 || addPaymentDto.online < 0 || card < 0 || refund < 0) {
-      throw new BadRequestException('Payment amounts cannot be negative.');
-    }
-    const grossPaid = addPaymentDto.cash + addPaymentDto.online + card;
-    if (refund > grossPaid || grossPaid - refund > subtotal - discount) {
-      throw new BadRequestException('Payment cannot exceed the bill total after discount.');
-    }
-
-    const data = await this.billingModel.findOneAndUpdate(
-      { _id: id, user },
-      {
-        $set: {
-          cash: addPaymentDto.cash,
-          online: addPaymentDto.online,
-          card,
-          discount,
-          refund,
-        },
-      },
-      { new: true },
-    );
-    if (!data) throw new NotFoundException('Bill is not found.');
-    return data;
   }
 
   async markAsPaid(id: mongoose.Types.ObjectId, user: mongoose.Types.ObjectId) {
@@ -781,7 +890,6 @@ export class BillingService {
                 { $ifNull: ['$cash', 0] },
                 { $ifNull: ['$online', 0] },
                 { $ifNull: ['$card', 0] },
-                { $ifNull: ['$insurance', 0] },
               ],
             },
           ],
@@ -789,7 +897,11 @@ export class BillingService {
         2,
       ],
     };
-    const data = await this.billingModel.findOneAndUpdate(
+    const session = await this.billingModel.db.startSession();
+    try {
+      let data: Billing | null = null;
+      await session.withTransaction(async () => {
+        data = await this.billingModel.findOneAndUpdate(
       {
         _id: id,
         user,
@@ -805,13 +917,32 @@ export class BillingService {
                 2,
               ],
             },
+            paymentEvents: {
+              $concatArrays: [
+                { $ifNull: ['$paymentEvents', []] },
+                {
+                  $cond: [
+                    { $eq: [{ $size: { $ifNull: ['$paymentEvents', []] } }, 0] },
+                    [{
+                      at: '$createdAt',
+                      cashDelta: { $ifNull: ['$cash', 0] },
+                      onlineDelta: { $ifNull: ['$online', 0] },
+                      cardDelta: { $ifNull: ['$card', 0] },
+                      refundDelta: { $ifNull: ['$refund', 0] },
+                    }],
+                    [],
+                  ],
+                },
+                [{ at: new Date(), cashDelta: balance, onlineDelta: 0, cardDelta: 0, refundDelta: 0 }],
+              ],
+            },
           },
         },
       ],
-      { new: true },
+      { new: true, session },
     );
     if (!data) {
-      const bill = await this.billingModel.findOne({ _id: id, user });
+      const bill = await this.billingModel.findOne({ _id: id, user }).session(session);
       if (!bill) throw new NotFoundException('Bill is not found.');
       if (bill.transactionType === 'Return') {
         throw new BadRequestException('Return bills cannot be marked as paid.');
@@ -820,7 +951,12 @@ export class BillingService {
         'This bill has no remaining balance. Refresh the billing list.',
       );
     }
-    return data;
+        await this.syncLinkedOrderPayment(data, session);
+      });
+      return data;
+    } finally {
+      await session.endSession();
+    }
   }
 
   async getBillDropDown(getBillDropDownDto: GetBillDropdownDto, user: mongoose.Types.ObjectId) {

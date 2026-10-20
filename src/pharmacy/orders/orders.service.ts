@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Order, OrderDocument, OrderStatus } from './schemas/order.schema';
+import { Order, OrderDocument, OrderStatus, PaymentStatus } from './schemas/order.schema';
 import mongoose, { Model } from 'mongoose';
 import { ItemsService, SaleContext } from '../items/items.service';
 import { UpdateOrderDto } from './dto/UpdateOrder.dto';
@@ -802,12 +802,23 @@ export class OrdersService {
               { new: true, runValidators: true, session },
             );
             if (!bill) throw new BadRequestException('Linked order bill was not found.');
+            const payable = Math.round((billItems.reduce((sum, item) => sum + (item.total || 0), 0) -
+              (bill.discount || 0)) * 100) / 100;
+            const paid = Math.round(((bill.cash || 0) + (bill.online || 0) +
+              (bill.card || 0) - (bill.refund || 0)) * 100) / 100;
+            if (payable < 0 || paid > payable) {
+              throw new BadRequestException('Updated order prices conflict with recorded bill payments.');
+            }
+            order.paidAmount = paid;
+            order.paymentStatus = paid <= 0 ? PaymentStatus.Pending :
+              paid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
           } else {
             const bill = await this.billingService.generateBill({
               patient: order.patient,
               items: billItems,
               user: getInHouseObjectId('pharmacy'),
               discount: order.discount ?? 0,
+              cash: order.paidAmount ?? 0,
               doctor: order.doctorName || 'Self',
             }, session);
             order.billNo = bill.mrn;
@@ -867,6 +878,7 @@ export class OrdersService {
         user: getInHouseObjectId('pharmacy'),
         discount: data.discount ?? 0,
         doctor: existOrder.doctorName || "Self",
+        rxId: data.mrn,
       });
     }
 
@@ -874,26 +886,46 @@ export class OrdersService {
   }
 
   async updatePayment(dto: UpdatePaymentDto) {
+    if (!Number.isFinite(dto.paidAmount) || dto.paidAmount < 0) {
+      throw new BadRequestException('Paid amount must be non-negative.');
+    }
+    const order = await this.orderModel.findById(dto.orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.billNo && order.billNo !== '-') {
+      const bill = await this.billingModel.findOne({ mrn: order.billNo });
+      if (!bill) throw new BadRequestException('Linked order bill was not found.');
+      const cash = Math.round((dto.paidAmount - (bill.online || 0) -
+        (bill.card || 0) + (bill.refund || 0)) * 100) / 100;
+      if (cash < 0) throw new BadRequestException('Paid amount is less than other recorded payments.');
+      await this.billingService.addPayment(bill._id, {
+        cash,
+        online: bill.online || 0,
+        card: bill.card || 0,
+        refund: bill.refund || 0,
+      }, bill.user);
+    } else {
+      const lineTotals = await Promise.all(order.items.map(async (item) => {
+        const master = await this.itemsService.getItem(item.name);
+        const price = item.batchSellingPrice ?? this.itemsService.resolveItemUnitPrice(master);
+        return price * item.quantity;
+      }));
+      const total = lineTotals.reduce((sum, amount) => sum + amount, 0);
+      const payable = Math.max(0, total - (order.discount || 0));
+      if (dto.paidAmount > payable) {
+        throw new BadRequestException('Payment exceeds the order balance.');
+      }
+      order.paidAmount = dto.paidAmount;
+      order.paymentStatus = dto.paidAmount <= 0 ? PaymentStatus.Pending :
+        dto.paidAmount >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
+      if (dto.paymentReference) order.paymentReference = dto.paymentReference;
+      await order.save();
+    }
     const data = await this.orderModel
-      .findByIdAndUpdate(dto.orderId, dto, { new: true, runValidators: true })
+      .findById(dto.orderId)
       .populate('patient')
       .populate('doctor', 'name phoneNumber specialization qualification designation')
       .populate('items.name')
       .lean();
-
-    if (data?.billNo) {
-      await this.billingModel
-        .findOneAndUpdate(
-          { mrn: data?.billNo },
-          { cash: data.paidAmount },
-          { new: true, runValidators: true },
-        )
-        .lean();
-    }
-
-    if (!data) {
-      throw new NotFoundException('Order not found');
-    }
     return data;
   }
 

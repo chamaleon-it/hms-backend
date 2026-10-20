@@ -70,16 +70,6 @@ export class PatientRegisterDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }: { value: string }) => value.trim())
-  insurance?: string;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
-  insuranceValidity?: string;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }: { value: string }) => value.trim())
   uhid?: string;
 
   @IsOptional()

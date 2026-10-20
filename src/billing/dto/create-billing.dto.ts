@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -81,6 +82,10 @@ export class CreateBillingItemDto {
 }
 
 export class CreateBillingDto {
+  @IsUUID()
+  @IsOptional()
+  clientRequestId?: string;
+
   @IsMongoId()
   @IsOptional()
   user!: mongoose.Types.ObjectId;

@@ -43,12 +43,6 @@ export class Patient {
   allergies: string;
 
   @Prop()
-  insurance: string;
-
-  @Prop()
-  insuranceValidity: Date;
-
-  @Prop()
   uhid: string;
 
   @Prop()

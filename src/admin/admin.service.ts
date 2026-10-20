@@ -38,6 +38,55 @@ export class AdminService {
     private purchaseEntryModel: Model<PurchaseEntry>,
   ) {}
 
+  private paymentEventPipeline(): any[] {
+    return [
+      {
+        $addFields: {
+          reportPaymentEvents: {
+            $cond: [
+              { $gt: [{ $size: { $ifNull: ['$paymentEvents', []] } }, 0] },
+              '$paymentEvents',
+              [{
+                at: '$createdAt',
+                cashDelta: { $ifNull: ['$cash', 0] },
+                onlineDelta: { $ifNull: ['$online', 0] },
+                cardDelta: { $ifNull: ['$card', 0] },
+                refundDelta: { $ifNull: ['$refund', 0] },
+              }],
+            ],
+          },
+        },
+      },
+      { $unwind: '$reportPaymentEvents' },
+      {
+        $addFields: {
+          reportSign: { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+          reportCash: {
+            $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $subtract: [
+                { $ifNull: ['$reportPaymentEvents.cashDelta', 0] },
+                { $ifNull: ['$reportPaymentEvents.refundDelta', 0] },
+              ] },
+            ],
+          },
+          reportOnline: {
+            $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $ifNull: ['$reportPaymentEvents.onlineDelta', 0] },
+            ],
+          },
+          reportCard: {
+            $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $ifNull: ['$reportPaymentEvents.cardDelta', 0] },
+            ],
+          },
+        },
+      },
+    ];
+  }
+
   async getDashboardStats() {
     const [
       totalDoctors,
@@ -57,22 +106,16 @@ export class AdminService {
 
     // Aggregate overall revenue
     const revenueAgg = await this.billingModel.aggregate([
-      { $match: { transactionType: 'Sale' } },
+      ...this.paymentEventPipeline(),
       {
         $group: {
           _id: null,
           totalRevenue: {
-            $sum: {
-              $add: [
-                { $ifNull: ['$cash', 0] },
-                { $ifNull: ['$online', 0] },
-                { $ifNull: ['$insurance', 0] },
-              ],
-            },
+            $sum: { $add: ['$reportCash', '$reportOnline', '$reportCard'] },
           },
-          totalCash: { $sum: { $ifNull: ['$cash', 0] } },
-          totalOnline: { $sum: { $ifNull: ['$online', 0] } },
-          totalInsurance: { $sum: { $ifNull: ['$insurance', 0] } },
+          totalCash: { $sum: '$reportCash' },
+          totalOnline: { $sum: '$reportOnline' },
+          totalCard: { $sum: '$reportCard' },
         },
       },
     ]);
@@ -81,9 +124,8 @@ export class AdminService {
       totalRevenue: 0,
       totalCash: 0,
       totalOnline: 0,
-      totalInsurance: 0,
+      totalCard: 0,
     };
-
     // Aggregate monthly revenue for the last 6 months
     const now = new Date();
     const sixMonthsAgo = new Date();
@@ -92,12 +134,8 @@ export class AdminService {
     sixMonthsAgo.setHours(0, 0, 0, 0);
 
     const monthlyAgg = await this.billingModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: sixMonthsAgo },
-          transactionType: 'Sale',
-        },
-      },
+      ...this.paymentEventPipeline(),
+      { $match: { 'reportPaymentEvents.at': { $gte: sixMonthsAgo } } },
       {
         $lookup: {
           from: 'users',
@@ -111,21 +149,24 @@ export class AdminService {
       },
       {
         $project: {
-          month: { $month: '$createdAt' },
-          year: { $year: '$createdAt' },
-          amount: {
-            $add: [
-              { $ifNull: ['$cash', 0] },
-              { $ifNull: ['$online', 0] },
-              { $ifNull: ['$insurance', 0] },
+          month: { $month: '$reportPaymentEvents.at' },
+          year: { $year: '$reportPaymentEvents.at' },
+          amount: { $add: ['$reportCash', '$reportOnline', '$reportCard'] },
+          department: {
+            $cond: [
+              { $or: [
+                { $eq: ['$creator.role', UserRole.LAB] },
+                { $ne: [{ $ifNull: ['$reportId', null] }, null] },
+              ] },
+              'lab',
+              'pharmacy',
             ],
           },
-          role: '$creator.role',
         },
       },
       {
         $group: {
-          _id: { month: '$month', year: '$year', role: '$role' },
+          _id: { month: '$month', year: '$year', department: '$department' },
           total: { $sum: '$amount' },
         },
       },
@@ -155,7 +196,7 @@ export class AdminService {
       if (monthlyMap[key]) {
         const amt = item.total || 0;
         monthlyMap[key].total += amt;
-        if (item._id.role === UserRole.LAB) {
+        if (item._id.department === 'lab') {
           monthlyMap[key].lab += amt;
         } else {
           monthlyMap[key].pharmacy += amt;
@@ -177,7 +218,7 @@ export class AdminService {
         totalRevenue: revenue.totalRevenue,
         totalCash: revenue.totalCash,
         totalOnline: revenue.totalOnline,
-        totalInsurance: revenue.totalInsurance,
+        totalCard: revenue.totalCard,
         totalDoctors,
         totalPharmacists,
         totalTechnicians,
@@ -346,7 +387,6 @@ export class AdminService {
     if (query.method && query.method !== 'all') {
       if (query.method === 'Cash') filter.cash = { $gt: 0 };
       else if (query.method === 'Online') filter.online = { $gt: 0 };
-      else if (query.method === 'Insurance') filter.insurance = { $gt: 0 };
     }
 
     if (query.startDate && query.endDate) {
@@ -433,16 +473,31 @@ export class AdminService {
             _id: null,
             totalRevenue: {
               $sum: {
-                $add: [
-                  { $ifNull: ['$cash', 0] },
-                  { $ifNull: ['$online', 0] },
-                  { $ifNull: ['$insurance', 0] },
+                $multiply: [
+                  { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+                  { $subtract: [
+                    { $add: [
+                      { $ifNull: ['$cash', 0] },
+                      { $ifNull: ['$online', 0] },
+                      { $ifNull: ['$card', 0] },
+                    ] },
+                    { $ifNull: ['$refund', 0] },
+                  ] },
                 ],
               },
             },
-            totalCash: { $sum: { $ifNull: ['$cash', 0] } },
-            totalOnline: { $sum: { $ifNull: ['$online', 0] } },
-            totalInsurance: { $sum: { $ifNull: ['$insurance', 0] } },
+            totalCash: { $sum: { $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $subtract: [{ $ifNull: ['$cash', 0] }, { $ifNull: ['$refund', 0] }] },
+            ] } },
+            totalOnline: { $sum: { $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $ifNull: ['$online', 0] },
+            ] } },
+            totalCard: { $sum: { $multiply: [
+              { $cond: [{ $eq: ['$transactionType', 'Return'] }, -1, 1] },
+              { $ifNull: ['$card', 0] },
+            ] } },
           },
         },
       ]),
@@ -457,14 +512,14 @@ export class AdminService {
         totalRevenue: 0,
         totalCash: 0,
         totalOnline: 0,
-        totalInsurance: 0,
+        totalCard: 0,
       },
     };
   }
 
   /**
    * Profit & Loss for a date range.
-   * Revenue = billing cash + online (sales only).
+   * Revenue = dated payment changes across cash, online and card, net of refunds and returns.
    * COGS = item soldHistory totals priced at purchasePrice (or sold unitPrice fallback).
    * Consumable expense = issued consumables cost (not sales).
    * Does not invent other operating expenses.
@@ -480,14 +535,10 @@ export class AdminService {
     const round2 = (n: number) =>
       Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 
-    const [revenueAgg, cogsAgg, consumableAgg, billCount] = await Promise.all([
+    const [revenueAgg, cogsAgg, consumableAgg, billCount, discountAgg] = await Promise.all([
       this.billingModel.aggregate([
-        {
-          $match: {
-            transactionType: 'Sale',
-            createdAt: { $gte: start, $lte: end },
-          },
-        },
+        ...this.paymentEventPipeline(),
+        { $match: { 'reportPaymentEvents.at': { $gte: start, $lte: end } } },
         {
           $lookup: {
             from: 'users',
@@ -500,26 +551,19 @@ export class AdminService {
         {
           $group: {
             _id: null,
-            totalCash: { $sum: { $ifNull: ['$cash', 0] } },
-            totalOnline: { $sum: { $ifNull: ['$online', 0] } },
-            totalDiscount: { $sum: { $ifNull: ['$discount', 0] } },
+            totalCash: { $sum: '$reportCash' },
+            totalOnline: { $sum: '$reportOnline' },
+            totalCard: { $sum: '$reportCard' },
             pharmacyRevenue: {
               $sum: {
                 $cond: [
                   {
-                    $or: [
-                      { $eq: ['$owner.role', UserRole.PHARMACY] },
-                      { $eq: ['$owner.role', UserRole.ADMIN] },
-                      { $eq: ['$owner.role', UserRole.SUPER_ADMIN] },
-                      { $and: [{ $ne: ['$owner.role', UserRole.LAB] }, { $not: ['$reportId'] }] },
+                    $and: [
+                      { $ne: ['$owner.role', UserRole.LAB] },
+                      { $eq: [{ $ifNull: ['$reportId', null] }, null] },
                     ],
                   },
-                  {
-                    $add: [
-                      { $ifNull: ['$cash', 0] },
-                      { $ifNull: ['$online', 0] },
-                    ],
-                  },
+                  { $add: ['$reportCash', '$reportOnline', '$reportCard'] },
                   0,
                 ],
               },
@@ -530,15 +574,10 @@ export class AdminService {
                   {
                     $or: [
                       { $eq: ['$owner.role', UserRole.LAB] },
-                      { $ifNull: ['$reportId', false] },
+                      { $ne: [{ $ifNull: ['$reportId', null] }, null] },
                     ],
                   },
-                  {
-                    $add: [
-                      { $ifNull: ['$cash', 0] },
-                      { $ifNull: ['$online', 0] },
-                    ],
-                  },
+                  { $add: ['$reportCash', '$reportOnline', '$reportCard'] },
                   0,
                 ],
               },
@@ -593,12 +632,16 @@ export class AdminService {
         transactionType: 'Sale',
         createdAt: { $gte: start, $lte: end },
       }),
+      this.billingModel.aggregate([
+        { $match: { transactionType: { $ne: 'Return' }, createdAt: { $gte: start, $lte: end } } },
+        { $group: { _id: null, totalDiscount: { $sum: { $ifNull: ['$discount', 0] } } } },
+      ]),
     ]);
 
     const revenue = revenueAgg[0] || {
       totalCash: 0,
       totalOnline: 0,
-      totalDiscount: 0,
+      totalCard: 0,
       pharmacyRevenue: 0,
       labRevenue: 0,
     };
@@ -606,7 +649,7 @@ export class AdminService {
     const consumables = consumableAgg[0] || { totalCost: 0, quantity: 0 };
 
     const totalRevenue = round2(
-      (revenue.totalCash || 0) + (revenue.totalOnline || 0),
+      (revenue.totalCash || 0) + (revenue.totalOnline || 0) + (revenue.totalCard || 0),
     );
     const costOfGoodsSold = round2(cogs.cogs || 0);
     const consumableExpense = round2(consumables.totalCost || 0);
@@ -621,7 +664,8 @@ export class AdminService {
       revenue: {
         cash: round2(revenue.totalCash || 0),
         online: round2(revenue.totalOnline || 0),
-        discount: round2(revenue.totalDiscount || 0),
+        card: round2(revenue.totalCard || 0),
+        discount: round2(discountAgg[0]?.totalDiscount || 0),
         pharmacy: round2(revenue.pharmacyRevenue || 0),
         lab: round2(revenue.labRevenue || 0),
         total: totalRevenue,

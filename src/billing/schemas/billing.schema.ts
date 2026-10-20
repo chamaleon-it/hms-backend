@@ -48,10 +48,32 @@ export class BillingItem {
 }
 export const BillingItemSchema = SchemaFactory.createForClass(BillingItem);
 
+@Schema({ _id: false, versionKey: false })
+export class BillingPaymentEvent {
+  @Prop({ type: Date, required: true })
+  at: Date;
+
+  @Prop({ type: Number, default: 0 })
+  cashDelta: number;
+
+  @Prop({ type: Number, default: 0 })
+  onlineDelta: number;
+
+  @Prop({ type: Number, default: 0 })
+  cardDelta: number;
+
+  @Prop({ type: Number, default: 0 })
+  refundDelta: number;
+}
+export const BillingPaymentEventSchema = SchemaFactory.createForClass(BillingPaymentEvent);
+
 export type BillingDocument = Billing & Document;
 
 @Schema({ timestamps: true, versionKey: false })
 export class Billing {
+  @Prop({ type: String, unique: true, sparse: true })
+  clientRequestId?: string;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 
@@ -78,6 +100,9 @@ export class Billing {
 
   @Prop({ type: Number, default: 0 })
   refund: number;
+
+  @Prop({ type: [BillingPaymentEventSchema], default: [] })
+  paymentEvents: BillingPaymentEvent[];
 
   @Prop({ type: String, required: false })
   note?: string;
