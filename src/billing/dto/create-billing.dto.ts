@@ -80,18 +80,15 @@ export class CreateBillingDto {
         return null;
       }
 
-      return mongoose.isValidObjectId(trimmed)
-        ? new mongoose.Types.ObjectId(trimmed)
-        : null;
+      return mongoose.isValidObjectId(trimmed) ? trimmed : null;
     }
 
-    return mongoose.isValidObjectId(value)
-      ? new mongoose.Types.ObjectId(value.toString())
-      : null;
+    const doctorId = value?.toString?.();
+    return mongoose.isValidObjectId(doctorId) ? doctorId : null;
   })
   @IsOptional()
   @IsMongoId()
-  doctor?: mongoose.Types.ObjectId | null;
+  doctor?: mongoose.Types.ObjectId | string | null;
 
   @IsString()
   @IsOptional()
