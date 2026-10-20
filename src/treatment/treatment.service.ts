@@ -719,6 +719,11 @@ export class TreatmentService {
     ).trim();
     const therapistName =
       assignedTherapist && assignedTherapist !== '-' ? assignedTherapist : '';
+    if (!therapistName) {
+      throw new BadRequestException(
+        'A therapist must be assigned before billing a procedure.',
+      );
+    }
 
     const billPayload: any = {
       user: new mongoose.Types.ObjectId(pharmacyUserIdStr),
@@ -732,6 +737,7 @@ export class TreatmentService {
       discount: totalDiscount,
       status: 'Completed',
       transactionType: 'Sale',
+      billingCategory: 'Procedure',
       note: sessionNotes,
     };
 

@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsMongoId,
   IsNotEmpty,
   IsNumber,
@@ -94,6 +95,10 @@ export class CreateBillingDto {
   @IsOptional()
   inCharge?: string;
 
+  @IsString()
+  @IsOptional()
+  therapistName?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateBillingItemDto)
@@ -143,6 +148,14 @@ export class CreateBillingDto {
   @IsString()
   @IsOptional()
   transactionType?: 'Sale' | 'Return' | 'Refund';
+
+  @IsOptional()
+  @IsIn(['Pharmacy', 'Procedure', 'Reception', 'Other'])
+  billingCategory?: 'Pharmacy' | 'Procedure' | 'Reception' | 'Other';
+
+  @IsString()
+  @IsOptional()
+  salesMRN?: string;
 
   @IsMongoId()
   @IsOptional()

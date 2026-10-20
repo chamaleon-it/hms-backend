@@ -153,6 +153,51 @@ export class BillingService {
 
   async generateBill(createBill: CreateBillingDto) {
     createBill.doctor = this.normalizeDoctorValue(createBill.doctor);
+
+    if (
+      !createBill.salesMRN &&
+      (createBill.transactionType === 'Refund' ||
+        createBill.transactionType === 'Return')
+    ) {
+      createBill.salesMRN = String(createBill.note || '').match(
+        /\bInvoice\s+([A-Z0-9-]+)/i,
+      )?.[1];
+    }
+
+    const sourceBill = createBill.salesMRN
+      ? await this.billingModel.findOne({ mrn: createBill.salesMRN }).lean()
+      : null;
+    if (sourceBill) {
+      const sourceSession = await this.billingModel.db
+        .collection('treatments')
+        .findOne({ bill: sourceBill._id, isDeleted: { $ne: true } });
+      const inheritedTherapist = String(
+        sourceBill.therapistName || sourceSession?.therapistName || '',
+      ).trim();
+      createBill.billingCategory =
+        sourceBill.billingCategory ||
+        (inheritedTherapist ? 'Procedure' : createBill.billingCategory);
+      createBill.therapistName = inheritedTherapist;
+    }
+
+    if (!createBill.billingCategory) {
+      const isSessionBill =
+        /^\s*(therapy|procedure)\s+session\s+#\s*\d+\s*$/i.test(
+          String(createBill.note || ''),
+        );
+      if (createBill.therapistName || isSessionBill) {
+        createBill.billingCategory = 'Procedure';
+      } else {
+        const sourceModule = await this.determineSourceModule(createBill.user);
+        createBill.billingCategory =
+          sourceModule === SourceModule.Reception
+            ? 'Reception'
+            : sourceModule === SourceModule.Lab
+              ? 'Other'
+              : 'Pharmacy';
+      }
+    }
+
     const prefix = await this.usersService.getPharmacyBillingPrefix(
       createBill.user,
     );
@@ -321,17 +366,15 @@ export class BillingService {
     return data;
   }
 
-  private readonly therapyBillRegex =
-    /therapy|acupuncture|panchakarma|cupping|moxibustion|varmam|physio|kizhi|massage|treatment/i;
-
-  private readonly procedureBillRegex = /procedure/i;
-
   private treatmentBillClauses() {
     return [
-      { note: this.therapyBillRegex },
-      { 'items.name': this.therapyBillRegex },
-      { note: this.procedureBillRegex },
-      { 'items.name': this.procedureBillRegex },
+      { billingCategory: 'Procedure' },
+      { note: /^\s*(therapy|procedure)\s+session\s+#\s*\d+\s*$/i },
+      { therapistName: { $exists: true, $nin: ['', '-'] } },
+      {
+        transactionType: 'Refund',
+        note: /\b(therapy|procedure)\s+package\s+refund\s+for\s+invoice\b/i,
+      },
     ];
   }
 
@@ -355,23 +398,15 @@ export class BillingService {
   }
 
   private isTherapyOrProcedureBill(bill: {
+    billingCategory?: string;
+    therapistName?: string;
     note?: string;
-    items?: { name?: unknown }[];
   }): boolean {
-    const note = String(bill?.note || '');
-    const names = (bill?.items || []).map((item) =>
-      String(
-        typeof item?.name === 'string'
-          ? item.name
-          : (item?.name as { name?: string })?.name || '',
-      ),
-    );
     return (
-      this.therapyBillRegex.test(note) ||
-      this.procedureBillRegex.test(note) ||
-      names.some(
-        (name) =>
-          this.therapyBillRegex.test(name) || this.procedureBillRegex.test(name),
+      bill.billingCategory === 'Procedure' ||
+      !!String(bill.therapistName || '').trim() ||
+      /^\s*(therapy|procedure)\s+session\s+#\s*\d+\s*$/i.test(
+        String(bill.note || ''),
       )
     );
   }
@@ -457,17 +492,7 @@ export class BillingService {
       const receptionRegex =
         /consultation|registration|ncf|refund|fee|opd|doctor|token|reception/i;
 
-      if (billType === 'therapy') {
-        match.$or = [
-          { note: this.therapyBillRegex },
-          { 'items.name': this.therapyBillRegex },
-        ];
-      } else if (billType === 'procedure') {
-        match.$or = [
-          { note: this.procedureBillRegex },
-          { 'items.name': this.procedureBillRegex },
-        ];
-      } else if (billType === 'treatment') {
+      if (billType === 'therapy' || billType === 'procedure' || billType === 'treatment') {
         const clauses = this.treatmentBillClauses();
         if (match.$or) {
           match.$and = [...(match.$and || []), { $or: clauses }];
@@ -475,10 +500,11 @@ export class BillingService {
           match.$or = clauses;
         }
       } else if (billType === 'pharmacy') {
-        // Pharmacy sales only: not procedure/therapy, and not reception fees.
+        // Pharmacy category is independent of editable product names.
         match.$nor = [
           ...(match.$nor || []),
           ...this.treatmentBillClauses(),
+          { billingCategory: 'Reception' },
           ...this.receptionFeeClauses(),
         ];
       } else if (billType === 'counter') {
@@ -577,9 +603,7 @@ export class BillingService {
         },
       });
     } else if (pharmacyListing) {
-      const pharmacyScope: Record<string, unknown>[] = [
-        ...this.treatmentBillClauses(),
-      ];
+      const pharmacyScope: Record<string, unknown>[] = [];
       if (user) {
         pharmacyScope.unshift({ user: new mongoose.Types.ObjectId(user) });
       }
@@ -703,6 +727,7 @@ export class BillingService {
     }
 
     await this.attachSessionTherapists(data);
+    await this.enrichBillingCategories(data);
     await this.repairZeroPricedBills(data);
 
     return { data, total };
@@ -773,6 +798,67 @@ export class BillingService {
       }
       if (visit.name) {
         bill.doctor = { name: visit.name };
+      }
+    }
+  }
+
+  /** Resolve old refund records through their original invoice instead of their line text. */
+  private async enrichBillingCategories(bills: any[]) {
+    if (!bills?.length) return;
+
+    const refundSourceMrns = new Map<string, string>();
+    for (const bill of bills) {
+      if (!['Refund', 'Return'].includes(bill.transactionType)) continue;
+      const sourceMrn =
+        String(bill.salesMRN || '').trim() ||
+        String(bill.note || '').match(/\bInvoice\s+([A-Z0-9-]+)/i)?.[1] ||
+        '';
+      if (sourceMrn) refundSourceMrns.set(String(bill._id), sourceMrn);
+    }
+
+    const sourceMrns = [...new Set(refundSourceMrns.values())];
+    const sourceBills = sourceMrns.length
+      ? await this.billingModel.find({ mrn: { $in: sourceMrns } }).lean()
+      : [];
+    await this.attachSessionTherapists(sourceBills);
+
+    const sourceByMrn = new Map<string, any>();
+    for (const source of sourceBills) {
+      if (!source.billingCategory) {
+        if (this.isTherapyOrProcedureBill(source)) {
+          source.billingCategory = 'Procedure';
+        } else {
+          const module = await this.determineSourceModule(source.user);
+          source.billingCategory =
+            module === SourceModule.Reception
+              ? 'Reception'
+              : module === SourceModule.Lab
+                ? 'Other'
+                : 'Pharmacy';
+        }
+      }
+      sourceByMrn.set(source.mrn, source);
+    }
+
+    for (const bill of bills) {
+      if (!bill.billingCategory) {
+        const sourceMrn = refundSourceMrns.get(String(bill._id));
+        const source = sourceMrn ? sourceByMrn.get(sourceMrn) : null;
+        if (source) {
+          bill.salesMRN = source.mrn;
+          bill.billingCategory = source.billingCategory;
+          bill.therapistName = source.therapistName || '';
+        } else if (this.isTherapyOrProcedureBill(bill)) {
+          bill.billingCategory = 'Procedure';
+        } else {
+          const module = await this.determineSourceModule(bill.user);
+          bill.billingCategory =
+            module === SourceModule.Reception
+              ? 'Reception'
+              : module === SourceModule.Lab
+                ? 'Other'
+                : 'Pharmacy';
+        }
       }
     }
   }

@@ -170,6 +170,7 @@ export class AppointmentsService {
           upi: payment.upi,
           discount: payment.discount,
           status: payment.settled ? 'Completed' : 'Draft',
+          billingCategory: 'Reception' as const,
         };
 
         await this.billingService.generateBill(createBillingDto);
@@ -907,6 +908,7 @@ export class AppointmentsService {
       upi: 0,
       discount: 0,
       transactionType: 'Refund',
+      billingCategory: 'Reception',
       status: 'Completed',
       note: reason || undefined,
     } as any);

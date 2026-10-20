@@ -36,6 +36,9 @@ export type BillingDocument = Billing & Document;
 
 @Schema({ timestamps: true, versionKey: false })
 export class Billing {
+  @Prop({ type: String, enum: ['Pharmacy', 'Procedure', 'Reception', 'Other'] })
+  billingCategory?: 'Pharmacy' | 'Procedure' | 'Reception' | 'Other';
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: Types.ObjectId;
 

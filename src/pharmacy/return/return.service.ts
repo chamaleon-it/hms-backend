@@ -66,6 +66,7 @@ export class ReturnService {
           mrn: billNo,
           salesMRN: saleBillNo,
           transactionType: 'Return',
+          billingCategory: 'Pharmacy',
           cash: returnTotal,
         });
         break;
