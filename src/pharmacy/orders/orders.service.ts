@@ -246,6 +246,13 @@ export class OrdersService {
       };
     }
 
+    if (query.since) {
+      filter.createdAt = {
+        ...(filter.createdAt ?? {}),
+        $gt: query.since,
+      };
+    }
+
     filter.isDeleted = false;
 
     if (q === OrderStatus.Pending) {

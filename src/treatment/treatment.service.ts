@@ -334,6 +334,7 @@ export class TreatmentService {
       billingStatus,
       startDate,
       endDate,
+      since,
       patient,
       therapist,
       sort,
@@ -382,6 +383,13 @@ export class TreatmentService {
       filter.treatmentDate = { $gte: new Date(startDate) };
     } else if (endDate) {
       filter.treatmentDate = { $lte: new Date(endDate) };
+    }
+
+    if (since) {
+      const createdAfter = new Date(since);
+      if (!Number.isNaN(createdAfter.getTime())) {
+        filter.createdAt = { $gt: createdAfter };
+      }
     }
 
     if (q && q.trim()) {
