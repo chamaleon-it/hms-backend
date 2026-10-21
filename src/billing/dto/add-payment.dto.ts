@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class AddPaymentDto {
   @IsNumber()
@@ -29,4 +29,15 @@ export class AddPaymentDto {
   @Min(0)
   @IsOptional()
   refund?: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @IsOptional()
+  expense?: number;
+
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  remarks?: string;
 }

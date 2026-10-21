@@ -101,6 +101,12 @@ export class Billing {
   @Prop({ type: Number, default: 0 })
   refund: number;
 
+  @Prop({ type: Number, default: 0 })
+  expense: number;
+
+  @Prop({ type: String, default: '' })
+  remarks: string;
+
   @Prop({ type: [BillingPaymentEventSchema], default: [] })
   paymentEvents: BillingPaymentEvent[];
 

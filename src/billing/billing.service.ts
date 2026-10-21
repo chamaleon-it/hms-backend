@@ -859,6 +859,8 @@ export class BillingService {
               card: payment.card,
               discount: payment.discount,
               refund: payment.refund,
+              expense: addPaymentDto.expense ?? bill.expense ?? 0,
+              remarks: addPaymentDto.remarks?.trim() ?? bill.remarks ?? '',
             },
             $push: { paymentEvents: { $each: [...oldEvents, delta] } },
           },

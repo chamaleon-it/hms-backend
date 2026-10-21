@@ -89,4 +89,36 @@ describe('BillingService money rules', () => {
     )).rejects.toBeInstanceOf(ConflictException);
     expect(session.endSession).toHaveBeenCalled();
   });
+
+  it('saves expenses and remarks without changing the payment amounts', async () => {
+    const { service, billingModel } = makeService();
+    const session = {
+      withTransaction: async (callback: () => Promise<void>) => callback(),
+      endSession: jest.fn(),
+    };
+    billingModel.db.startSession.mockResolvedValue(session);
+    billingModel.findOne.mockReturnValue({
+      session: async () => ({
+        items: [{ total: 100 }], cash: 20, online: 0, card: 0,
+        refund: 0, discount: 0, transactionType: 'Sale',
+        paymentEvents: [], updatedAt: new Date(),
+      }),
+    });
+    billingModel.findOneAndUpdate.mockResolvedValue({ items: [{ total: 100 }] });
+    jest.spyOn(service as any, 'syncLinkedOrderPayment').mockResolvedValue(undefined);
+
+    await service.addPayment(
+      '507f1f77bcf86cd799439013' as any,
+      { cash: 20, online: 0, expense: 15, remarks: '  Courier  ' },
+      '507f1f77bcf86cd799439012' as any,
+    );
+
+    expect(billingModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ $set: expect.objectContaining({
+        cash: 20, expense: 15, remarks: 'Courier',
+      }) }),
+      expect.anything(),
+    );
+  });
 });
