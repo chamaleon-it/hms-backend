@@ -230,6 +230,7 @@ export class ReportService implements OnModuleInit {
         upi: 0,
         discount: 0,
         reportId: report._id,
+        billingCategory: 'Other',
         status: 'Draft',
       });
     }
