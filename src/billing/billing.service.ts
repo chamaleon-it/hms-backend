@@ -879,80 +879,65 @@ export class BillingService {
     if (!mongoose.isValidObjectId(id)) {
       throw new BadRequestException('A valid bill is required.');
     }
-    // Calculate the outstanding balance in MongoDB so a stale table cannot
-    // submit an incorrect amount. The update and balance check are atomic.
-    const balance = {
-      $round: [
-        {
-          $subtract: [
-            { $add: [{ $sum: '$items.total' }, { $ifNull: ['$refund', 0] }] },
-            {
-              $add: [
-                { $ifNull: ['$discount', 0] },
-                { $ifNull: ['$cash', 0] },
-                { $ifNull: ['$online', 0] },
-                { $ifNull: ['$card', 0] },
-              ],
-            },
-          ],
-        },
-        2,
-      ],
-    };
     const session = await this.billingModel.db.startSession();
     try {
       let data: Billing | null = null;
       await session.withTransaction(async () => {
+        const bill = await this.billingModel.findOne({ _id: id, user }).session(session);
+        if (!bill) throw new NotFoundException('Bill is not found.');
+        if (bill.transactionType === 'Return') {
+          throw new BadRequestException('Return bills cannot be marked as paid.');
+        }
+
+        const total = (bill.items || []).reduce(
+          (sum, item) => sum + (item.total || 0),
+          0,
+        );
+        const paid =
+          (bill.cash || 0) + (bill.online || 0) + (bill.card || 0) - (bill.refund || 0);
+        const balance = Math.max(
+          0,
+          Number((total - (bill.discount || 0) - paid).toFixed(2)),
+        );
+        if (balance <= 0) {
+          throw new BadRequestException(
+            'This bill has no remaining balance. Refresh the billing list.',
+          );
+        }
+
+        const old = {
+          cash: bill.cash || 0,
+          online: bill.online || 0,
+          card: bill.card || 0,
+          refund: bill.refund || 0,
+        };
+        const oldEvents = bill.paymentEvents?.length ? [] : [
+          this.initialPaymentEvent(old, (bill as any).createdAt || new Date()),
+        ];
         data = await this.billingModel.findOneAndUpdate(
-      {
-        _id: id,
-        user,
-        transactionType: { $ne: 'Return' },
-        $expr: { $gt: [balance, 0] },
-      },
-      [
-        {
-          $set: {
-            cash: {
-              $round: [
-                { $add: [{ $ifNull: ['$cash', 0] }, balance] },
-                2,
-              ],
+          { _id: id, user, updatedAt: (bill as any).updatedAt },
+          {
+            $set: {
+              cash: Number(((bill.cash || 0) + balance).toFixed(2)),
             },
-            paymentEvents: {
-              $concatArrays: [
-                { $ifNull: ['$paymentEvents', []] },
-                {
-                  $cond: [
-                    { $eq: [{ $size: { $ifNull: ['$paymentEvents', []] } }, 0] },
-                    [{
-                      at: '$createdAt',
-                      cashDelta: { $ifNull: ['$cash', 0] },
-                      onlineDelta: { $ifNull: ['$online', 0] },
-                      cardDelta: { $ifNull: ['$card', 0] },
-                      refundDelta: { $ifNull: ['$refund', 0] },
-                    }],
-                    [],
-                  ],
-                },
-                [{ at: new Date(), cashDelta: balance, onlineDelta: 0, cardDelta: 0, refundDelta: 0 }],
-              ],
+            $push: {
+              paymentEvents: {
+                $each: [
+                  ...oldEvents,
+                  {
+                    at: new Date(),
+                    cashDelta: balance,
+                    onlineDelta: 0,
+                    cardDelta: 0,
+                    refundDelta: 0,
+                  },
+                ],
+              },
             },
           },
-        },
-      ],
-      { new: true, session },
-    );
-    if (!data) {
-      const bill = await this.billingModel.findOne({ _id: id, user }).session(session);
-      if (!bill) throw new NotFoundException('Bill is not found.');
-      if (bill.transactionType === 'Return') {
-        throw new BadRequestException('Return bills cannot be marked as paid.');
-      }
-      throw new BadRequestException(
-        'This bill has no remaining balance. Refresh the billing list.',
-      );
-    }
+          { new: true, session },
+        );
+        if (!data) throw new ConflictException('Bill changed. Refresh and retry the payment.');
         await this.syncLinkedOrderPayment(data, session);
       });
       return data;
