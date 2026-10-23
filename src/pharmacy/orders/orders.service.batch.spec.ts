@@ -127,6 +127,61 @@ describe('OrdersService.updateOrder before completion', () => {
 });
 
 describe('OrdersService.completeOrder', () => {
+  it('keeps consultation and procedure lines on a linked bill when completing', async () => {
+    const id = new mongoose.Types.ObjectId();
+    const patient = new mongoose.Types.ObjectId();
+    const itemId = new mongoose.Types.ObjectId();
+    const billId = new mongoose.Types.ObjectId();
+    const session = {
+      withTransaction: jest.fn(async (work: () => Promise<void>) => work()),
+      endSession: jest.fn(),
+    };
+    const order: any = {
+      _id: id, patient, mrn: 'RX3', billNo: 'INV3', status: 'Completed',
+      discount: 0,
+      items: [{ name: itemId, quantity: 1, batchSellingPrice: 27 }],
+      save: jest.fn(),
+    };
+    const existingBill: any = {
+      _id: billId, patient,
+      items: [
+        { name: 'Medicine', itemId, quantity: 1, unitPrice: 35, total: 35 },
+        { name: 'Consultation Fee', quantity: 1, unitPrice: 100, total: 100 },
+        { name: 'Procedure', quantity: 1, unitPrice: 50, total: 50 },
+      ],
+      cash: 177, online: 0, card: 0, refund: 0,
+    };
+    const service: any = Object.create(OrdersService.prototype);
+    service.orderModel = {
+      db: { startSession: jest.fn().mockResolvedValue(session) },
+      findById: jest.fn().mockReturnValue({ exec: async () => ({ ...order, status: 'Pending' }) }),
+      findOneAndUpdate: jest.fn().mockReturnValue({ exec: async () => order }),
+    };
+    service.billingModel = {
+      findOne: jest.fn().mockReturnValue({ session: () => ({ exec: async () => existingBill }) }),
+      findOneAndUpdate: jest.fn().mockResolvedValue(existingBill),
+    };
+    service.usersService = { getPharmacyBilling: jest.fn().mockResolvedValue({ autoGenerateBill: false }) };
+    service.saleContext = jest.fn().mockResolvedValue({ orderId: id, orderNumber: 'RX3' });
+    service.itemsService = {
+      ensurePersistedBatchIds: jest.fn(),
+      resolveBatchForSale: jest.fn().mockResolvedValue(null),
+      decreaseItem: jest.fn().mockResolvedValue({}),
+      getItem: jest.fn().mockResolvedValue({ name: 'Medicine' }),
+    };
+
+    await service.completeOrder(id, new mongoose.Types.ObjectId());
+
+    const update = service.billingModel.findOneAndUpdate.mock.calls[0][1];
+    expect(update.$set.items.map((item: any) => item.name)).toEqual([
+      'Medicine', 'Consultation Fee', 'Procedure',
+    ]);
+    expect(update.$set.items[0]).toEqual(expect.objectContaining({ unitPrice: 27, total: 27 }));
+    expect(order.paidAmount).toBe(177);
+    expect(order.paymentStatus).toBe('Paid');
+    expect(order.save).toHaveBeenCalledWith({ session });
+  });
+
   it('reduces all item quantities only when completing the order', async () => {
     const id = new mongoose.Types.ObjectId();
     const itemId = new mongoose.Types.ObjectId();

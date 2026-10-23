@@ -6,10 +6,6 @@ import { Billing, BillingSchema } from './schemas/billing.schema';
 import { BillingItem, BillingItemSchema } from './schemas/billingItem.schema';
 import { UsersModule } from 'src/users/users.module';
 import { Order, OrderSchema } from 'src/pharmacy/orders/schemas/order.schema';
-import {
-  Consulting,
-  ConsultingSchema,
-} from 'src/consultings/schemas/consulting.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 @Module({
@@ -19,9 +15,6 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
       { name: BillingItem.name, schema: BillingItemSchema },
     ]),
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
-    MongooseModule.forFeature([
-      { name: Consulting.name, schema: ConsultingSchema },
-    ]),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     UsersModule,
   ],

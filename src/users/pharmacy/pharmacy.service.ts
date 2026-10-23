@@ -55,9 +55,6 @@ export class PharmacyService {
           ...(dto.printDualCopies !== undefined && {
             'pharmacy.billing.printDualCopies': dto.printDualCopies,
           }),
-          ...(dto.freeReconsultDays !== undefined && {
-            'pharmacy.billing.freeReconsultDays': dto.freeReconsultDays,
-          }),
         },
       },
       { new: true, runValidators: true },

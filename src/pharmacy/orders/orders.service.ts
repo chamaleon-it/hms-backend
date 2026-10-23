@@ -796,19 +796,39 @@ export class OrdersService {
             });
           }
           if (order.billNo && order.billNo !== '-') {
+            const existingBill = await this.billingModel.findOne({
+              mrn: order.billNo,
+              transactionType: 'Sale',
+              patient: order.patient,
+            }).session(session).exec();
+            if (!existingBill) throw new BadRequestException('Linked order bill was not found.');
+
+            // The order contains medicines only. Keep consultation, procedure and
+            // other manually added bill lines when refreshing its medicine lines.
+            const medicineNames = new Set(billItems.map(item => item.name.trim().toLowerCase()));
+            const otherItems = existingBill.items.filter(item =>
+              !item.itemId && !medicineNames.has(item.name.trim().toLowerCase()),
+            );
+            const updatedItems = [...billItems, ...otherItems];
+            const discount = order.discount ?? 0;
+            const payable = Math.round((updatedItems.reduce((sum, item) => sum + (item.total || 0), 0) -
+              discount) * 100) / 100;
+            const paid = Math.round(((existingBill.cash || 0) + (existingBill.online || 0) +
+              (existingBill.card || 0) - (existingBill.refund || 0)) * 100) / 100;
+            if (payable < 0) {
+              throw new BadRequestException('Bill discount exceeds the updated bill total.');
+            }
+            if (paid > payable) {
+              throw new BadRequestException(
+                `Recorded payment (₹${paid.toFixed(2)}) exceeds the updated bill total (₹${payable.toFixed(2)}). Adjust the payment or order prices before completing.`,
+              );
+            }
             const bill = await this.billingModel.findOneAndUpdate(
-              { mrn: order.billNo, transactionType: 'Sale' },
-              { $set: { items: billItems, discount: order.discount, doctor: order.doctorName || 'Self' } },
+              { _id: existingBill._id },
+              { $set: { items: updatedItems, discount, doctor: order.doctorName || 'Self' } },
               { new: true, runValidators: true, session },
             );
-            if (!bill) throw new BadRequestException('Linked order bill was not found.');
-            const payable = Math.round((billItems.reduce((sum, item) => sum + (item.total || 0), 0) -
-              (bill.discount || 0)) * 100) / 100;
-            const paid = Math.round(((bill.cash || 0) + (bill.online || 0) +
-              (bill.card || 0) - (bill.refund || 0)) * 100) / 100;
-            if (payable < 0 || paid > payable) {
-              throw new BadRequestException('Updated order prices conflict with recorded bill payments.');
-            }
+            if (!bill) throw new BadRequestException('Bill changed while completing the order. Refresh and retry.');
             order.paidAmount = paid;
             order.paymentStatus = paid <= 0 ? PaymentStatus.Pending :
               paid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;

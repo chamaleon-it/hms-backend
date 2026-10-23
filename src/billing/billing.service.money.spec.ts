@@ -18,7 +18,6 @@ describe('BillingService money rules', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
       usersService as any,
       { registerBootSeedJob: jest.fn() } as any,
     );
@@ -43,6 +42,64 @@ describe('BillingService money rules', () => {
       items: [expect.objectContaining({ total: 23.57 })],
       paymentEvents: [expect.objectContaining({ cashDelta: 20, onlineDelta: 3.57 })],
     }));
+  });
+
+  it('saves every submitted service line on a lab report bill', async () => {
+    const { service, billingModel } = makeService();
+    await service.generateBill(bill({
+      reportId: '507f1f77bcf86cd799439014',
+      items: [
+        { name: 'Blood Test', quantity: 1, unitPrice: 100, total: 100 },
+        { name: 'Consultation Fee', quantity: 1, unitPrice: 50, total: 50 },
+      ],
+      cash: 150,
+      online: 0,
+    }) as any);
+
+    expect(billingModel.create).toHaveBeenCalledWith(expect.objectContaining({
+      items: [
+        expect.objectContaining({ name: 'Blood Test', total: 100 }),
+        expect.objectContaining({ name: 'Consultation Fee', total: 50 }),
+      ],
+      reportId: '507f1f77bcf86cd799439014',
+    }));
+  });
+
+  it('saves all pharmacy order lines before the order is completed', async () => {
+    const { service, billingModel } = makeService();
+    const session = {
+      withTransaction: async (callback: () => Promise<void>) => callback(),
+      endSession: jest.fn(),
+    };
+    billingModel.db.startSession.mockResolvedValue(session);
+    billingModel.create.mockImplementation(async (input: any) => input);
+    const orderModel = {
+      findOneAndUpdate: jest.fn().mockResolvedValue({ patient: bill().patient }),
+    };
+    (service as any).orderModel = orderModel;
+    jest.spyOn(service as any, 'syncLinkedOrderPayment').mockResolvedValue(undefined);
+
+    await service.generateBill(bill({
+      rxId: 'RX3',
+      items: [
+        { name: 'Medicine', quantity: 1, unitPrice: 27, total: 27 },
+        { name: 'Consultation Fee', quantity: 1, unitPrice: 100, total: 100 },
+        { name: 'Procedure', quantity: 1, unitPrice: 50, total: 50 },
+      ],
+      cash: 177,
+      online: 0,
+    }) as any);
+
+    expect(billingModel.create).toHaveBeenCalledWith([
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({ name: 'Medicine', total: 27 }),
+          expect.objectContaining({ name: 'Consultation Fee', total: 100 }),
+          expect.objectContaining({ name: 'Procedure', total: 50 }),
+        ],
+      }),
+    ], { session });
+    expect(orderModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('returns the saved invoice for a repeated request ID', async () => {

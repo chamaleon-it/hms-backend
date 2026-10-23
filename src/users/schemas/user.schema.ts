@@ -163,7 +163,6 @@ export class User {
         autoGenerateBill: { type: Boolean, default: false },
         autoGeneratePrescription: { type: Boolean, default: false },
         printDualCopies: { type: Boolean, default: true },
-        freeReconsultDays: { type: Number, default: 7 },
       },
       inventory: {
         lowStockThreshold: { type: Number, default: 20 },
@@ -192,7 +191,6 @@ export class User {
       autoGenerateBill: boolean;
       autoGeneratePrescription?: boolean;
       printDualCopies?: boolean;
-      freeReconsultDays?: number;
     };
     inventory: {
       lowStockThreshold: number;

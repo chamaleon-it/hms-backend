@@ -1,12 +1,9 @@
 import {
   IsBoolean,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
-  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class UpdateBillingDto {
   @IsString({ message: 'Prefix must be a string' })
@@ -29,9 +26,4 @@ export class UpdateBillingDto {
   @IsBoolean({ message: 'Print dual copies must be a boolean' })
   printDualCopies?: boolean;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({}, { message: 'Free reconsult days must be a number' })
-  @Min(0, { message: 'Free reconsult days cannot be negative' })
-  freeReconsultDays?: number;
 }
