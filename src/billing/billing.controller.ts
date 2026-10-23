@@ -14,6 +14,9 @@ import { CreateBillingDto } from './dto/create-billing.dto';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { JwtAuthGuard } from 'src/auth/auth.guard';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/users/schemas/user.schema';
 import mongoose from 'mongoose';
 import { GetBillisDto } from './dto/get-bills.dto';
 import { AddBillingItemDto } from './dto/add-billing-item.dto';
@@ -22,6 +25,7 @@ import { AddPaymentDto } from './dto/add-payment.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import { EditPharmacyBillDto } from './dto/edit-pharmacy-bill.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -171,6 +175,30 @@ export class BillingController {
     return {
       data,
       message: 'Bill were retrived successfully.',
+    };
+  }
+
+  @Get('pharmacy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async getPharmacyBillForEdit(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    return { data: await this.billingService.getPharmacyBillForEdit(id, user.id) };
+  }
+
+  @Patch('pharmacy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACY, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async editPharmacyBill(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() dto: EditPharmacyBillDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    return {
+      data: await this.billingService.editPharmacyBill(id, dto, user.id),
+      message: 'Bill updated successfully.',
     };
   }
 

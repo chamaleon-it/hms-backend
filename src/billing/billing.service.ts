@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { CreateBillingDto, CreateBillingItemDto } from './dto/create-billing.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import { EditPharmacyBillDto } from './dto/edit-pharmacy-bill.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Billing } from './schemas/billing.schema';
 import mongoose, { Model } from 'mongoose';
@@ -722,6 +723,95 @@ export class BillingService {
       { new: true, runValidators: true }
     );
     return data;
+  }
+
+  async getPharmacyBillForEdit(id: mongoose.Types.ObjectId, user: mongoose.Types.ObjectId) {
+    if (!mongoose.isValidObjectId(id)) throw new BadRequestException('Invalid bill ID.');
+    const bill = await this.billingModel.findOne({
+      _id: id, user, transactionType: 'Sale', reportId: null,
+    }).populate('patient').lean().exec();
+    if (!bill) throw new NotFoundException('Pharmacy bill not found.');
+    if (bill.status === 'Completed') throw new BadRequestException('Completed bills cannot be edited.');
+    const linkedOrder = await this.orderModel.exists({ billNo: bill.mrn });
+    return { bill, linkedOrder: !!linkedOrder };
+  }
+
+  async editPharmacyBill(
+    id: mongoose.Types.ObjectId,
+    dto: EditPharmacyBillDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(id)) throw new BadRequestException('Invalid bill ID.');
+    const items = this.normalizeItems(dto.items);
+    const session = await this.billingModel.db.startSession();
+    try {
+      let updated: Billing | null = null;
+      await session.withTransaction(async () => {
+        const existing = await this.billingModel.findOne({
+          _id: id, user, transactionType: 'Sale', reportId: null,
+        }).session(session).exec();
+        if (!existing) throw new NotFoundException('Pharmacy bill not found.');
+        if (existing.status === 'Completed') throw new BadRequestException('Completed bills cannot be edited.');
+        const expectedUpdatedAt = new Date(dto.expectedUpdatedAt);
+        if (existing.get('updatedAt')?.getTime() !== expectedUpdatedAt.getTime()) {
+          throw new ConflictException('Bill changed while editing. Refresh and retry.');
+        }
+
+        const linkedOrder = await this.orderModel.findOne({ billNo: existing.mrn }).session(session).exec();
+        const savedMedicines = existing.items.filter(item => !!item.itemId);
+        if (linkedOrder) {
+          const editedMedicines = items.filter(item => !!item.itemId);
+          const medicineChanged = savedMedicines.length !== editedMedicines.length ||
+            savedMedicines.some((saved, index) => {
+              const edited = editedMedicines[index];
+              return !edited || String(saved.itemId) !== String(edited.itemId) ||
+                saved.name !== edited.name || saved.quantity !== edited.quantity ||
+                saved.unitPrice !== edited.unitPrice || saved.discount !== edited.discount ||
+                saved.total !== edited.total || saved.batchId !== (edited.batchId ?? null) ||
+                saved.batchNumber !== (edited.batchNumber ?? null);
+            });
+          if (medicineChanged) {
+            throw new BadRequestException('Edit medicines on the linked order, not on its bill.');
+          }
+        }
+
+        // Keep the original inventory snapshot; this form only edits bill lines.
+        let medicineIndex = 0;
+        const billItems = linkedOrder
+          ? items.map(item => item.itemId ? savedMedicines[medicineIndex++] : item)
+          : items;
+
+        const payment = this.validatePaymentTotals(billItems, {
+          cash: existing.cash,
+          online: existing.online,
+          card: existing.card,
+          refund: existing.refund,
+          discount: dto.discount,
+        });
+        updated = await this.billingModel.findOneAndUpdate(
+          { _id: id, user, transactionType: 'Sale', reportId: null, status: { $ne: 'Completed' }, updatedAt: expectedUpdatedAt },
+          { $set: {
+            items: billItems,
+            discount: payment.discount,
+            doctor: dto.doctor?.trim() || 'Self',
+            note: dto.note ?? existing.note ?? '',
+          } },
+          { new: true, runValidators: true, session },
+        );
+        if (!updated) throw new ConflictException('Bill changed while editing. Refresh and retry.');
+        if (linkedOrder) {
+          await this.orderModel.findOneAndUpdate(
+            { _id: linkedOrder._id },
+            { $set: { discount: payment.discount, doctorName: dto.doctor?.trim() || 'Self' } },
+            { session },
+          );
+          await this.syncLinkedOrderPayment(updated, session);
+        }
+      });
+      return updated!;
+    } finally {
+      await session.endSession();
+    }
   }
 
   async updateBillStatusByReportId(reportId: mongoose.Types.ObjectId, status: 'Draft' | 'Completed') {
