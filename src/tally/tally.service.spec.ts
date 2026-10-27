@@ -131,6 +131,34 @@ describe('TallyService.syncAccountTransaction ledger routing', () => {
     },
   );
 
+  it('posts the separate NCF refund as a Reception Payment, and consultation fee collection as a Receipt', async () => {
+    const { service } = createService();
+
+    const ncf = await syncAndCapture(service, {
+      ...base,
+      type: TransactionType.Expense,
+      category: 'Refund',
+      ledgerGroup: TallyLedgerGroup.Reception,
+      description: 'Reception NCF #REG-1',
+    });
+    expect(ncf.outcome.status).toBe('synced');
+    expect(ncf.postedXml).toContain('VCHTYPE="Payment"');
+    expect(ncf.postedXml).toContain('Reception Refunds');
+    expect(ncf.postedXml).not.toContain('Reception Income');
+
+    const collected = await syncAndCapture(service, {
+      ...base,
+      transactionId: 'TXN-00002',
+      type: TransactionType.Income,
+      category: 'Consultation Fee',
+      description: 'Reception Bill #REG-1',
+    });
+    expect(collected.outcome.status).toBe('synced');
+    expect(collected.postedXml).toContain('VCHTYPE="Receipt"');
+    expect(collected.postedXml).toContain('Reception Income');
+    expect(collected.postedXml).not.toContain('VCHTYPE="Payment"');
+  });
+
   it('posts a Purchase Payment to the Purchase ledger via the explicit ledgerGroup override', async () => {
     const { service } = createService();
     const { outcome, postedXml } = await syncAndCapture(service, {

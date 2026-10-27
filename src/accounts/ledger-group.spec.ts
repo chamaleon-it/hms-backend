@@ -1,4 +1,8 @@
-import { ledgerGroupForCategory, TallyLedgerGroup } from './ledger-group';
+import {
+  isSeparateNcfPayment,
+  ledgerGroupForCategory,
+  TallyLedgerGroup,
+} from './ledger-group';
 import {
   ExpenseCategory,
   IncomeCategory,
@@ -26,7 +30,7 @@ describe('ledgerGroupForCategory', () => {
     );
   });
 
-  it('routes consultation fees and refunds (including NCF/appointment refunds) to the Reception ledger', () => {
+  it('routes consultation fee collection to the Reception receipt side and refunds to the payment side', () => {
     expect(ledgerGroupForCategory(IncomeCategory.ConsultationFee)).toBe(
       TallyLedgerGroup.Reception,
     );
@@ -50,5 +54,35 @@ describe('ledgerGroupForCategory', () => {
       ledgerGroupForCategory(ExpenseCategory.PaymentCorrection),
     ).toBeUndefined();
     expect(ledgerGroupForCategory(undefined)).toBeUndefined();
+  });
+});
+
+describe('isSeparateNcfPayment', () => {
+  it('matches the separate Mark as NCF refund bill', () => {
+    expect(
+      isSeparateNcfPayment({ transactionType: 'Refund', note: 'NCF' }),
+    ).toBe(true);
+    expect(
+      isSeparateNcfPayment({ transactionType: 'Refund', note: ' ncf ' }),
+    ).toBe(true);
+  });
+
+  it('does not treat consultation fee collection, or other refund reasons, as NCF', () => {
+    expect(isSeparateNcfPayment({ transactionType: 'Sale', note: 'NCF' })).toBe(
+      false,
+    );
+    expect(isSeparateNcfPayment({ note: undefined })).toBe(false);
+    expect(
+      isSeparateNcfPayment({
+        transactionType: 'Refund',
+        note: 'Doctor Unavailable',
+      }),
+    ).toBe(false);
+    expect(
+      isSeparateNcfPayment({
+        transactionType: undefined,
+        note: 'Consultation Fee',
+      }),
+    ).toBe(false);
   });
 });

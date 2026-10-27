@@ -16,6 +16,25 @@ export enum TallyLedgerGroup {
 }
 
 /**
+ * Reception's "Mark as NCF" action stores a separate refund bill
+ * (`POST /appointments/refund` with reason `"NCF"`). That bill's note is
+ * the reason and its transaction type is Refund. It is money going out.
+ * It is not a line on the consultation-fee bill, and a consultation-fee
+ * sale (money collected at booking) is not this record.
+ */
+export function isSeparateNcfPayment(bill: {
+  transactionType?: string | null;
+  note?: string | null;
+}): boolean {
+  if (String(bill.transactionType || '') !== 'Refund') return false;
+  return (
+    String(bill.note || '')
+      .trim()
+      .toLowerCase() === 'ncf'
+  );
+}
+
+/**
  * Maps an AccountTransaction category to one of the four Tally ledgers.
  * Categories outside these four (e.g. Lab income, Salary, Office Expense)
  * resolve to `undefined` and fall back to the connection's generic

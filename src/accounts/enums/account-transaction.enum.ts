@@ -13,7 +13,7 @@ export enum ExpenseCategory {
   OfficeExpense = 'Office Expense',
   Internet = 'Internet',
   Maintenance = 'Maintenance',
-  /** Reception ledger payment: consultation/appointment refunds and NCF reversals. */
+  /** Reception ledger payment: appointment refunds, including the separate NCF refund bill. */
   Refund = 'Refund',
   /** Pharmacy ledger payment: medicine returns. */
   SalesReturn = 'Sales Return',

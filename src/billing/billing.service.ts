@@ -28,7 +28,11 @@ import {
   SourceModule,
   TransactionType,
 } from 'src/accounts/enums/account-transaction.enum';
-import { ledgerGroupForCategory } from 'src/accounts/ledger-group';
+import {
+  TallyLedgerGroup,
+  isSeparateNcfPayment,
+  ledgerGroupForCategory,
+} from 'src/accounts/ledger-group';
 
 import configuration from 'src/config/configuration';
 import { resolveSaleLine } from 'src/pharmacy/sale-line';
@@ -280,7 +284,8 @@ export class BillingService {
               .includes('refund'),
           ));
       const isReturn = createBill.transactionType === 'Return';
-      const isExpense = isRefund || isReturn;
+      const ncfPayment = isSeparateNcfPayment(createBill);
+      const isExpense = ncfPayment || isRefund || isReturn;
 
       const type = isExpense ? TransactionType.Expense : TransactionType.Income;
 
@@ -306,15 +311,17 @@ export class BillingService {
               .includes('procedure'),
           ));
 
-      // Therapy/procedure refunds route to the Therapy ledger; all other
-      // refunds (consultation, appointment, NCF) route to Reception.
+      // Therapy/procedure refunds route to the Therapy ledger. NCF is the
+      // separate refund bill from "Mark as NCF", not the consultation sale.
       const isTherapyOrProcedure =
         isTherapy ||
         isProcedure ||
         this.isTherapyOrProcedureBill(createBill);
 
       let category: string;
-      if (isRefund) {
+      if (ncfPayment) {
+        category = ExpenseCategory.Refund;
+      } else if (isRefund) {
         category = isTherapyOrProcedure
           ? ExpenseCategory.TherapyRefund
           : ExpenseCategory.Refund;
@@ -365,9 +372,12 @@ export class BillingService {
           type,
           category,
           amount: billAmount,
-          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Bill'} #${data.mrn}`,
+          description: `${sourceModule} ${ncfPayment ? 'NCF' : isRefund ? 'Refund' : isReturn ? 'Return' : 'Bill'} #${data.mrn}`,
           paymentMethod,
           sourceModule,
+          ...(ncfPayment
+            ? { ledgerGroup: TallyLedgerGroup.Reception, notes: 'NCF' }
+            : {}),
           createdBy: createBill.user,
           transactionDate: new Date(),
         });
@@ -1176,7 +1186,8 @@ export class BillingService {
                 .includes('refund'),
             ));
         const isReturn = data.transactionType === 'Return';
-        const isExpense = isRefund || isReturn;
+        const ncfPayment = isSeparateNcfPayment(data);
+        const isExpense = ncfPayment || isRefund || isReturn;
 
         const type = isExpense
           ? TransactionType.Expense
@@ -1208,7 +1219,9 @@ export class BillingService {
           isTherapy || isProcedure || this.isTherapyOrProcedureBill(data);
 
         let category: string;
-        if (isRefund) {
+        if (ncfPayment) {
+          category = ExpenseCategory.Refund;
+        } else if (isRefund) {
           category = isTherapyOrProcedure
             ? ExpenseCategory.TherapyRefund
             : ExpenseCategory.Refund;
@@ -1245,9 +1258,12 @@ export class BillingService {
           type,
           category,
           amount: totalNewPaid,
-          description: `${sourceModule} ${isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
+          description: `${sourceModule} ${ncfPayment ? 'NCF' : isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
           paymentMethod,
           sourceModule,
+          ...(ncfPayment
+            ? { ledgerGroup: TallyLedgerGroup.Reception, notes: 'NCF' }
+            : {}),
           createdBy: user || data.user,
           transactionDate: new Date(),
         });
@@ -1346,7 +1362,8 @@ export class BillingService {
                 .includes('refund'),
             ));
         const isReturn = data.transactionType === 'Return';
-        const isExpense = isRefund || isReturn;
+        const ncfPayment = isSeparateNcfPayment(data);
+        const isExpense = ncfPayment || isRefund || isReturn;
 
         const type = isExpense
           ? TransactionType.Expense
@@ -1378,7 +1395,9 @@ export class BillingService {
           isTherapy || isProcedure || this.isTherapyOrProcedureBill(data);
 
         let category: string;
-        if (isRefund) {
+        if (ncfPayment) {
+          category = ExpenseCategory.Refund;
+        } else if (isRefund) {
           category = isTherapyOrProcedure
             ? ExpenseCategory.TherapyRefund
             : ExpenseCategory.Refund;
@@ -1411,11 +1430,13 @@ export class BillingService {
         const reverseCorrectionCategory = isExpense
           ? ExpenseCategory.PaymentCorrection
           : IncomeCategory.PaymentCorrection;
-        const paymentLabel = isRefund
-          ? 'Refund'
-          : isReturn
-            ? 'Return'
-            : 'Payment';
+        const paymentLabel = ncfPayment
+          ? 'NCF'
+          : isRefund
+            ? 'Refund'
+            : isReturn
+              ? 'Return'
+              : 'Payment';
 
         const deltas: { amount: number; method: PaymentMethod }[] = [
           { amount: deltaCash, method: PaymentMethod.Cash },
@@ -1472,6 +1493,7 @@ export class BillingService {
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
+              ...(ncfPayment ? { notes: 'NCF' } : {}),
               createdBy: data.user,
               transactionDate: new Date(),
             });
