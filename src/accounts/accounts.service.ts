@@ -24,6 +24,7 @@ import {
   SourceModule,
   TransactionType,
 } from './enums/account-transaction.enum';
+import { TallyLedgerGroup } from './ledger-group';
 import { TallyService } from 'src/tally/tally.service';
 
 @Injectable()
@@ -85,6 +86,8 @@ export class AccountsService {
     description: string;
     paymentMethod?: PaymentMethod;
     sourceModule?: SourceModule;
+    /** Explicit Tally ledger override — see ledgerGroupForCategory. */
+    ledgerGroup?: TallyLedgerGroup;
     notes?: string;
     createdBy?: string | mongoose.Types.ObjectId;
     transactionDate?: Date;
@@ -117,6 +120,7 @@ export class AccountsService {
         description: params.description,
         paymentMethod: params.paymentMethod || PaymentMethod.Cash,
         sourceModule: params.sourceModule || SourceModule.Uncategorised,
+        ledgerGroup: params.ledgerGroup,
         notes: params.notes,
         transactionDate: params.transactionDate || new Date(),
         createdBy: createdByObjectId,

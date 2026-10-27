@@ -26,6 +26,10 @@ import {
   PaymentMethod,
   TransactionType,
 } from 'src/accounts/enums/account-transaction.enum';
+import {
+  TallyLedgerGroup,
+  ledgerGroupForCategory,
+} from 'src/accounts/ledger-group';
 
 const CONNECTION_KEY = 'pharmacy';
 const REQUEST_TIMEOUT_MS = 8000;
@@ -71,6 +75,12 @@ export class TallyService {
       cardLedger: doc.cardLedger || 'Card',
       salesLedger: doc.salesLedger || 'Pharmacy Sales',
       expenseLedger: doc.expenseLedger || 'Indirect Expenses',
+      pharmacyPaymentLedger: doc.pharmacyPaymentLedger || 'Pharmacy Returns',
+      therapyReceiptLedger: doc.therapyReceiptLedger || 'Therapy Income',
+      therapyPaymentLedger: doc.therapyPaymentLedger || 'Therapy Refunds',
+      receptionReceiptLedger: doc.receptionReceiptLedger || 'Reception Income',
+      receptionPaymentLedger: doc.receptionPaymentLedger || 'Reception Refunds',
+      purchasePaymentLedger: doc.purchasePaymentLedger || 'Purchase Payments',
       lastCheckedAt: doc.lastCheckedAt || null,
       lastError: doc.lastError || null,
       connectedAt: doc.connectedAt || null,
@@ -131,6 +141,18 @@ export class TallyService {
     if (dto.cardLedger) doc.cardLedger = dto.cardLedger.trim();
     if (dto.salesLedger) doc.salesLedger = dto.salesLedger.trim();
     if (dto.expenseLedger) doc.expenseLedger = dto.expenseLedger.trim();
+    if (dto.pharmacyPaymentLedger)
+      doc.pharmacyPaymentLedger = dto.pharmacyPaymentLedger.trim();
+    if (dto.therapyReceiptLedger)
+      doc.therapyReceiptLedger = dto.therapyReceiptLedger.trim();
+    if (dto.therapyPaymentLedger)
+      doc.therapyPaymentLedger = dto.therapyPaymentLedger.trim();
+    if (dto.receptionReceiptLedger)
+      doc.receptionReceiptLedger = dto.receptionReceiptLedger.trim();
+    if (dto.receptionPaymentLedger)
+      doc.receptionPaymentLedger = dto.receptionPaymentLedger.trim();
+    if (dto.purchasePaymentLedger)
+      doc.purchasePaymentLedger = dto.purchasePaymentLedger.trim();
     doc.lastCheckedAt = new Date();
 
     if (!probe.ok || probe.error) {
@@ -237,7 +259,36 @@ export class TallyService {
       { name: doc.cashLedger || 'Cash', parent: 'Cash-in-Hand' },
       { name: doc.upiLedger || 'UPI', parent: 'Bank Accounts' },
       { name: doc.cardLedger || 'Card', parent: 'Bank Accounts' },
+      // Pharmacy ledger: medicine sales (Receipt) / returns (Payment)
       { name: doc.salesLedger || 'Pharmacy Sales', parent: 'Sales Accounts' },
+      {
+        name: doc.pharmacyPaymentLedger || 'Pharmacy Returns',
+        parent: 'Indirect Expenses',
+      },
+      // Therapy ledger: procedure + therapy fees (Receipt) / refunds (Payment)
+      {
+        name: doc.therapyReceiptLedger || 'Therapy Income',
+        parent: 'Sales Accounts',
+      },
+      {
+        name: doc.therapyPaymentLedger || 'Therapy Refunds',
+        parent: 'Indirect Expenses',
+      },
+      // Reception ledger: appointment/consultation fees (Receipt) / NCF + refunds (Payment)
+      {
+        name: doc.receptionReceiptLedger || 'Reception Income',
+        parent: 'Sales Accounts',
+      },
+      {
+        name: doc.receptionPaymentLedger || 'Reception Refunds',
+        parent: 'Indirect Expenses',
+      },
+      // Purchase ledger: Payment only — Cash/Card/UPI actually paid to suppliers
+      {
+        name: doc.purchasePaymentLedger || 'Purchase Payments',
+        parent: 'Purchase Accounts',
+      },
+      // Generic fallback for anything outside the four ledgers above (e.g. Lab income, Salary)
       {
         name: doc.expenseLedger || 'Indirect Expenses',
         parent: 'Indirect Expenses',
@@ -273,6 +324,48 @@ export class TallyService {
   }
 
   /**
+   * Pick the Receipt (income) and Payment (expense) ledger for one of the
+   * four product ledgers — Pharmacy, Therapy, Reception, Purchase — or the
+   * generic fallback pair when the transaction does not belong to any of
+   * them (e.g. Lab income, Salary, Office Expense).
+   */
+  private ledgerPairFor(
+    doc: TallyConnectionDocument,
+    group: TallyLedgerGroup | undefined,
+  ): { receiptLedger: string; paymentLedger: string } {
+    switch (group) {
+      case TallyLedgerGroup.Pharmacy:
+        return {
+          receiptLedger: doc.salesLedger || 'Pharmacy Sales',
+          paymentLedger: doc.pharmacyPaymentLedger || 'Pharmacy Returns',
+        };
+      case TallyLedgerGroup.Therapy:
+        return {
+          receiptLedger: doc.therapyReceiptLedger || 'Therapy Income',
+          paymentLedger: doc.therapyPaymentLedger || 'Therapy Refunds',
+        };
+      case TallyLedgerGroup.Reception:
+        return {
+          receiptLedger: doc.receptionReceiptLedger || 'Reception Income',
+          paymentLedger: doc.receptionPaymentLedger || 'Reception Refunds',
+        };
+      case TallyLedgerGroup.Purchase:
+        // Purchase has no Receipt side by product rule — money only ever
+        // goes out to suppliers. Kept here only so a stray Income-typed
+        // Purchase transaction does not crash; it should never occur.
+        return {
+          receiptLedger: doc.purchasePaymentLedger || 'Purchase Payments',
+          paymentLedger: doc.purchasePaymentLedger || 'Purchase Payments',
+        };
+      default:
+        return {
+          receiptLedger: doc.salesLedger || 'Pharmacy Sales',
+          paymentLedger: doc.expenseLedger || 'Indirect Expenses',
+        };
+    }
+  }
+
+  /**
    * Push an HMS account transaction into Tally as Receipt (Income) or Payment (Expense).
    * Non-throwing — logs and marks the transaction with sync status.
    */
@@ -284,6 +377,7 @@ export class TallyService {
     amount: number;
     description: string;
     paymentMethod?: PaymentMethod | string;
+    ledgerGroup?: TallyLedgerGroup | string;
     transactionDate?: Date;
     tallySynced?: boolean;
   }): Promise<TallySyncOutcome> {
@@ -302,8 +396,11 @@ export class TallyService {
     const party = this.paymentLedger(doc, tx.paymentMethod);
     const isIncome = tx.type === TransactionType.Income || tx.type === 'Income';
     const voucherType = isIncome ? 'Receipt' : 'Payment';
-    const incomeLedger = doc.salesLedger || 'Pharmacy Sales';
-    const expenseLedger = doc.expenseLedger || 'Indirect Expenses';
+    const ledgerGroup =
+      (tx.ledgerGroup as TallyLedgerGroup | undefined) ||
+      ledgerGroupForCategory(tx.category);
+    const { receiptLedger: incomeLedger, paymentLedger: expenseLedger } =
+      this.ledgerPairFor(doc, ledgerGroup);
 
     // Receipt: Debit Cash/Bank, Credit Sales
     // Payment: Debit Expense, Credit Cash/Bank
@@ -441,6 +538,12 @@ export class TallyService {
         doc.upiLedger || 'UPI',
         doc.cardLedger || 'Card',
         doc.salesLedger || 'Pharmacy Sales',
+        doc.pharmacyPaymentLedger || 'Pharmacy Returns',
+        doc.therapyReceiptLedger || 'Therapy Income',
+        doc.therapyPaymentLedger || 'Therapy Refunds',
+        doc.receptionReceiptLedger || 'Reception Income',
+        doc.receptionPaymentLedger || 'Reception Refunds',
+        doc.purchasePaymentLedger || 'Purchase Payments',
         doc.expenseLedger || 'Indirect Expenses',
       ],
     };

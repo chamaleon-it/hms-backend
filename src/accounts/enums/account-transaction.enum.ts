@@ -13,8 +13,14 @@ export enum ExpenseCategory {
   OfficeExpense = 'Office Expense',
   Internet = 'Internet',
   Maintenance = 'Maintenance',
+  /** Reception ledger payment: consultation/appointment refunds and NCF reversals. */
   Refund = 'Refund',
+  /** Pharmacy ledger payment: medicine returns. */
   SalesReturn = 'Sales Return',
+  /** Therapy ledger payment: procedure/therapy fee refunds. */
+  TherapyRefund = 'Therapy Refund',
+  /** Purchase ledger payment: Cash/Card/UPI actually paid to a supplier. */
+  PurchasePayment = 'Purchase Payment',
   PaymentCorrection = 'Payment Correction',
   Miscellaneous = 'Miscellaneous',
   OtherExpense = 'Other Expense',
@@ -42,4 +48,5 @@ export enum SourceModule {
   Pharmacy = 'Pharmacy',
   Lab = 'Lab',
   Reception = 'Reception',
+  Purchase = 'Purchase',
 }

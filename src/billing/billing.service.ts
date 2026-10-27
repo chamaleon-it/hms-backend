@@ -28,6 +28,7 @@ import {
   SourceModule,
   TransactionType,
 } from 'src/accounts/enums/account-transaction.enum';
+import { ledgerGroupForCategory } from 'src/accounts/ledger-group';
 
 import configuration from 'src/config/configuration';
 import { resolveSaleLine } from 'src/pharmacy/sale-line';
@@ -282,43 +283,55 @@ export class BillingService {
       const isExpense = isRefund || isReturn;
 
       const type = isExpense ? TransactionType.Expense : TransactionType.Income;
+
+      const isTherapy =
+        String(createBill.note || '')
+          .toLowerCase()
+          .includes('therapy') ||
+        (createBill.items &&
+          createBill.items.some((i: any) =>
+            String(i.name || '')
+              .toLowerCase()
+              .includes('therapy'),
+          ));
+
+      const isProcedure =
+        String(createBill.note || '')
+          .toLowerCase()
+          .includes('procedure') ||
+        (createBill.items &&
+          createBill.items.some((i: any) =>
+            String(i.name || '')
+              .toLowerCase()
+              .includes('procedure'),
+          ));
+
+      // Therapy/procedure refunds route to the Therapy ledger; all other
+      // refunds (consultation, appointment, NCF) route to Reception.
+      const isTherapyOrProcedure =
+        isTherapy ||
+        isProcedure ||
+        this.isTherapyOrProcedureBill(createBill);
+
       let category: string;
       if (isRefund) {
-        category = ExpenseCategory.Refund;
+        category = isTherapyOrProcedure
+          ? ExpenseCategory.TherapyRefund
+          : ExpenseCategory.Refund;
       } else if (isReturn) {
         category = ExpenseCategory.SalesReturn;
+      } else if (isTherapy) {
+        category = IncomeCategory.TherapyIncome;
+      } else if (isProcedure) {
+        category = IncomeCategory.ProcedureIncome;
+      } else if (sourceModule === SourceModule.Doctor) {
+        category = IncomeCategory.ConsultationFee;
+      } else if (sourceModule === SourceModule.Lab) {
+        category = IncomeCategory.LaboratoryIncome;
+      } else if (sourceModule === SourceModule.Reception) {
+        category = IncomeCategory.ConsultationFee;
       } else {
-        const isTherapy =
-          String(createBill.note || '')
-            .toLowerCase()
-            .includes('therapy') ||
-          (createBill.items &&
-            createBill.items.some((i: any) =>
-              String(i.name || '')
-                .toLowerCase()
-                .includes('therapy'),
-            ));
-
-        const isProcedure =
-          String(createBill.note || '')
-            .toLowerCase()
-            .includes('procedure') ||
-          (createBill.items &&
-            createBill.items.some((i: any) =>
-              String(i.name || '')
-                .toLowerCase()
-                .includes('procedure'),
-            ));
-
-        if (isTherapy) category = IncomeCategory.TherapyIncome;
-        else if (isProcedure) category = IncomeCategory.ProcedureIncome;
-        else if (sourceModule === SourceModule.Doctor)
-          category = IncomeCategory.ConsultationFee;
-        else if (sourceModule === SourceModule.Lab)
-          category = IncomeCategory.LaboratoryIncome;
-        else if (sourceModule === SourceModule.Reception)
-          category = IncomeCategory.ConsultationFee;
-        else category = IncomeCategory.MedicineSale;
+        category = IncomeCategory.MedicineSale;
       }
 
       let paymentMethod = PaymentMethod.Cash;
@@ -1168,43 +1181,51 @@ export class BillingService {
         const type = isExpense
           ? TransactionType.Expense
           : TransactionType.Income;
+
+        const isTherapy =
+          String(data.note || '')
+            .toLowerCase()
+            .includes('therapy') ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '')
+                .toLowerCase()
+                .includes('therapy'),
+            ));
+
+        const isProcedure =
+          String(data.note || '')
+            .toLowerCase()
+            .includes('procedure') ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '')
+                .toLowerCase()
+                .includes('procedure'),
+            ));
+
+        const isTherapyOrProcedure =
+          isTherapy || isProcedure || this.isTherapyOrProcedureBill(data);
+
         let category: string;
         if (isRefund) {
-          category = ExpenseCategory.Refund;
+          category = isTherapyOrProcedure
+            ? ExpenseCategory.TherapyRefund
+            : ExpenseCategory.Refund;
         } else if (isReturn) {
           category = ExpenseCategory.SalesReturn;
+        } else if (isTherapy) {
+          category = IncomeCategory.TherapyIncome;
+        } else if (isProcedure) {
+          category = IncomeCategory.ProcedureIncome;
+        } else if (sourceModule === SourceModule.Doctor) {
+          category = IncomeCategory.ConsultationFee;
+        } else if (sourceModule === SourceModule.Lab) {
+          category = IncomeCategory.LaboratoryIncome;
+        } else if (sourceModule === SourceModule.Reception) {
+          category = IncomeCategory.ConsultationFee;
         } else {
-          const isTherapy =
-            String(data.note || '')
-              .toLowerCase()
-              .includes('therapy') ||
-            (data.items &&
-              data.items.some((i: any) =>
-                String(i.name || '')
-                  .toLowerCase()
-                  .includes('therapy'),
-              ));
-
-          const isProcedure =
-            String(data.note || '')
-              .toLowerCase()
-              .includes('procedure') ||
-            (data.items &&
-              data.items.some((i: any) =>
-                String(i.name || '')
-                  .toLowerCase()
-                  .includes('procedure'),
-              ));
-
-          if (isTherapy) category = IncomeCategory.TherapyIncome;
-          else if (isProcedure) category = IncomeCategory.ProcedureIncome;
-          else if (sourceModule === SourceModule.Doctor)
-            category = IncomeCategory.ConsultationFee;
-          else if (sourceModule === SourceModule.Lab)
-            category = IncomeCategory.LaboratoryIncome;
-          else if (sourceModule === SourceModule.Reception)
-            category = IncomeCategory.ConsultationFee;
-          else category = IncomeCategory.MedicineSale;
+          category = IncomeCategory.MedicineSale;
         }
 
         let paymentMethod = PaymentMethod.Cash;
@@ -1330,44 +1351,56 @@ export class BillingService {
         const type = isExpense
           ? TransactionType.Expense
           : TransactionType.Income;
+
+        const isTherapy =
+          String(data.note || '')
+            .toLowerCase()
+            .includes('therapy') ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '')
+                .toLowerCase()
+                .includes('therapy'),
+            ));
+
+        const isProcedure =
+          String(data.note || '')
+            .toLowerCase()
+            .includes('procedure') ||
+          (data.items &&
+            data.items.some((i: any) =>
+              String(i.name || '')
+                .toLowerCase()
+                .includes('procedure'),
+            ));
+
+        const isTherapyOrProcedure =
+          isTherapy || isProcedure || this.isTherapyOrProcedureBill(data);
+
         let category: string;
         if (isRefund) {
-          category = ExpenseCategory.Refund;
+          category = isTherapyOrProcedure
+            ? ExpenseCategory.TherapyRefund
+            : ExpenseCategory.Refund;
         } else if (isReturn) {
           category = ExpenseCategory.SalesReturn;
+        } else if (isTherapy) {
+          category = IncomeCategory.TherapyIncome;
+        } else if (isProcedure) {
+          category = IncomeCategory.ProcedureIncome;
+        } else if (sourceModule === SourceModule.Doctor) {
+          category = IncomeCategory.ConsultationFee;
+        } else if (sourceModule === SourceModule.Lab) {
+          category = IncomeCategory.LaboratoryIncome;
+        } else if (sourceModule === SourceModule.Reception) {
+          category = IncomeCategory.ConsultationFee;
         } else {
-          const isTherapy =
-            String(data.note || '')
-              .toLowerCase()
-              .includes('therapy') ||
-            (data.items &&
-              data.items.some((i: any) =>
-                String(i.name || '')
-                  .toLowerCase()
-                  .includes('therapy'),
-              ));
-
-          const isProcedure =
-            String(data.note || '')
-              .toLowerCase()
-              .includes('procedure') ||
-            (data.items &&
-              data.items.some((i: any) =>
-                String(i.name || '')
-                  .toLowerCase()
-                  .includes('procedure'),
-              ));
-
-          if (isTherapy) category = IncomeCategory.TherapyIncome;
-          else if (isProcedure) category = IncomeCategory.ProcedureIncome;
-          else if (sourceModule === SourceModule.Doctor)
-            category = IncomeCategory.ConsultationFee;
-          else if (sourceModule === SourceModule.Lab)
-            category = IncomeCategory.LaboratoryIncome;
-          else if (sourceModule === SourceModule.Reception)
-            category = IncomeCategory.ConsultationFee;
-          else category = IncomeCategory.MedicineSale;
+          category = IncomeCategory.MedicineSale;
         }
+
+        // Payment-method corrections stay on the same ledger as the bill
+        // they correct (PaymentCorrection itself does not identify a ledger).
+        const ledgerGroup = ledgerGroupForCategory(category);
 
         const reverseType = isExpense
           ? TransactionType.Income
@@ -1404,6 +1437,7 @@ export class BillingService {
               description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} reduced)`,
               paymentMethod: d.method,
               sourceModule,
+              ledgerGroup,
               createdBy: data.user,
               transactionDate: new Date(),
             });
@@ -1424,6 +1458,7 @@ export class BillingService {
               description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} increased)`,
               paymentMethod: d.method,
               sourceModule,
+              ledgerGroup,
               createdBy: data.user,
               transactionDate: new Date(),
             });
@@ -1436,6 +1471,7 @@ export class BillingService {
               description: `${sourceModule} ${paymentLabel} for Bill #${data.mrn} (${d.method})`,
               paymentMethod: d.method,
               sourceModule,
+              ledgerGroup,
               createdBy: data.user,
               transactionDate: new Date(),
             });
