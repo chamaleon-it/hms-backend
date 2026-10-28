@@ -5,7 +5,6 @@ import mongoose, { Model } from 'mongoose';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 
 @Injectable()
 export class PharmacyService {
@@ -81,29 +80,4 @@ export class PharmacyService {
     return updated;
   }
 
-  async updateNotifications(
-    user: mongoose.Types.ObjectId,
-    dto: UpdateNotificationsDto,
-  ) {
-    const updated = await this.userModel.findByIdAndUpdate(
-      user,
-      {
-        $set: {
-          'pharmacy.notifications.whatsapp': dto.whatsapp,
-          'pharmacy.notifications.sms': dto.sms,
-          'pharmacy.notifications.inApp': dto.inApp,
-          ...(dto.note && {
-            'pharmacy.notifications.note': dto.note,
-          }),
-        },
-      },
-      { new: true, runValidators: true, context: 'query' },
-    );
-
-    if (!updated) {
-      throw new NotFoundException('Pharmacy Not found');
-    }
-
-    return updated;
-  }
 }

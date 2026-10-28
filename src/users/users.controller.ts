@@ -25,8 +25,8 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   //create
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(UserRole.ADMIN)
   @Post()
   async createUser(@Body() createUserDto: CreateUserDto) {
     const data = await this.usersService.createUser(createUserDto);
@@ -64,16 +64,6 @@ export class UsersController {
     return {
       data,
       message: 'All doctors data retrived successfully',
-    };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('pharmacy_wholesaler')
-  async getAllPharmacyWholesaler() {
-    const data = await this.usersService.getAllPharmacyWholesaler();
-    return {
-      data,
-      message: 'All pharmacy wholesaler data retrived successfully',
     };
   }
 

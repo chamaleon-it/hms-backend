@@ -7,7 +7,6 @@ export enum UserRole {
   NOT_ASSIGNED = 'Not assigned',
   DOCTOR = 'Doctor',
   PHARMACY = 'Pharmacy',
-  PHARMACY_WHOLESALER = 'Pharmacy Wholesaler',
   LAB = 'Lab',
   ADMIN = 'Admin',
   RECEPTION = 'Reception',
@@ -144,12 +143,6 @@ export class User {
         expiryAlert: { type: Number, default: 90 },
         allowNegativeStock: { type: Boolean, default: false },
       },
-      notifications: {
-        whatsapp: { type: Boolean, default: false },
-        sms: { type: Boolean, default: false },
-        inApp: { type: Boolean, default: false },
-        note: { type: String, default: null, trim: true },
-      },
     },
   })
   pharmacy: {
@@ -169,12 +162,6 @@ export class User {
       expiryAlert: number;
       allowNegativeStock: boolean;
     };
-    notifications: {
-      whatsapp: boolean;
-      sms: boolean;
-      inApp: boolean;
-      note: string;
-    };
   };
 
   @Prop({
@@ -192,12 +179,6 @@ export class User {
         defaultGst: { type: Number, default: 5 },
         roundOff: { type: Boolean, default: false },
         autoPrintAfterSave: { type: Boolean, default: false },
-      },
-      notifications: {
-        whatsapp: { type: Boolean, default: false },
-        sms: { type: Boolean, default: false },
-        inApp: { type: Boolean, default: false },
-        note: { type: String, default: null, trim: true },
       },
       reportLayout: {
         type: String,
@@ -222,70 +203,10 @@ export class User {
       showProfilesOnPatientBill: boolean;
       allowEditingPanelComposition: boolean;
     };
-    notifications: {
-      whatsapp: boolean;
-      sms: boolean;
-      inApp: boolean;
-      note: string;
-    };
     reportLayout: string;
     panelPerPage: boolean;
   };
 
-  @Prop({
-    type: {
-      general: {
-        contactPerson: { type: String, default: null },
-        gstin: { type: String, default: null, uppercase: true },
-      },
-      pricing: {
-        defaultMargin: { type: Number, default: 18 },
-        minOrderValue: { type: Number, default: 5000 },
-        creditPeriod: { type: Number, default: 30 },
-        allowCreditOrder: { type: Boolean, default: false },
-      },
-      logistics: {
-        sameDayDispatchCutOf: { type: String, default: '16:00' },
-        defaultCourier: { type: String, default: null },
-        returnWindow: { type: Number, default: 7 },
-        allowPartialDispatch: { type: Boolean, default: false },
-        autoMergeOrders: { type: Boolean, default: false },
-      },
-      notifications: {
-        whatsapp: { type: Boolean, default: false },
-        email: { type: Boolean, default: false },
-        sms: { type: Boolean, default: false },
-        inApp: { type: Boolean, default: false },
-        note: { type: String, default: null },
-      },
-    },
-  })
-  pharmacyWholesaler: {
-    general: {
-      contactPerson: string | null;
-      gstin: string | null;
-    };
-    pricing: {
-      defaultMargin: number;
-      minOrderValue: number;
-      creditPeriod: number;
-      allowCreditOrder: boolean;
-    };
-    logistics: {
-      sameDayDispatchCutOf: string;
-      defaultCourier: string;
-      returnWindow: number;
-      allowPartialDispatch: boolean;
-      autoMergeOrders: boolean;
-    };
-    notifications: {
-      whatsapp: boolean;
-      email: boolean;
-      sms: boolean;
-      inApp: boolean;
-      note?: string | null;
-    };
-  };
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

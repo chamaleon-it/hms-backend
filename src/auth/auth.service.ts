@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserStatus } from 'src/users/schemas/user.schema';
+import { User, UserRole, UserStatus } from 'src/users/schemas/user.schema';
 import mongoose, { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -27,6 +27,9 @@ export class AuthService {
       throw new BadRequestException(
         'No user record found. Kindly register to proceed.',
       );
+    }
+    if (!Object.values(UserRole).includes(user.role as UserRole)) {
+      throw new UnauthorizedException('This account role is no longer supported.');
     }
     if ((user.status as UserStatus) === UserStatus.PENDING) {
       throw new BadRequestException(
@@ -92,6 +95,9 @@ export class AuthService {
       const user = await this.userModel.findById(id).select('+refreshToken');
       if (!user) {
         throw new BadRequestException('User not found');
+      }
+      if (!Object.values(UserRole).includes(user.role as UserRole)) {
+        throw new UnauthorizedException('This account role is no longer supported.');
       }
 
       const isRefreshTokenMatching =

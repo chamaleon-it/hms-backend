@@ -124,23 +124,6 @@ export class ReportController {
     };
   }
 
-  @Post('mark_as_flagged/:id')
-  async markAsFlagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsFlagged(id);
-    return {
-      message: 'Report is marked as flagged',
-      data,
-    };
-  }
-  @Post('mark_as_unflagged/:id')
-  async markAsUnflagged(@Param('id') id: mongoose.Types.ObjectId) {
-    const data = await this.reportService.markAsUnflagged(id);
-    return {
-      message: 'Report is marked as unflagged',
-      data,
-    };
-  }
-
   @Post('reset_timer/:id')
   async resetTimer(
     @Param('id') id: mongoose.Types.ObjectId,

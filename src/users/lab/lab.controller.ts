@@ -5,7 +5,6 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { UpdateGeneralDto } from './dto/update-general.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
-import { UpdateNotificationsDto } from './dto/update-notifications.dto';
 import { UpdateCatalogueDto } from './dto/update-catalogue.dto';
 import { UpdateReportLayoutDto } from './dto/update-report-layout.dto';
 @Controller('users/lab')
@@ -58,19 +57,6 @@ export class LabController {
     return {
       data,
       message: 'All labs were retrived successfully.',
-    };
-  }
-
-  @Patch('notifications')
-  @UseGuards(JwtAuthGuard)
-  async updateNotifications(
-    @GetUser() user: JWTUserInterface,
-    @Body() dto: UpdateNotificationsDto,
-  ) {
-    const data = await this.labService.updateNotifications(user.id, dto);
-    return {
-      data,
-      message: 'Lab notifications settings updated successfully',
     };
   }
 

@@ -94,9 +94,6 @@ export class Report {
   @Prop({ default: false })
   isDeleted: boolean;
 
-  @Prop({ default: false })
-  isFlagged: boolean;
-
   @Prop({ type: Number, unique: true })
   mrn: number;
 

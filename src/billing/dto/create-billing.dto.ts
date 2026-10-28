@@ -92,22 +92,6 @@ export class CreateBillingDto {
 
   @IsString()
   @IsOptional()
-  payer?: string;
-
-  @IsString()
-  @IsOptional()
-  policyNo?: string;
-
-  @IsString()
-  @IsOptional()
-  tpa?: string;
-
-  @IsString()
-  @IsOptional()
-  preAuthNo?: string;
-
-  @IsString()
-  @IsOptional()
   note?: string;
 
   @IsString()

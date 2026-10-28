@@ -215,9 +215,7 @@ export class ReportService implements OnModuleInit {
     match.isDeleted = false;
 
     if (dto.status) {
-      if (dto.status === 'Flagged') {
-        match.isFlagged = true;
-      } else if (dto.status === 'Deleted') {
+      if (dto.status === 'Deleted') {
         match.isDeleted = true;
       } else {
         match.status = dto.status;
@@ -762,26 +760,6 @@ export class ReportService implements OnModuleInit {
     return data;
   }
 
-  async markAsFlagged(id: mongoose.Types.ObjectId) {
-    const data = await this.reportModel.findById(id);
-    if (!data) {
-      throw new NotFoundException('Records not found');
-    }
-    data.isFlagged = true;
-    await data.save();
-    return data;
-  }
-
-  async markAsUnflagged(id: mongoose.Types.ObjectId) {
-    const data = await this.reportModel.findById(id);
-    if (!data) {
-      throw new NotFoundException('Records not found');
-    }
-    data.isFlagged = false;
-    await data.save();
-    return data;
-  }
-
   async getStatistics() {
     const data: any[] = await this.reportModel.aggregate([
       {
@@ -824,15 +802,6 @@ export class ReportService implements OnModuleInit {
             $sum: {
               $cond: {
                 if: { $eq: ['$status', ReportStatus.COMPLETED] },
-                then: 1,
-                else: 0,
-              },
-            },
-          },
-          flagged: {
-            $sum: {
-              $cond: {
-                if: { $eq: ['$isFlagged', true] },
                 then: 1,
                 else: 0,
               },

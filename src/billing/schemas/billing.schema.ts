@@ -52,18 +52,6 @@ export class Billing {
   discount: number;
 
   @Prop({ type: String, required: false })
-  payer?: string;
-
-  @Prop({ type: String, required: false })
-  policyNo?: string;
-
-  @Prop({ type: String, required: false })
-  tpa?: string;
-
-  @Prop({ type: String, required: false })
-  preAuthNo?: string;
-
-  @Prop({ type: String, required: false })
   note?: string;
 
   @Prop({ type: String, required: true, unique: true })

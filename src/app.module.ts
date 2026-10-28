@@ -17,7 +17,6 @@ import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
 import { OrdersModule } from './pharmacy/orders/orders.module';
 import { ReturnModule } from './pharmacy/return/return.module';
-import { PurchaseModule } from './pharmacy/purchase/purchase.module';
 import { ReportModule } from './lab/report/report.module';
 import { PanelsModule } from './lab/panels/panels.module';
 import { BackupModule } from './backup/backup.module';
@@ -49,7 +48,6 @@ import { TechnicianModule } from './lab/technician/technician.module';
     ItemsModule,
     OrdersModule,
     ReturnModule,
-    PurchaseModule,
     ReportModule,
     PanelsModule,
     BackupModule,
