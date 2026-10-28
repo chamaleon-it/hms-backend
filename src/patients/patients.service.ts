@@ -204,14 +204,15 @@ async getPatient(getPatientsDto: GetPatientsDto) {
   }
 
   const searchTerm = query.trim().toLowerCase();
+  const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const patients = await this.patientModel
     .find({
       ...filter,
       $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { mrn: { $regex: searchTerm, $options: 'i' } },
-        { phoneNumber: { $regex: searchTerm, $options: 'i' } },
+        { name: { $regex: escapedSearchTerm, $options: 'i' } },
+        { mrn: { $regex: escapedSearchTerm, $options: 'i' } },
+        { phoneNumber: { $regex: escapedSearchTerm, $options: 'i' } },
       ],
     })
     .populate('doctor')
@@ -232,23 +233,27 @@ async getPatient(getPatientsDto: GetPatientsDto) {
       return 2;
     }
 
-    if (words.some((word) => word.endsWith(searchTerm))) {
+    if (mrn.startsWith(searchTerm)) {
       return 3;
     }
 
-    if (mrn.includes(searchTerm)) {
+    if (phone.startsWith(searchTerm)) {
       return 4;
     }
 
-    if (phone.includes(searchTerm)) {
+    if (name.includes(searchTerm)) {
       return 5;
     }
 
-    if (address.includes(searchTerm)) {
+    if (mrn.includes(searchTerm)) {
       return 6;
     }
 
-    return 999;
+    if (phone.includes(searchTerm)) {
+      return 7;
+    }
+
+    return 8;
   };
 
   const sortedPatients = patients
@@ -256,7 +261,6 @@ async getPatient(getPatientsDto: GetPatientsDto) {
       ...patient,
       _searchPriority: getPriority(patient),
     }))
-    .filter((patient) => patient._searchPriority !== 999)
     .sort((a, b) => {
       if (a._searchPriority !== b._searchPriority) {
         return a._searchPriority - b._searchPriority;

@@ -9,6 +9,24 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Appointment, AppointmentStatus } from './schemas/appointment.schema';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UsersService } from 'src/users/users.service';
+import { UserRole } from 'src/users/schemas/user.schema';
+
+const removedStatuses = ['Observation', 'Admit'];
+const hiddenModuleStatuses = [...removedStatuses, AppointmentStatus.COMPLETED];
+
+function isPharmacyOrLab(role: UserRole): boolean {
+  return role === UserRole.PHARMACY || role === UserRole.LAB;
+}
+
+function validateAppointmentStatus(status: string | undefined, role: UserRole) {
+  if (
+    status &&
+    (removedStatuses.includes(status) ||
+      (isPharmacyOrLab(role) && status === AppointmentStatus.COMPLETED))
+  ) {
+    throw new BadRequestException('Appointment status is no longer available');
+  }
+}
 
 @Injectable()
 export class AppointmentsService {
@@ -20,7 +38,9 @@ export class AppointmentsService {
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
     createdBy: mongoose.Types.ObjectId,
+    role: UserRole,
   ) {
+    validateAppointmentStatus(createAppointmentDto.status, role);
     const appointment = await this.appointmentModel.create({
       ...createAppointmentDto,
       createdBy,
@@ -34,11 +54,13 @@ export class AppointmentsService {
     status,
     date,
     activeDate,
+    role,
   }: {
     query?: string;
     status?: string[];
     date: string;
     activeDate: 'Today' | '7 days' | '30 days' | 'Custom';
+    role: UserRole;
   }) {
     let startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -76,6 +98,10 @@ export class AppointmentsService {
         $match.status = { $in: status };
       }
     }
+    $match.status = {
+      ...($match.status ?? {}),
+      $nin: isPharmacyOrLab(role) ? hiddenModuleStatuses : removedStatuses,
+    };
 
     return this.appointmentModel
       .aggregate([
@@ -140,7 +166,7 @@ export class AppointmentsService {
       .option({ allowDiskUse: true });
   }
 
-  async getStatistics() {
+  async getStatistics(role: UserRole) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -153,6 +179,11 @@ export class AppointmentsService {
           $match: {
             date: { $gte: startOfDay, $lte: endOfDay },
             isDeleted: false,
+            status: {
+              $nin: isPharmacyOrLab(role)
+                ? hiddenModuleStatuses
+                : removedStatuses,
+            },
           },
         },
         {
@@ -167,11 +198,9 @@ export class AppointmentsService {
       today: 0,
       upcoming: 0,
       consulted: 0,
-      observation: 0,
-      completed: 0,
       notShow: 0,
       test: 0,
-      admit: 0,
+      ...(isPharmacyOrLab(role) ? {} : { completed: 0 }),
     };
 
     stats.today = results.reduce((acc: number, r) => acc + r.count, 0);
@@ -184,9 +213,6 @@ export class AppointmentsService {
         case AppointmentStatus.CONSULTED:
           stats.consulted = r.count;
           break;
-        case AppointmentStatus.OBSERVATION:
-          stats.observation = r.count;
-          break;
         case AppointmentStatus.COMPLETED:
           stats.completed = r.count;
           break;
@@ -197,17 +223,13 @@ export class AppointmentsService {
         case AppointmentStatus.TEST:
           stats.test = r.count;
           break;
-
-        case AppointmentStatus.ADMIT:
-          stats.admit = r.count;
-          break;
       }
     }
 
     return stats;
   }
 
-  async calenderMonthly(date: string) {
+  async calenderMonthly(date: string, role: UserRole) {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -219,6 +241,7 @@ export class AppointmentsService {
       .find({
         date: { $gte: startDate, $lte: endDate },
         isDeleted: false,
+        status: { $nin: isPharmacyOrLab(role) ? hiddenModuleStatuses : removedStatuses },
       })
       .select('date patientName type status')
       .sort({ date: 1 })
@@ -236,7 +259,9 @@ export class AppointmentsService {
   async updateStatus(
     id: mongoose.Types.ObjectId,
     updateStatusDto: UpdateStatusDto,
+    role: UserRole,
   ) {
+    validateAppointmentStatus(updateStatusDto.status, role);
     if (!mongoose.isValidObjectId(id))
       throw new BadRequestException('id not valid');
 
@@ -266,7 +291,7 @@ export class AppointmentsService {
     return data;
   }
 
-  async calenderWeekly(date: string) {
+  async calenderWeekly(date: string, role: UserRole) {
     const now = new Date(date);
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
@@ -280,6 +305,7 @@ export class AppointmentsService {
       .find({
         date: { $gte: startOfWeek, $lte: endOfWeek },
         isDeleted: false,
+        status: { $nin: isPharmacyOrLab(role) ? hiddenModuleStatuses : removedStatuses },
       })
       .select('date status')
       .populate('patient', 'name')
@@ -378,7 +404,9 @@ export class AppointmentsService {
   async updateAppointment(
     createAppointmentDto: CreateAppointmentDto,
     id: mongoose.Types.ObjectId,
+    role: UserRole,
   ) {
+    validateAppointmentStatus(createAppointmentDto.status, role);
     const data = await this.appointmentModel.findByIdAndUpdate(
       id,
       createAppointmentDto,

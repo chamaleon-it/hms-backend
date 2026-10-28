@@ -31,6 +31,7 @@ import { TechnicianModule } from './lab/technician/technician.module';
       limit: 10,
     }]),
     ConfigModule.forRoot({
+      envFilePath: join(__dirname, '..', '.env'),
       load: [configuration],
     }),
     MongooseModule.forRoot(configuration().databaseUrl),

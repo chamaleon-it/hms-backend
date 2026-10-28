@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Model, Types } from 'mongoose';
-import configuration from 'src/config/configuration';
 
 export type ReportDocument = HydratedDocument<Report>;
 
@@ -10,6 +9,8 @@ export enum ReportStatus {
   WAITING_FOR_RESULT = 'Waiting For Result',
   COMPLETED = 'Completed',
 }
+
+export const REPORT_PRIORITIES = ['Normal', 'High', 'Stat'];
 
 @Schema({ versionKey: false, timestamps: true })
 export class Report {
@@ -27,14 +28,13 @@ export class Report {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    default: configuration().in_house_lab_id,
   })
   lab: Types.ObjectId;
 
   @Prop({ type: Date, required: true })
   date: Date;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: true, enum: REPORT_PRIORITIES, default: 'Normal' })
   priority: string;
 
   @Prop({ type: [String], default: [] })

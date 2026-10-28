@@ -1,12 +1,15 @@
 import mongoose, { Types } from 'mongoose';
-import { ReportStatus } from 'src/lab/report/schemas/report.schema';
+import { ReportStatus, REPORT_PRIORITIES } from 'src/lab/report/schemas/report.schema';
+import { IsIn, IsOptional } from 'class-validator';
 
 export class CreateReportDto {
   patient: Types.ObjectId;
   doctor: Types.ObjectId | null;
   lab?: Types.ObjectId;
   date: Date;
-  priority: string;
+  @IsOptional()
+  @IsIn(REPORT_PRIORITIES)
+  priority?: string;
   panels?: string[];
   groups?: string[];
   test: {

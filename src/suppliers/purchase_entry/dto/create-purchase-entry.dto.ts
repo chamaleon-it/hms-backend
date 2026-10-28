@@ -3,7 +3,6 @@ import {
   IsMongoId,
   IsString,
   IsDateString,
-  IsBoolean,
   IsOptional,
   IsArray,
   IsNumber,
@@ -70,14 +69,6 @@ export class CreatePurchaseEntryDto {
   @IsNotEmpty()
   invoiceDate: Date;
 
-  @IsBoolean()
-  @IsOptional()
-  gstEnabled?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  tscEnabled?: boolean;
-
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
@@ -95,10 +86,6 @@ export class CreatePurchaseEntryDto {
   @IsNumber()
   @IsNotEmpty()
   gst: number;
-
-  @IsNumber()
-  @IsNotEmpty()
-  transportCharge: number;
 
   @IsNumber()
   @IsNotEmpty()

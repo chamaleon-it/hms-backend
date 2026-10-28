@@ -19,13 +19,20 @@ import mongoose from 'mongoose';
 import { SampleCollectedDto } from './dto/sample-collected.dto';
 import { GetReportDto } from './dto/get-report.dto';
 import { LisResultDto } from './dto/lis-result.dto';
+import { UserRole } from 'src/users/schemas/user.schema';
 
 @Controller('lab/report')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
   @Post()
   @UseGuards(JwtAuthGuard)
-  async createReport(@Body() dto: CreateReportDto) {
+  async createReport(
+    @Body() dto: CreateReportDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    dto.lab = user.role === UserRole.LAB
+      ? user.id
+      : await this.reportService.resolveInHouseLabId();
     const data = await this.reportService.createReport(dto);
     return {
       message: 'Test is created successfully',

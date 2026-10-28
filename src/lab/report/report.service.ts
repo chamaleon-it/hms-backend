@@ -5,11 +5,12 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { CreateReportDto } from './dto/create-report.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
-import { Report, ReportStatus } from './schemas/report.schema';
+import { Report, ReportStatus, REPORT_PRIORITIES } from './schemas/report.schema';
 // import { GetReportDto } from './dto/get-report.dto';
 import configuration from 'src/config/configuration';
 import { ResultDto } from './dto/result.dto';
@@ -22,6 +23,7 @@ import { Panel } from '../panels/schemas/panel.schema';
 import { Group } from '../panels/schemas/group.schema';
 import { BillingService } from '../../billing/billing.service';
 import { async } from 'rxjs';
+import { User, UserRole } from '../../users/schemas/user.schema';
 
 @Injectable()
 export class ReportService implements OnModuleInit {
@@ -31,14 +33,36 @@ export class ReportService implements OnModuleInit {
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Panel.name) private panelModel: Model<Panel>,
     @InjectModel(Group.name) private groupModel: Model<Group>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private billingService: BillingService,
   ) {}
+
+  async resolveInHouseLabId(): Promise<mongoose.Types.ObjectId> {
+    const configuredId = configuration().in_house_lab_id;
+    if (configuredId && /^[0-9a-fA-F]{24}$/.test(configuredId)) {
+      return new mongoose.Types.ObjectId(configuredId);
+    }
+
+    const labs = await this.userModel
+      .find({ role: UserRole.LAB })
+      .select('_id')
+      .limit(2)
+      .lean()
+      .exec();
+    if (labs.length === 1) return labs[0]._id;
+
+    throw new ServiceUnavailableException('In-house lab account is not configured');
+  }
 
   async onModuleInit() {
     try {
       const result = await this.reportModel.updateMany(
         { status: 'Sample Collected' },
         { $set: { status: ReportStatus.WAITING_FOR_RESULT } }
+      );
+      await this.reportModel.updateMany(
+        { priority: 'Urgent' },
+        { $set: { priority: 'Normal' } },
       );
       if (result.modifiedCount > 0) {
 
@@ -48,8 +72,12 @@ export class ReportService implements OnModuleInit {
     }
   }
   async createReport(@Body() dto: CreateReportDto) {
+    dto.priority ??= 'Normal';
+    if (!REPORT_PRIORITIES.includes(dto.priority)) {
+      throw new BadRequestException('Unsupported lab report priority');
+    }
     if (!dto.lab) {
-      dto.lab = new mongoose.Types.ObjectId(configuration().in_house_lab_id);
+      dto.lab = await this.resolveInHouseLabId();
     }
     const startOfDay = new Date(dto.date);
     startOfDay.setUTCHours(0, 0, 0, 0);
@@ -849,6 +877,9 @@ export class ReportService implements OnModuleInit {
       data.panels = dto.panels;
     }
     if (dto.priority) {
+      if (!REPORT_PRIORITIES.includes(dto.priority)) {
+        throw new BadRequestException('Unsupported lab report priority');
+      }
       data.priority = dto.priority;
     }
     if (dto.date) {
@@ -871,10 +902,9 @@ export class ReportService implements OnModuleInit {
       panels: data.panels,
       test: data.test,
       patient: data.patient,
-      priority: data.priority,
+      priority: REPORT_PRIORITIES.includes(data.priority) ? data.priority : 'Normal',
       sampleType: data.sampleType || '',
       status: ReportStatus.UPCOMING,
-      lab: data.lab,
     });
     return newReport;
   }

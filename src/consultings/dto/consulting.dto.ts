@@ -105,10 +105,6 @@ class TestDto {
   @IsDateString({}, { message: 'Test date must be a valid date.' })
   date: Date;
 
-  @IsString({ message: 'Lab name is required and must be a string.' })
-  @IsOptional()
-  lab: mongoose.Types.ObjectId;
-
   @IsString({ message: 'Priority is required and must be a string.' })
   @IsNotEmpty({ message: 'Priority cannot be empty.' })
   priority: string;

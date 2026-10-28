@@ -31,6 +31,7 @@ export class AppointmentsController {
     const data = await this.appointmentsService.createAppointment(
       createAppointmentDto,
       user.id,
+      user.role,
     );
     return {
       data,
@@ -40,12 +41,16 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('list')
-  async getAppointments(@Query() getListDto: GetListDto) {
+  async getAppointments(
+    @Query() getListDto: GetListDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
     const data = await this.appointmentsService.getAppointments({
       query: getListDto.query,
       status: getListDto.status ? getListDto.status : [],
       date: getListDto.date || new Date().toString(),
       activeDate: getListDto.activeDate,
+      role: user.role,
     });
     return {
       data,
@@ -65,8 +70,8 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('statistics')
-  async getStatistics() {
-    const data = await this.appointmentsService.getStatistics();
+  async getStatistics(@GetUser() user: JWTUserInterface) {
+    const data = await this.appointmentsService.getStatistics(user.role);
     return {
       data,
       message: 'Appointment statistics retrived successfully',
@@ -75,9 +80,10 @@ export class AppointmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('calender-monthly')
-  async calenderMonthly() {
+  async calenderMonthly(@GetUser() user: JWTUserInterface) {
     const data = await this.appointmentsService.calenderMonthly(
       new Date().toString(),
+      user.role,
     );
     return {
       data,
@@ -85,10 +91,15 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/calender/weekly')
-  async calenderWeekly(@Query('date') date?: string) {
+  async calenderWeekly(
+    @GetUser() user: JWTUserInterface,
+    @Query('date') date?: string,
+  ) {
     const data = await this.appointmentsService.calenderWeekly(
       date || new Date().toString(),
+      user.role,
     );
     return {
       message: 'Weekly calander fetched',
@@ -101,10 +112,12 @@ export class AppointmentsController {
   async updateStatus(
     @Param('id') id: mongoose.Types.ObjectId,
     @Body() updateStatusDto: UpdateStatusDto,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateStatus(
       id,
       updateStatusDto,
+      user.role,
     );
     return {
       data,
@@ -153,14 +166,17 @@ export class AppointmentsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateAppointment(
     @Body() createAppointmentDto: CreateAppointmentDto,
     @Param('id') id: mongoose.Types.ObjectId,
+    @GetUser() user: JWTUserInterface,
   ) {
     const data = await this.appointmentsService.updateAppointment(
       createAppointmentDto,
       id,
+      user.role,
     );
     return {
       data,

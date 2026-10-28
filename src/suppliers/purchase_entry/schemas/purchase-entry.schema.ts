@@ -22,12 +22,6 @@ export class PurchaseEntry {
   @Prop({ required: true })
   invoiceDate: Date;
 
-  @Prop({ default: true })
-  gstEnabled: boolean;
-
-  @Prop({ default: true })
-  tscEnabled: boolean;
-
   @Prop([
     {
       item: {
@@ -67,9 +61,6 @@ export class PurchaseEntry {
 
   @Prop({ default: 0 })
   gst: number;
-
-  @Prop({ default: 0 })
-  transportCharge: number;
 
   @Prop({ default: 0 })
   total: number;

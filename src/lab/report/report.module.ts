@@ -8,6 +8,7 @@ import { Patient, PatientSchema } from '../../patients/schemas/patient.schema';
 import { Panel, PanelSchema } from '../panels/schemas/panel.schema';
 import { Group, GroupSchema } from '../panels/schemas/group.schema';
 import { BillingModule } from '../../billing/billing.module';
+import { User, UserSchema } from '../../users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { BillingModule } from '../../billing/billing.module';
       { name: Patient.name, schema: PatientSchema },
       { name: Panel.name, schema: PanelSchema },
       { name: Group.name, schema: GroupSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     BillingModule,
   ],
