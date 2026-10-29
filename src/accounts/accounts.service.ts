@@ -88,6 +88,8 @@ export class AccountsService {
     sourceModule?: SourceModule;
     /** Explicit Tally ledger override — see ledgerGroupForCategory. */
     ledgerGroup?: TallyLedgerGroup;
+    /** Therapist name; only stored for a Therapy-ledger cost centre. */
+    costCentre?: string;
     notes?: string;
     createdBy?: string | mongoose.Types.ObjectId;
     transactionDate?: Date;
@@ -121,6 +123,7 @@ export class AccountsService {
         paymentMethod: params.paymentMethod || PaymentMethod.Cash,
         sourceModule: params.sourceModule || SourceModule.Uncategorised,
         ledgerGroup: params.ledgerGroup,
+        costCentre: params.costCentre,
         notes: params.notes,
         transactionDate: params.transactionDate || new Date(),
         createdBy: createdByObjectId,

@@ -1,6 +1,7 @@
 import {
   isSeparateNcfPayment,
   ledgerGroupForCategory,
+  therapyCostCentre,
   TallyLedgerGroup,
 } from './ledger-group';
 import {
@@ -54,6 +55,35 @@ describe('ledgerGroupForCategory', () => {
       ledgerGroupForCategory(ExpenseCategory.PaymentCorrection),
     ).toBeUndefined();
     expect(ledgerGroupForCategory(undefined)).toBeUndefined();
+  });
+});
+
+describe('therapyCostCentre', () => {
+  it('uses the therapist name only for a procedure or therapy', () => {
+    expect(therapyCostCentre('Sarah Connor', 'Therapy Income')).toBe(
+      'Sarah Connor',
+    );
+    expect(therapyCostCentre('Shadan', 'Procedure Income')).toBe('Shadan');
+    expect(therapyCostCentre('Sarah Connor', 'Therapy Refund')).toBe(
+      'Sarah Connor',
+    );
+  });
+
+  it('does not invent a cost centre without a therapist or off the therapy ledger', () => {
+    expect(therapyCostCentre('', 'Therapy Income')).toBeUndefined();
+    expect(therapyCostCentre('-', 'Procedure Income')).toBeUndefined();
+    expect(therapyCostCentre('  ', 'Therapy Income')).toBeUndefined();
+    expect(therapyCostCentre('Sarah Connor', 'Medicine Sale')).toBeUndefined();
+    expect(
+      therapyCostCentre('Sarah Connor', 'Consultation Fee'),
+    ).toBeUndefined();
+    expect(
+      therapyCostCentre(
+        'Sarah Connor',
+        'Payment Correction',
+        TallyLedgerGroup.Therapy,
+      ),
+    ).toBe('Sarah Connor');
   });
 });
 

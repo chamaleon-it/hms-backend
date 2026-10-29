@@ -54,6 +54,13 @@ export class AccountTransaction {
   @Prop({ required: false, enum: TallyLedgerGroup, type: String })
   ledgerGroup?: TallyLedgerGroup;
 
+  /**
+   * Therapist name used as the Tally cost centre. Set only for a
+   * procedure/therapy voucher that already has a therapist.
+   */
+  @Prop({ required: false })
+  costCentre?: string;
+
   @Prop({ required: true, type: Date })
   transactionDate: Date;
 

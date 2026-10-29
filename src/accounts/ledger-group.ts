@@ -35,6 +35,23 @@ export function isSeparateNcfPayment(bill: {
 }
 
 /**
+ * Cost centre for a procedure/therapy voucher. Only a real therapist name
+ * on the Therapy ledger qualifies. Blank, "-", and every other ledger
+ * return undefined so no cost centre is invented.
+ */
+export function therapyCostCentre(
+  therapistName: string | null | undefined,
+  category: string | null | undefined,
+  ledgerGroup?: TallyLedgerGroup,
+): string | undefined {
+  const group = ledgerGroup || ledgerGroupForCategory(category);
+  if (group !== TallyLedgerGroup.Therapy) return undefined;
+  const name = String(therapistName || '').trim();
+  if (!name || name === '-') return undefined;
+  return name;
+}
+
+/**
  * Maps an AccountTransaction category to one of the four Tally ledgers.
  * Categories outside these four (e.g. Lab income, Salary, Office Expense)
  * resolve to `undefined` and fall back to the connection's generic

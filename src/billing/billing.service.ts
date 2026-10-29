@@ -32,6 +32,7 @@ import {
   TallyLedgerGroup,
   isSeparateNcfPayment,
   ledgerGroupForCategory,
+  therapyCostCentre,
 } from 'src/accounts/ledger-group';
 
 import configuration from 'src/config/configuration';
@@ -378,6 +379,7 @@ export class BillingService {
           ...(ncfPayment
             ? { ledgerGroup: TallyLedgerGroup.Reception, notes: 'NCF' }
             : {}),
+          costCentre: therapyCostCentre(createBill.therapistName, category),
           createdBy: createBill.user,
           transactionDate: new Date(),
         });
@@ -1264,6 +1266,7 @@ export class BillingService {
           ...(ncfPayment
             ? { ledgerGroup: TallyLedgerGroup.Reception, notes: 'NCF' }
             : {}),
+          costCentre: therapyCostCentre(data.therapistName, category),
           createdBy: user || data.user,
           transactionDate: new Date(),
         });
@@ -1459,6 +1462,11 @@ export class BillingService {
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
+              costCentre: therapyCostCentre(
+                data.therapistName,
+                category,
+                ledgerGroup,
+              ),
               createdBy: data.user,
               transactionDate: new Date(),
             });
@@ -1480,6 +1488,11 @@ export class BillingService {
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
+              costCentre: therapyCostCentre(
+                data.therapistName,
+                category,
+                ledgerGroup,
+              ),
               createdBy: data.user,
               transactionDate: new Date(),
             });
@@ -1493,6 +1506,11 @@ export class BillingService {
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
+              costCentre: therapyCostCentre(
+                data.therapistName,
+                category,
+                ledgerGroup,
+              ),
               ...(ncfPayment ? { notes: 'NCF' } : {}),
               createdBy: data.user,
               transactionDate: new Date(),

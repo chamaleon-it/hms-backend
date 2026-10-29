@@ -159,6 +159,52 @@ describe('TallyService.syncAccountTransaction ledger routing', () => {
     expect(collected.postedXml).not.toContain('VCHTYPE="Payment"');
   });
 
+  it('allocates a therapy voucher to the therapist cost centre and leaves other ledgers alone', async () => {
+    const { service } = createService();
+    const fetchMock = mockFetchOnce();
+    const outcome = await service.syncAccountTransaction({
+      ...base,
+      type: TransactionType.Income,
+      category: 'Therapy Income',
+      costCentre: 'Sarah Connor',
+    });
+
+    expect(outcome.status).toBe('synced');
+    expect(fetchMock.mock.calls).toHaveLength(2);
+    const master = fetchMock.mock.calls[0][1].body as string;
+    const voucher = fetchMock.mock.calls[1][1].body as string;
+    expect(master).toContain(
+      '<COSTCENTRE NAME="Sarah Connor" ACTION="Create">',
+    );
+    expect(master).toContain('<CATEGORY>Primary Cost Category</CATEGORY>');
+    expect(voucher).toContain('VCHTYPE="Receipt"');
+    expect(voucher).toContain('<LEDGERNAME>Therapy Income</LEDGERNAME>');
+    expect(voucher).toContain('<LEDGERNAME>Cash</LEDGERNAME>');
+    expect(voucher).toContain('<NAME>Sarah Connor</NAME>');
+    expect(voucher).toContain('<AMOUNT>500.00</AMOUNT>');
+    const cashLine = voucher.split('<ALLLEDGERENTRIES.LIST>')[1];
+    expect(cashLine).toContain('<LEDGERNAME>Cash</LEDGERNAME>');
+    expect(cashLine).not.toContain('COSTCENTRE');
+
+    const plain = await syncAndCapture(service, {
+      ...base,
+      transactionId: 'TXN-00002',
+      type: TransactionType.Income,
+      category: 'Therapy Income',
+    });
+    expect(plain.postedXml).not.toContain('COSTCENTRE');
+
+    const pharmacy = await syncAndCapture(service, {
+      ...base,
+      transactionId: 'TXN-00003',
+      type: TransactionType.Income,
+      category: 'Medicine Sale',
+      costCentre: 'Sarah Connor',
+    });
+    expect(pharmacy.postedXml).not.toContain('Sarah Connor');
+    expect(pharmacy.postedXml).not.toContain('COSTCENTRE');
+  });
+
   it('posts a Purchase Payment to the Purchase ledger via the explicit ledgerGroup override', async () => {
     const { service } = createService();
     const { outcome, postedXml } = await syncAndCapture(service, {

@@ -13,6 +13,7 @@ import {
 import { ConnectTallyDto } from './dto/connect-tally.dto';
 import {
   companiesExportXml,
+  createCostCentreXml,
   createLedgerXml,
   createVoucherXml,
   parseCompanyNames,
@@ -378,6 +379,7 @@ export class TallyService {
     description: string;
     paymentMethod?: PaymentMethod | string;
     ledgerGroup?: TallyLedgerGroup | string;
+    costCentre?: string;
     transactionDate?: Date;
     tallySynced?: boolean;
   }): Promise<TallySyncOutcome> {
@@ -401,16 +403,40 @@ export class TallyService {
       ledgerGroupForCategory(tx.category);
     const { receiptLedger: incomeLedger, paymentLedger: expenseLedger } =
       this.ledgerPairFor(doc, ledgerGroup);
+    const costCentre =
+      ledgerGroup === TallyLedgerGroup.Therapy
+        ? String(tx.costCentre || '').trim()
+        : '';
+    const centre = costCentre && costCentre !== '-' ? costCentre : undefined;
+
+    if (centre) {
+      await this.postXml(
+        doc.host,
+        doc.port,
+        createCostCentreXml(centre, doc.companyName),
+      );
+    }
 
     // Receipt: Debit Cash/Bank, Credit Sales
     // Payment: Debit Expense, Credit Cash/Bank
+    // Cost centre sits on the therapy ledger line only. Cash/bank stays plain.
     const lines = isIncome
       ? [
           { ledgerName: party, isDebit: true, amount: tx.amount },
-          { ledgerName: incomeLedger, isDebit: false, amount: tx.amount },
+          {
+            ledgerName: incomeLedger,
+            isDebit: false,
+            amount: tx.amount,
+            costCentre: centre,
+          },
         ]
       : [
-          { ledgerName: expenseLedger, isDebit: true, amount: tx.amount },
+          {
+            ledgerName: expenseLedger,
+            isDebit: true,
+            amount: tx.amount,
+            costCentre: centre,
+          },
           { ledgerName: party, isDebit: false, amount: tx.amount },
         ];
 
