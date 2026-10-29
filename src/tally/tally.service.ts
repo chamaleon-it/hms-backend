@@ -1,8 +1,11 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -31,6 +34,7 @@ import {
   TallyLedgerGroup,
   ledgerGroupForCategory,
 } from 'src/accounts/ledger-group';
+import { BillingService } from 'src/billing/billing.service';
 
 const CONNECTION_KEY = 'pharmacy';
 const REQUEST_TIMEOUT_MS = 8000;
@@ -44,6 +48,9 @@ export class TallyService {
     private readonly connectionModel: Model<TallyConnectionDocument>,
     @InjectModel(AccountTransaction.name)
     private readonly accountTransactionModel: Model<AccountTransactionDocument>,
+    @Optional()
+    @Inject(forwardRef(() => BillingService))
+    private readonly billingService?: BillingService,
   ) {}
 
   private async getOrCreateConnection(): Promise<TallyConnectionDocument> {
@@ -517,6 +524,12 @@ export class TallyService {
 
     const doc = await this.getOrCreateConnection();
     await this.ensureDefaultLedgers(doc);
+
+    // Paid pharmacy sales are stored on the bill, not as account receipts.
+    // Create the missing Receipt rows before this query so this sync exports them.
+    if (this.billingService) {
+      await this.billingService.backfillPaidPharmacyReceipts();
+    }
 
     const pending = await this.accountTransactionModel
       .find({
