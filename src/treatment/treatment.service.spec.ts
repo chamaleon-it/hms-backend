@@ -344,4 +344,30 @@ describe('TreatmentService', () => {
     expect(result.sessionNumber).toBe(1);
     expect(result.isRepeated).toBe(false);
   });
+
+  it('should count treatments created after since without a treatmentDate window', async () => {
+    const since = '2026-10-12T10:00:00.000Z';
+    let captured: Record<string, unknown> | undefined;
+    const chain: Record<string, jest.Mock> = {};
+    const self = () => chain;
+    for (const method of ['populate', 'sort', 'skip', 'limit', 'lean']) {
+      chain[method] = jest.fn(self);
+    }
+    chain.exec = jest.fn().mockResolvedValue([]);
+    mockTreatmentModel.find.mockImplementation((filter: Record<string, unknown>) => {
+      captured = filter;
+      return chain;
+    });
+    mockTreatmentModel.countDocuments.mockImplementation(async (filter: Record<string, unknown>) => {
+      captured = filter;
+      return 2;
+    });
+
+    const result = await service.findAll({ since, page: 1, limit: 1 });
+
+    expect(result.total).toBe(2);
+    expect(captured?.treatmentDate).toBeUndefined();
+    expect(captured?.createdAt).toEqual({ $gt: new Date(since) });
+    expect(captured?.isDeleted).toEqual({ $ne: true });
+  });
 });

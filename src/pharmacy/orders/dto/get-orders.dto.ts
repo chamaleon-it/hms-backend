@@ -28,4 +28,10 @@ export class GetOrdersDto {
   @IsDate()
   @Type(() => Date)
   endDate?: Date;
+
+  /** Orders created strictly after this instant. */
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  since?: Date;
 }
