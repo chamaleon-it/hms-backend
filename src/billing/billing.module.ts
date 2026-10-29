@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -16,7 +16,7 @@ import { AccountsModule } from 'src/accounts/accounts.module';
     ]),
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
     UsersModule,
-    AccountsModule,
+    forwardRef(() => AccountsModule),
   ],
   controllers: [BillingController],
   providers: [BillingService],

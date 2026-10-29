@@ -150,6 +150,7 @@ export class OrdersService {
     bill.upi = split.upi;
     bill.status = paidAmount + 0.009 >= payable ? 'Completed' : 'Draft';
     await bill.save();
+    await this.billingService.recordPharmacySaleReceipt(bill);
   }
 
   private async generateUniqueMRN(): Promise<string> {
@@ -1106,18 +1107,21 @@ export class OrdersService {
       .populate('items.name')
       .lean();
 
-    if (data?.billNo) {
-      await this.billingModel
-        .findOneAndUpdate(
-          { mrn: data?.billNo },
-          { cash: data.paidAmount },
-          { new: true, runValidators: true },
-        )
-        .lean();
-    }
+    const paidBill = data?.billNo
+      ? await this.billingModel
+          .findOneAndUpdate(
+            { mrn: data.billNo },
+            { cash: data.paidAmount },
+            { new: true, runValidators: true },
+          )
+          .lean()
+      : null;
 
     if (!data) {
       throw new NotFoundException('Order not found');
+    }
+    if (paidBill) {
+      await this.billingService.recordPharmacySaleReceipt(paidBill);
     }
     return data;
   }

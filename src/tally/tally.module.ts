@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TallyController } from './tally.controller';
 import { TallyService } from './tally.service';
+import { BillingModule } from 'src/billing/billing.module';
 import {
   TallyConnection,
   TallyConnectionSchema,
@@ -17,6 +18,7 @@ import {
       { name: TallyConnection.name, schema: TallyConnectionSchema },
       { name: AccountTransaction.name, schema: AccountTransactionSchema },
     ]),
+    forwardRef(() => BillingModule),
   ],
   controllers: [TallyController],
   providers: [TallyService],

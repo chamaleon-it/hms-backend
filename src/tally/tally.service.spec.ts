@@ -219,6 +219,42 @@ describe('TallyService.syncAccountTransaction ledger routing', () => {
     expect(postedXml).toContain('Purchase Payments');
   });
 
+  it('backfills paid pharmacy sale receipts before reading pending vouchers', async () => {
+    const backfillPaidPharmacyReceipts = jest.fn().mockResolvedValue(undefined);
+    const sort = jest.fn().mockResolvedValue([]);
+    const find = jest.fn().mockReturnValue({ sort });
+    const connectionModel = {
+      findOne: jest.fn().mockResolvedValue(connectedDoc),
+    };
+    const service = new TallyService(
+      connectionModel as never,
+      { find } as never,
+      { backfillPaidPharmacyReceipts } as never,
+    );
+    jest.spyOn(service, 'testConnection').mockResolvedValue({
+      ok: true,
+      message: 'ok',
+    } as Awaited<ReturnType<TallyService['testConnection']>>);
+    jest
+      .spyOn(
+        service as unknown as { ensureDefaultLedgers: () => Promise<void> },
+        'ensureDefaultLedgers',
+      )
+      .mockResolvedValue(undefined);
+
+    await service.syncPending();
+
+    expect(backfillPaidPharmacyReceipts).toHaveBeenCalledTimes(1);
+    expect(find).toHaveBeenCalledWith({
+      isDeleted: { $ne: true },
+      tallySynced: { $ne: true },
+      amount: { $gt: 0 },
+    });
+    expect(
+      backfillPaidPharmacyReceipts.mock.invocationCallOrder[0],
+    ).toBeLessThan(find.mock.invocationCallOrder[0]);
+  });
+
   it('falls back to the generic ledger pair for categories outside the four product ledgers', async () => {
     const { service } = createService();
     const { outcome, postedXml } = await syncAndCapture(service, {

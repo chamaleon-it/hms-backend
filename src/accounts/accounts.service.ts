@@ -93,6 +93,11 @@ export class AccountsService {
     notes?: string;
     createdBy?: string | mongoose.Types.ObjectId;
     transactionDate?: Date;
+    /**
+     * Skip the immediate Tally push. Used when a sync is about to export
+     * the new row itself, so the same request cannot post it twice.
+     */
+    deferTally?: boolean;
   }) {
     if (!params.amount || params.amount <= 0) return null;
 
@@ -130,7 +135,7 @@ export class AccountsService {
       });
 
       const saved = await newTransaction.save();
-      this.pushToTally(saved);
+      if (!params.deferTally) this.pushToTally(saved);
       return saved;
     } catch (err) {
       console.error(
@@ -139,6 +144,30 @@ export class AccountsService {
       );
       return null;
     }
+  }
+
+  /**
+   * Medicine Sale income already recorded for one invoice. The bill number
+   * must end the match so INV-0306 does not swallow INV-03061.
+   */
+  async sumMedicineSaleReceipts(mrn: string): Promise<number> {
+    const trimmed = String(mrn || '').trim();
+    if (!trimmed) return 0;
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const [row] = await this.accountTransactionModel.aggregate<{
+      total?: number;
+    }>([
+      {
+        $match: {
+          isDeleted: { $ne: true },
+          type: TransactionType.Income,
+          category: IncomeCategory.MedicineSale,
+          description: { $regex: `Bill #${escaped}(?:\\s|\\(|$)` },
+        },
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    return Number(row?.total) || 0;
   }
 
   async create(
