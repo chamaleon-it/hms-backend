@@ -37,6 +37,7 @@ import {
 
 import configuration from 'src/config/configuration';
 import { resolveSaleLine } from 'src/pharmacy/sale-line';
+import { pharmacySaleReceipts } from './pharmacy-receipt';
 
 @Injectable()
 export class BillingService {
@@ -1628,5 +1629,70 @@ export class BillingService {
       objectId,
       message: `Successfully converted "${trimmed}" to ObjectId: ${objectId}`,
     };
+  }
+
+  /**
+   * Pharmacy sales are created with no cash/card/UPI. Payment is written
+   * onto the bill afterwards and, until this call, never became an account
+   * receipt — so Tally exported pharmacy returns but not medicine sales.
+   * Receipt amount is only cash + card + UPI still missing from Medicine
+   * Sale rows for this invoice. Unpaid bills and returns/refunds are skipped.
+   */
+  async recordPharmacySaleReceipt(
+    bill: {
+      mrn?: string | null;
+      billingCategory?: string | null;
+      transactionType?: string | null;
+      cash?: number | null;
+      card?: number | null;
+      upi?: number | null;
+      user?: string | mongoose.Types.ObjectId | null;
+      createdAt?: Date | string | null;
+    },
+    options?: { deferTally?: boolean },
+  ) {
+    try {
+      const mrn = String(bill?.mrn || '').trim();
+      if (!mrn) return;
+      const already = await this.accountsService.sumMedicineSaleReceipts(mrn);
+      const lines = pharmacySaleReceipts(bill, already);
+      const parsed = bill.createdAt ? new Date(bill.createdAt) : new Date();
+      const transactionDate = Number.isNaN(parsed.getTime())
+        ? new Date()
+        : parsed;
+      for (const line of lines) {
+        await this.accountsService.recordTransaction({
+          type: TransactionType.Income,
+          category: IncomeCategory.MedicineSale,
+          amount: line.amount,
+          description: `Pharmacy Bill #${mrn} (${line.method})`,
+          paymentMethod: line.method as PaymentMethod,
+          sourceModule: SourceModule.Pharmacy,
+          ledgerGroup: TallyLedgerGroup.Pharmacy,
+          createdBy: bill.user ?? undefined,
+          transactionDate,
+          ...(options?.deferTally ? { deferTally: true } : {}),
+        });
+      }
+    } catch (err) {
+      console.error('Error recording pharmacy sale receipt:', err);
+    }
+  }
+
+  /** Paid pharmacy sales that never produced a receipt, included in the next sync. */
+  async backfillPaidPharmacyReceipts() {
+    const bills = await this.billingModel
+      .find({
+        billingCategory: 'Pharmacy',
+        transactionType: { $nin: ['Refund', 'Return'] },
+        $or: [{ cash: { $gt: 0 } }, { card: { $gt: 0 } }, { upi: { $gt: 0 } }],
+      })
+      .select(
+        'mrn billingCategory transactionType cash card upi user createdAt',
+      )
+      .lean();
+    for (const bill of bills) {
+      await this.recordPharmacySaleReceipt(bill, { deferTally: true });
+    }
   }
 }
