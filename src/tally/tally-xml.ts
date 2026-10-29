@@ -78,7 +78,47 @@ export type VoucherLine = {
   /** true = Debit (ISDEEMEDPOSITIVE Yes), false = Credit */
   isDebit: boolean;
   amount: number;
+  /**
+   * Tally cost centre for this ledger line. Omitted lines stay plain
+   * ledger entries — no cost centre is invented.
+   */
+  costCentre?: string;
 };
+
+/** Same Import Data envelope as createLedgerXml, for a cost centre master. */
+export function createCostCentreXml(
+  name: string,
+  companyName?: string,
+): string {
+  const companyBlock = companyName
+    ? `<SVCURRENTCOMPANY>${escapeXml(companyName)}</SVCURRENTCOMPANY>`
+    : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>All Masters</REPORTNAME>
+        <STATICVARIABLES>
+          ${companyBlock}
+        </STATICVARIABLES>
+      </REQUESTDESC>
+      <REQUESTDATA>
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+          <COSTCENTRE NAME="${escapeXml(name)}" ACTION="Create">
+            <NAME>${escapeXml(name)}</NAME>
+            <PARENT></PARENT>
+            <CATEGORY>Primary Cost Category</CATEGORY>
+          </COSTCENTRE>
+        </TALLYMESSAGE>
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>`;
+}
 
 export function createVoucherXml(opts: {
   voucherType: 'Receipt' | 'Payment';
@@ -97,10 +137,24 @@ export function createVoucherXml(opts: {
       const abs = Math.abs(line.amount).toFixed(2);
       // Tally convention: debit amounts are negative with ISDEEMEDPOSITIVE=Yes
       const amount = line.isDebit ? `-${abs}` : abs;
+      const deemed = line.isDebit ? 'Yes' : 'No';
+      const centre = String(line.costCentre || '').trim();
+      const costCentreXml = centre
+        ? `
+              <CATEGORYALLOCATIONS.LIST>
+                <CATEGORY>Primary Cost Category</CATEGORY>
+                <ISDEEMEDPOSITIVE>${deemed}</ISDEEMEDPOSITIVE>
+                <COSTCENTREALLOCATIONS.LIST>
+                  <NAME>${escapeXml(centre)}</NAME>
+                  <ISDEEMEDPOSITIVE>${deemed}</ISDEEMEDPOSITIVE>
+                  <AMOUNT>${amount}</AMOUNT>
+                </COSTCENTREALLOCATIONS.LIST>
+              </CATEGORYALLOCATIONS.LIST>`
+        : '';
       return `<ALLLEDGERENTRIES.LIST>
               <LEDGERNAME>${escapeXml(line.ledgerName)}</LEDGERNAME>
-              <ISDEEMEDPOSITIVE>${line.isDebit ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-              <AMOUNT>${amount}</AMOUNT>
+              <ISDEEMEDPOSITIVE>${deemed}</ISDEEMEDPOSITIVE>
+              <AMOUNT>${amount}</AMOUNT>${costCentreXml}
             </ALLLEDGERENTRIES.LIST>`;
     })
     .join('\n            ');

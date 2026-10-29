@@ -76,19 +76,35 @@ function createHarness() {
     },
   };
 
+  const recordedTransactions: Array<Record<string, unknown>> = [];
+  const accountsService = {
+    recordTransaction: jest.fn((params: Record<string, unknown>) => {
+      recordedTransactions.push(params);
+      return Promise.resolve(params);
+    }),
+  };
+
   const service = new PurchaseEntryService(
     purchaseEntryModel as never,
     {} as never,
     supplierModel as never,
     supplierPaymentModel as never,
+    accountsService as never,
   );
 
-  return { service, bills, payments, supplierWrites: () => supplierWrites };
+  return {
+    service,
+    bills,
+    payments,
+    recordedTransactions,
+    supplierWrites: () => supplierWrites,
+  };
 }
 
 describe('PurchaseEntryService.recordSupplierPayment', () => {
   it('stores the split and leaves 4500 due on the newer bill', async () => {
-    const { service, bills, payments, supplierWrites } = createHarness();
+    const { service, bills, payments, recordedTransactions, supplierWrites } =
+      createHarness();
 
     const saved = await service.recordSupplierPayment(supplierId, {
       cash: 2000,
@@ -134,6 +150,23 @@ describe('PurchaseEntryService.recordSupplierPayment', () => {
         dueAmount: 4500,
       }),
     ]);
+
+    // Purchase Payment exports to Tally keep the cash/card/UPI split as
+    // separate vouchers instead of collapsing to one dominant mode.
+    expect(recordedTransactions).toHaveLength(3);
+    expect(recordedTransactions.map((tx) => tx.amount)).toEqual([
+      2000, 3000, 1500,
+    ]);
+    expect(recordedTransactions.map((tx) => tx.paymentMethod)).toEqual([
+      'Cash',
+      'Card',
+      'UPI',
+    ]);
+    expect(
+      recordedTransactions.every(
+        (tx) => tx.category === 'Purchase Payment' && tx.ledgerGroup === 'Purchase',
+      ),
+    ).toBe(true);
   });
 
   it('does not store a payment that exceeds the due', async () => {

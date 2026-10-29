@@ -12,6 +12,7 @@ import {
 } from './schemas/supplier-payment.schema';
 import { ItemsModule } from 'src/pharmacy/items/items.module';
 import { Supplier, SupplierSchema } from '../schemas/supplier.schema';
+import { AccountsModule } from 'src/accounts/accounts.module';
 
 @Module({
   controllers: [PurchaseEntryController],
@@ -25,6 +26,7 @@ import { Supplier, SupplierSchema } from '../schemas/supplier.schema';
     MongooseModule.forFeature([
       { name: Supplier.name, schema: SupplierSchema },
     ]),
+    AccountsModule,
   ],
 })
 export class PurchaseEntryModule {}

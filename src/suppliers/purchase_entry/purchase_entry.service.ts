@@ -21,6 +21,14 @@ import {
   compareOpenInvoices,
   planSupplierPayment,
 } from './supplier-payment.allocation';
+import { AccountsService } from 'src/accounts/accounts.service';
+import {
+  ExpenseCategory,
+  PaymentMethod,
+  SourceModule,
+  TransactionType,
+} from 'src/accounts/enums/account-transaction.enum';
+import { TallyLedgerGroup } from 'src/accounts/ledger-group';
 
 /** Payments shown per page in the supplier payment history modal. */
 export const SUPPLIER_PAYMENT_PAGE_SIZE = 5;
@@ -34,7 +42,39 @@ export class PurchaseEntryService {
     @InjectModel(Supplier.name) private supplierModel: Model<Supplier>,
     @InjectModel(SupplierPayment.name)
     private supplierPaymentModel: Model<SupplierPayment>,
+    private readonly accountsService: AccountsService,
   ) {}
+
+  /**
+   * Export the Cash/Card/UPI actually paid to a supplier as a Purchase
+   * Payment voucher. Never the full invoice or the remaining due — only
+   * the amount handed over right now. Non-throwing: Tally export must
+   * never block a purchase entry or supplier payment from saving.
+   */
+  private async recordPurchasePayment(params: {
+    amount: number;
+    description: string;
+    paymentMethod?: PaymentMethod;
+  }) {
+    if (!params.amount || params.amount <= 0) return;
+    try {
+      await this.accountsService.recordTransaction({
+        type: TransactionType.Expense,
+        category: ExpenseCategory.PurchasePayment,
+        amount: params.amount,
+        description: params.description,
+        paymentMethod: params.paymentMethod,
+        sourceModule: SourceModule.Purchase,
+        ledgerGroup: TallyLedgerGroup.Purchase,
+        transactionDate: new Date(),
+      });
+    } catch (err) {
+      console.error(
+        'Error recording account transaction for Purchase Payment:',
+        err,
+      );
+    }
+  }
 
   async create(createPurchaseEntryDto: CreatePurchaseEntryDto) {
     if (createPurchaseEntryDto.paidAmount > createPurchaseEntryDto.total) {
@@ -86,6 +126,16 @@ export class PurchaseEntryService {
         },
       );
     }
+
+    // Export only the amount actually paid now — never the full invoice
+    // or the remaining due. No cash/card/UPI split is captured at entry
+    // creation time today, so this posts as Cash (see Tally export notes).
+    await this.recordPurchasePayment({
+      amount: createPurchaseEntryDto.paidAmount,
+      description: `Purchase Payment for Invoice #${createPurchaseEntryDto.invoiceNumber}`,
+      paymentMethod: PaymentMethod.Cash,
+    });
+
     return data;
   }
 
@@ -200,7 +250,17 @@ export class PurchaseEntryService {
     if (data.paidAmount < data.total) {
       data.paymentStatus = PaymentStatus.PARTIALLY_PAID;
     }
-    return await data.save();
+    const saved = await data.save();
+
+    // No cash/card/UPI split is captured on this endpoint today, so this
+    // posts as Cash (see Tally export notes).
+    await this.recordPurchasePayment({
+      amount: addPaymentDto.paidAmount,
+      description: `Purchase Payment for Invoice #${saved.invoiceNumber}`,
+      paymentMethod: PaymentMethod.Cash,
+    });
+
+    return saved;
   }
 
   async listOpenInvoices(supplierId: string) {
@@ -240,7 +300,7 @@ export class PurchaseEntryService {
     supplierId: string,
     dto: RecordSupplierPaymentDto,
   ) {
-    await this.requireSupplier(supplierId);
+    const supplier = await this.requireSupplier(supplierId);
     const entries = await this.purchaseEntryModel
       .find({ supplier: supplierId })
       .exec();
@@ -289,7 +349,7 @@ export class PurchaseEntryService {
         applied.push(update);
       }
 
-      return await this.supplierPaymentModel.create({
+      const payment = await this.supplierPaymentModel.create({
         supplier: supplierId,
         cash: plan.cash,
         card: plan.card,
@@ -302,6 +362,23 @@ export class PurchaseEntryService {
           amount: allocation.amount,
         })),
       });
+
+      // Keep the cash/card/UPI split on separate Purchase Payment vouchers,
+      // the same way this payment is split across modes here.
+      const modeAmounts: Array<{ amount: number; method: PaymentMethod }> = [
+        { amount: plan.cash, method: PaymentMethod.Cash },
+        { amount: plan.card, method: PaymentMethod.Card },
+        { amount: plan.upi, method: PaymentMethod.UPI },
+      ];
+      for (const mode of modeAmounts) {
+        await this.recordPurchasePayment({
+          amount: mode.amount,
+          description: `Purchase Payment to ${supplier.name} (${mode.method})`,
+          paymentMethod: mode.method,
+        });
+      }
+
+      return payment;
     } catch (error) {
       for (const update of [...applied].reverse()) {
         await this.purchaseEntryModel.updateOne(

@@ -42,4 +42,28 @@ export class ConnectTallyDto {
   @IsOptional()
   @IsString()
   expenseLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  pharmacyPaymentLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  therapyReceiptLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  therapyPaymentLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  receptionReceiptLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  receptionPaymentLedger?: string;
+
+  @IsOptional()
+  @IsString()
+  purchasePaymentLedger?: string;
 }

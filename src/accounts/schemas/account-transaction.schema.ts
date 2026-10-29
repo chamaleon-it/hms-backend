@@ -5,6 +5,7 @@ import {
   SourceModule,
   TransactionType,
 } from '../enums/account-transaction.enum';
+import { TallyLedgerGroup } from '../ledger-group';
 
 export type AccountTransactionDocument = HydratedDocument<AccountTransaction>;
 
@@ -43,6 +44,22 @@ export class AccountTransaction {
 
   @Prop({ required: false })
   notes?: string;
+
+  /**
+   * Explicit Tally ledger routing hint (Pharmacy / Therapy / Reception /
+   * Purchase). Falls back to inference from `category` when absent — see
+   * `ledgerGroupForCategory`. Used only for Payment-method correction
+   * entries whose category (PaymentCorrection) does not identify a ledger.
+   */
+  @Prop({ required: false, enum: TallyLedgerGroup, type: String })
+  ledgerGroup?: TallyLedgerGroup;
+
+  /**
+   * Therapist name used as the Tally cost centre. Set only for a
+   * procedure/therapy voucher that already has a therapist.
+   */
+  @Prop({ required: false })
+  costCentre?: string;
 
   @Prop({ required: true, type: Date })
   transactionDate: Date;
