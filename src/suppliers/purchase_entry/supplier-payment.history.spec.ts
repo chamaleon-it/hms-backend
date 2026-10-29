@@ -62,6 +62,7 @@ describe('PurchaseEntryService.listSupplierPayments', () => {
         }),
       } as never,
       supplierPaymentModel as never,
+      { recordTransaction: jest.fn() } as never,
     );
 
     const page = await service.listSupplierPayments(supplierId, {});
@@ -111,6 +112,7 @@ describe('PurchaseEntryService.listSupplierPayments', () => {
           return query;
         },
       } as never,
+      { recordTransaction: jest.fn() } as never,
     );
 
     const page = await service.listSupplierPayments(supplierId, { page: 1 });
