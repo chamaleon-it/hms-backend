@@ -830,8 +830,10 @@ export class OrdersService {
             );
             if (!bill) throw new BadRequestException('Bill changed while completing the order. Refresh and retry.');
             order.paidAmount = paid;
-            order.paymentStatus = paid <= 0 ? PaymentStatus.Pending :
-              paid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
+            const grossPaid = Math.round(((existingBill.cash || 0) + (existingBill.online || 0) +
+              (existingBill.card || 0)) * 100) / 100;
+            order.paymentStatus = grossPaid <= 0 ? PaymentStatus.Pending :
+              grossPaid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
           } else {
             const bill = await this.billingService.generateBill({
               patient: order.patient,

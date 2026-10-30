@@ -178,4 +178,37 @@ describe('BillingService money rules', () => {
       expect.anything(),
     );
   });
+
+  it('treats a fully collected, partially refunded bill as paid', async () => {
+    const { service, billingModel } = makeService();
+    const session = {
+      withTransaction: async (callback: () => Promise<void>) => callback(),
+      endSession: jest.fn(),
+    };
+    billingModel.db.startSession.mockResolvedValue(session);
+    billingModel.findOne.mockReturnValue({
+      session: async () => ({
+        mrn: 'INV0001', items: [{ total: 50 }], cash: 50, online: 0,
+        card: 0, refund: 25, discount: 0, transactionType: 'Sale',
+      }),
+    });
+
+    await expect(service.markAsPaid(
+      '507f1f77bcf86cd799439013' as any,
+      '507f1f77bcf86cd799439012' as any,
+    )).rejects.toThrow('no remaining balance');
+    expect(billingModel.findOneAndUpdate).not.toHaveBeenCalled();
+
+    const orderModel = { findOneAndUpdate: jest.fn() };
+    (service as any).orderModel = orderModel;
+    await (service as any).syncLinkedOrderPayment({
+      mrn: 'INV0001', items: [{ total: 50 }], cash: 50, online: 0,
+      card: 0, refund: 25, discount: 0, transactionType: 'Sale',
+    });
+    expect(orderModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { billNo: 'INV0001' },
+      { $set: { paidAmount: 25, paymentStatus: 'Paid' } },
+      { session: undefined },
+    );
+  });
 });

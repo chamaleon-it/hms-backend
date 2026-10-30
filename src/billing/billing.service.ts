@@ -112,8 +112,9 @@ export class BillingService {
     const payable = this.roundMoney(total - (bill.discount || 0));
     const paid = this.roundMoney((bill.cash || 0) + (bill.online || 0) +
       (bill.card || 0) - (bill.refund || 0));
-    const paymentStatus = paid <= 0 ? PaymentStatus.Pending :
-      paid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
+    const grossPaid = this.roundMoney((bill.cash || 0) + (bill.online || 0) + (bill.card || 0));
+    const paymentStatus = grossPaid <= 0 ? PaymentStatus.Pending :
+      grossPaid >= payable ? PaymentStatus.Paid : PaymentStatus.Partial;
     await this.orderModel.findOneAndUpdate(
       { billNo: bill.mrn },
       { $set: { paidAmount: paid, paymentStatus } },
@@ -982,7 +983,7 @@ export class BillingService {
           0,
         );
         const paid =
-          (bill.cash || 0) + (bill.online || 0) + (bill.card || 0) - (bill.refund || 0);
+          (bill.cash || 0) + (bill.online || 0) + (bill.card || 0);
         const balance = Math.max(
           0,
           Number((total - (bill.discount || 0) - paid).toFixed(2)),
