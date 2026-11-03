@@ -1,4 +1,4 @@
 'use strict';
 
-// Alternate entry. Cloudways is configured to start ./dist/main.js directly.
+// Root entry if Cloudways is pointed at server.js instead of ./dist/main.js.
 require('./dist/main.js');

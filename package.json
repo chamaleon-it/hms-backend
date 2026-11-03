@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "node dist/main.js",
+    "start": "node ./dist/main.js",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main.js",
+    "start:prod": "node ./dist/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -95,10 +95,7 @@
     "testEnvironment": "node"
   },
   "main": "dist/main.js",
-  "engines": {
-    "node": ">=20"
-  },
-  "bin": "dist/main.js",
+  "bin": "server.js",
   "pkg": {
     "assets": [
       "node_modules/**/*",
