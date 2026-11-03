@@ -1,5 +1,6 @@
 
-/dist
+/dist/**
+!/dist/main.js
 /node_modules
 /build
 
