@@ -38,16 +38,17 @@ exports.ensureUploadsDir = ensureUploadsDir;
 const multer_1 = require("multer");
 const path_1 = require("path");
 const fs = __importStar(require("fs"));
-exports.UPLOADS_DIR = (0, path_1.join)(process.cwd(), 'uploads');
+const storage_paths_1 = require("../config/storage-paths");
+Object.defineProperty(exports, "UPLOADS_DIR", { enumerable: true, get: function () { return storage_paths_1.UPLOADS_DIR; } });
 function ensureUploadsDir() {
-    if (!fs.existsSync(exports.UPLOADS_DIR)) {
-        fs.mkdirSync(exports.UPLOADS_DIR, { recursive: true });
+    if (!fs.existsSync(storage_paths_1.UPLOADS_DIR)) {
+        fs.mkdirSync(storage_paths_1.UPLOADS_DIR, { recursive: true });
     }
 }
 exports.storage = (0, multer_1.diskStorage)({
     destination: (_req, _file, cb) => {
         ensureUploadsDir();
-        cb(null, exports.UPLOADS_DIR);
+        cb(null, storage_paths_1.UPLOADS_DIR);
     },
     filename: (_req, file, cb) => {
         const unique = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;

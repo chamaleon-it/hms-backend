@@ -1,8 +1,9 @@
 import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { extname } from 'path';
 import * as fs from 'fs';
+import { UPLOADS_DIR } from '../config/storage-paths';
 
-export const UPLOADS_DIR = join(process.cwd(), 'uploads');
+export { UPLOADS_DIR };
 
 export function ensureUploadsDir() {
   if (!fs.existsSync(UPLOADS_DIR)) {

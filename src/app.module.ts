@@ -7,13 +7,13 @@ import configuration from './config/configuration';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { MongooseModule } from '@nestjs/mongoose';
+import { UPLOADS_DIR } from './config/storage-paths';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { PatientsModule } from './patients/patients.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { BillingModule } from './billing/billing.module';
 import { ConsultingsModule } from './consultings/consultings.module';
 import { ItemsModule } from './pharmacy/items/items.module';
@@ -49,7 +49,7 @@ import { TallyModule } from './tally/tally.module';
     }),
     MongooseModule.forRoot(configuration().databaseUrl),
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
+      rootPath: UPLOADS_DIR,
       serveRoot: '/uploads',
     }),
     UsersModule,

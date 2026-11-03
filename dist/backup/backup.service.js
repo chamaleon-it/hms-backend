@@ -52,10 +52,11 @@ const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const storage_paths_1 = require("../config/storage-paths");
 let BackupService = BackupService_1 = class BackupService {
     connection;
     logger = new common_1.Logger(BackupService_1.name);
-    backupDir = path.join(process.cwd(), 'backups');
+    backupDir = storage_paths_1.BACKUPS_DIR;
     constructor(connection) {
         this.connection = connection;
         if (!fs.existsSync(this.backupDir)) {
