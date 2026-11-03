@@ -5,8 +5,5 @@ import { join } from 'path';
 // and dist/config in production are both two levels below the project root.
 const applicationRoot = join(__dirname, '..', '..');
 
-export const UPLOADS_DIR =
-  process.env.UPLOADS_DIR?.trim() || join(applicationRoot, 'uploads');
-
 export const BACKUPS_DIR =
   process.env.BACKUPS_DIR?.trim() || join(applicationRoot, 'backups');

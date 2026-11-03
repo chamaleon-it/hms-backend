@@ -19,13 +19,10 @@ const configuration_1 = __importDefault(require("./config/configuration"));
 const config_1 = require("@nestjs/config");
 const throttler_1 = require("@nestjs/throttler");
 const mongoose_1 = require("@nestjs/mongoose");
-const storage_paths_1 = require("./config/storage-paths");
 const auth_module_1 = require("./auth/auth.module");
 const auth_guard_1 = require("./auth/auth.guard");
 const appointments_module_1 = require("./appointments/appointments.module");
 const patients_module_1 = require("./patients/patients.module");
-const uploads_module_1 = require("./uploads/uploads.module");
-const serve_static_1 = require("@nestjs/serve-static");
 const billing_module_1 = require("./billing/billing.module");
 const consultings_module_1 = require("./consultings/consultings.module");
 const items_module_1 = require("./pharmacy/items/items.module");
@@ -63,15 +60,10 @@ exports.AppModule = AppModule = __decorate([
                 load: [configuration_1.default],
             }),
             mongoose_1.MongooseModule.forRoot((0, configuration_1.default)().databaseUrl),
-            serve_static_1.ServeStaticModule.forRoot({
-                rootPath: storage_paths_1.UPLOADS_DIR,
-                serveRoot: '/uploads',
-            }),
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
             appointments_module_1.AppointmentsModule,
             patients_module_1.PatientsModule,
-            uploads_module_1.UploadsModule,
             billing_module_1.BillingModule,
             consultings_module_1.ConsultingsModule,
             items_module_1.ItemsModule,
