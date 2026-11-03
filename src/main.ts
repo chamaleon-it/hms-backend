@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as express from 'express';
 import { validateEnv } from './config/validate-env';
+import { listenPort } from './config/listen-port';
 
 async function bootstrap() {
   validateEnv();
@@ -44,7 +45,10 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-lis-api-key'],
     credentials: true,
   });
-  await app.listen(3001, '0.0.0.0');
+
+  // Cloudways injects PORT. Unset PORT keeps the local default.
+  const port = listenPort(process.env.PORT);
+  await app.listen(port, '0.0.0.0');
 }
 
 bootstrap();
