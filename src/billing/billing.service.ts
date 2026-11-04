@@ -18,6 +18,7 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { Order, PaymentStatus } from 'src/pharmacy/orders/schemas/order.schema';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
+import { SettleBillDto } from './dto/settle-bill.dto';
 
 @Injectable()
 export class BillingService {
@@ -432,6 +433,52 @@ export class BillingService {
       { new: true },
     );
     if (!data) throw new NotFoundException('Bill is not found.');
+    return data;
+  }
+
+  async settleBill(
+    id: mongoose.Types.ObjectId,
+    payment: SettleBillDto,
+    user: mongoose.Types.ObjectId,
+  ) {
+    if (!mongoose.isValidObjectId(id))
+      throw new BadRequestException('Please provide a valid bill id');
+
+    const bill = await this.billingModel.findOne({ _id: id, user });
+    if (!bill) throw new NotFoundException('Bill is not found.');
+    if (bill.transactionType !== 'Sale')
+      throw new BadRequestException('Only sale bills can be paid.');
+
+    const due = Math.round(
+      (bill.items.reduce((sum, item) => sum + item.total, 0) -
+        bill.cash - bill.online - bill.insurance - bill.discount) * 100,
+    );
+    const settlement = Math.round(
+      (payment.cash + payment.online + payment.discount) * 100,
+    );
+    if (due <= 0 || settlement !== due)
+      throw new BadRequestException('Cash, UPI/Card, and discount must equal the current due amount.');
+
+    const data = await this.billingModel.findOneAndUpdate(
+      {
+        _id: id,
+        user,
+        cash: bill.cash,
+        online: bill.online,
+        insurance: bill.insurance,
+        discount: bill.discount,
+      },
+      {
+        $inc: {
+          cash: payment.cash,
+          online: payment.online,
+          discount: payment.discount,
+        },
+      },
+      { new: true },
+    );
+    if (!data)
+      throw new BadRequestException('Bill changed. Refresh and try again.');
     return data;
   }
 

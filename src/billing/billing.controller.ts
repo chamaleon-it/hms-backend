@@ -23,6 +23,7 @@ import { MarkAsPaidDto } from './dto/mark-as-paind.dto';
 import { UpdateBillingItemDto } from './dto/update-billing-item.dto';
 import { GetBillDropdownDto } from './dto/get-bill-dropdown.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import { SettleBillDto } from './dto/settle-bill.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -207,6 +208,20 @@ export class BillingController {
     return {
       data,
       message: 'Bill is marked as paid successfully.',
+    };
+  }
+
+  @Patch('settle/:id')
+  @UseGuards(JwtAuthGuard)
+  async settleBill(
+    @Param('id') id: mongoose.Types.ObjectId,
+    @Body() payment: SettleBillDto,
+    @GetUser() user: JWTUserInterface,
+  ) {
+    const data = await this.billingService.settleBill(id, payment, user.id);
+    return {
+      data,
+      message: 'Bill paid successfully.',
     };
   }
 }
