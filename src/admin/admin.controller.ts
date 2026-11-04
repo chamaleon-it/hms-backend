@@ -23,6 +23,7 @@ export class AdminController {
     const { data, total } = await this.billingService.getBills(
       null,
       getBillisDto,
+      true,
     );
     return {
       message: 'All bills retrieved successfully.',

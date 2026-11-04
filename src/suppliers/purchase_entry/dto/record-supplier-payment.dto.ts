@@ -1,7 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, Min } from 'class-validator';
 
 export class RecordSupplierPaymentDto {
+  @IsOptional()
+  @IsDateString({ strict: true })
+  date?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

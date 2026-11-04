@@ -102,6 +102,23 @@ function createHarness() {
 }
 
 describe('PurchaseEntryService.recordSupplierPayment', () => {
+  it('uses the selected date for payment history and accounting', async () => {
+    const { service, payments, recordedTransactions } = createHarness();
+    const selectedDate = '2026-11-04';
+
+    await service.recordSupplierPayment(supplierId, {
+      cash: 100,
+      card: 0,
+      upi: 0,
+      date: selectedDate,
+    });
+
+    expect(payments[0].date).toEqual(new Date('2026-11-04T12:00:00.000Z'));
+    expect(recordedTransactions[0].transactionDate).toEqual(
+      new Date('2026-11-04T12:00:00.000Z'),
+    );
+  });
+
   it('stores the split and leaves 4500 due on the newer bill', async () => {
     const { service, bills, payments, recordedTransactions, supplierWrites } =
       createHarness();

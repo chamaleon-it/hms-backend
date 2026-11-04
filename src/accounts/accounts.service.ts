@@ -44,6 +44,41 @@ export class AccountsService {
     });
   }
 
+  /** A bill is synced only when every active account entry for its invoice is synced. */
+  async billTallySyncStatuses(bills: { _id: unknown; mrn: string }[]) {
+    const patterns = bills.map((bill) => {
+      const escaped = bill.mrn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`#${escaped}(?:\\s|\\(|$)`, 'i');
+    });
+    const statuses = new Map<string, boolean>();
+    if (patterns.length === 0) return statuses;
+
+    const transactions = await this.accountTransactionModel
+      .find({
+        isDeleted: { $ne: true },
+        $or: [
+          { billingId: { $in: bills.map((bill) => bill._id) } },
+          { billingId: null, description: { $in: patterns } },
+        ],
+      })
+      .select('billingId description tallySynced')
+      .lean()
+      .exec();
+
+    for (const [index, bill] of bills.entries()) {
+      const related = transactions.filter((tx) =>
+        tx.billingId
+          ? String(tx.billingId) === String(bill._id)
+          : patterns[index].test(tx.description),
+      );
+      statuses.set(
+        String(bill._id),
+        related.length > 0 && related.every((tx) => tx.tallySynced === true),
+      );
+    }
+    return statuses;
+  }
+
   private async generateTransactionId(): Promise<string> {
     const lastDoc = await this.accountTransactionModel
       .findOne({}, { transactionId: 1 })
@@ -84,6 +119,7 @@ export class AccountsService {
     category: string;
     amount: number;
     description: string;
+    billingId?: string;
     paymentMethod?: PaymentMethod;
     sourceModule?: SourceModule;
     /** Explicit Tally ledger override — see ledgerGroupForCategory. */
@@ -125,6 +161,7 @@ export class AccountsService {
         category: params.category,
         amount: Math.abs(params.amount),
         description: params.description,
+        billingId: params.billingId,
         paymentMethod: params.paymentMethod || PaymentMethod.Cash,
         sourceModule: params.sourceModule || SourceModule.Uncategorised,
         ledgerGroup: params.ledgerGroup,

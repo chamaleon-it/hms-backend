@@ -375,6 +375,7 @@ export class BillingService {
           category,
           amount: billAmount,
           description: `${sourceModule} ${ncfPayment ? 'NCF' : isRefund ? 'Refund' : isReturn ? 'Return' : 'Bill'} #${data.mrn}`,
+          billingId: String(data._id),
           paymentMethod,
           sourceModule,
           ...(ncfPayment
@@ -440,6 +441,7 @@ export class BillingService {
   async getBills(
     user: mongoose.Types.ObjectId | null,
     getBillisDto: GetBillisDto,
+    includeTallySync = false,
   ) {
     const {
       page = 1,
@@ -755,6 +757,13 @@ export class BillingService {
     await this.attachSessionTherapists(data);
     await this.enrichBillingCategories(data);
     await this.repairZeroPricedBills(data);
+
+    if (includeTallySync) {
+      const statuses = await this.accountsService.billTallySyncStatuses(data);
+      for (const bill of data) {
+        bill.tallySynced = statuses.get(String(bill._id)) ?? false;
+      }
+    }
 
     return { data, total };
   }
@@ -1262,6 +1271,7 @@ export class BillingService {
           category,
           amount: totalNewPaid,
           description: `${sourceModule} ${ncfPayment ? 'NCF' : isRefund ? 'Refund' : isReturn ? 'Return' : 'Payment'} for Bill #${data.mrn}`,
+          billingId: String(data._id),
           paymentMethod,
           sourceModule,
           ...(ncfPayment
@@ -1460,6 +1470,7 @@ export class BillingService {
               category: correctionCategory,
               amount,
               description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} reduced)`,
+              billingId: String(data._id),
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
@@ -1486,6 +1497,7 @@ export class BillingService {
               category: reverseCorrectionCategory,
               amount: reassigned,
               description: `${sourceModule} payment method correction for Bill #${data.mrn} (${d.method} increased)`,
+              billingId: String(data._id),
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
@@ -1504,6 +1516,7 @@ export class BillingService {
               category,
               amount: fresh,
               description: `${sourceModule} ${paymentLabel} for Bill #${data.mrn} (${d.method})`,
+              billingId: String(data._id),
               paymentMethod: d.method,
               sourceModule,
               ledgerGroup,
@@ -1640,6 +1653,7 @@ export class BillingService {
    */
   async recordPharmacySaleReceipt(
     bill: {
+      _id?: unknown;
       mrn?: string | null;
       billingCategory?: string | null;
       transactionType?: string | null;
@@ -1666,6 +1680,7 @@ export class BillingService {
           category: IncomeCategory.MedicineSale,
           amount: line.amount,
           description: `Pharmacy Bill #${mrn} (${line.method})`,
+          billingId: bill._id ? String(bill._id) : undefined,
           paymentMethod: line.method as PaymentMethod,
           sourceModule: SourceModule.Pharmacy,
           ledgerGroup: TallyLedgerGroup.Pharmacy,

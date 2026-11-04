@@ -26,6 +26,10 @@ export class AccountTransaction {
   @Prop({ required: true })
   description: string;
 
+  /** Source bill for receipts, refunds, and payment corrections. */
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Billing', index: true })
+  billingId?: mongoose.Types.ObjectId;
+
   @Prop({
     required: false,
     enum: PaymentMethod,

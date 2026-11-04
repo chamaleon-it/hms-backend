@@ -55,6 +55,7 @@ export class PurchaseEntryService {
     amount: number;
     description: string;
     paymentMethod?: PaymentMethod;
+    transactionDate?: Date;
   }) {
     if (!params.amount || params.amount <= 0) return;
     try {
@@ -66,7 +67,7 @@ export class PurchaseEntryService {
         paymentMethod: params.paymentMethod,
         sourceModule: SourceModule.Purchase,
         ledgerGroup: TallyLedgerGroup.Purchase,
-        transactionDate: new Date(),
+        transactionDate: params.transactionDate ?? new Date(),
       });
     } catch (err) {
       console.error(
@@ -300,6 +301,16 @@ export class PurchaseEntryService {
     supplierId: string,
     dto: RecordSupplierPaymentDto,
   ) {
+    const paymentDate = dto.date
+      ? new Date(
+          /^\d{4}-\d{2}-\d{2}$/.test(dto.date)
+            ? `${dto.date}T12:00:00.000Z`
+            : dto.date,
+        )
+      : new Date();
+    if (Number.isNaN(paymentDate.getTime())) {
+      throw new BadRequestException('Invalid payment date');
+    }
     const supplier = await this.requireSupplier(supplierId);
     const entries = await this.purchaseEntryModel
       .find({ supplier: supplierId })
@@ -355,7 +366,7 @@ export class PurchaseEntryService {
         card: plan.card,
         upi: plan.upi,
         total: plan.total,
-        date: new Date(),
+        date: paymentDate,
         allocations: plan.allocations.map((allocation) => ({
           purchaseEntry: allocation.purchaseEntryId,
           invoiceNumber: allocation.invoiceNumber,
@@ -375,6 +386,7 @@ export class PurchaseEntryService {
           amount: mode.amount,
           description: `Purchase Payment to ${supplier.name} (${mode.method})`,
           paymentMethod: mode.method,
+          transactionDate: paymentDate,
         });
       }
 
@@ -412,7 +424,7 @@ export class PurchaseEntryService {
       .sort({ date: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .select('date cash card upi total allocations')
+      .select('date createdAt cash card upi total allocations')
       .exec();
 
     return {
