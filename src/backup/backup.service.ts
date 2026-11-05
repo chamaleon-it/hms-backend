@@ -3,11 +3,12 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
 import * as fs from 'fs';
 import * as path from 'path';
+import { BACKUPS_DIR } from '../config/storage-paths';
 
 @Injectable()
 export class BackupService {
   private readonly logger = new Logger(BackupService.name);
-  private readonly backupDir = path.join(process.cwd(), 'backups');
+  private readonly backupDir = BACKUPS_DIR;
 
   constructor(@InjectConnection() private readonly connection: Connection) {
     if (!fs.existsSync(this.backupDir)) {
