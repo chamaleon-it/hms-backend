@@ -213,6 +213,24 @@ export class UsersService {
   }
 
   async syncConsultationValues(id: mongoose.Types.ObjectId, value: string) {
+    let values: unknown;
+    try {
+      values = JSON.parse(value);
+    } catch {
+      throw new BadRequestException('Invalid consultation options.');
+    }
+    const fields = ['presentHistory', 'pastHistory', 'diagnosis'];
+    if (
+      !values || typeof values !== 'object' || Array.isArray(values) ||
+      Object.keys(values).length !== fields.length ||
+      !fields.every((field) => {
+        const items = values[field];
+        return Array.isArray(items) && items.length <= 1000 &&
+          items.every((item) => typeof item === 'string' && item.trim().length > 0 && item.length <= 500);
+      })
+    ) {
+      throw new BadRequestException('Invalid consultation options.');
+    }
     const user = await this.userModel.findById(id).select('consultationValues');
     if (!user) {
       throw new NotFoundException('User not found.');

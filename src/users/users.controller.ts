@@ -17,6 +17,7 @@ import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JWTUserInterface } from 'src/interface/jwt-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateUserDto } from './dto/updateUser.dto';
+import { ConsultationValuesDto } from './dto/consultation-values.dto';
 import { UpdatePasswordDto } from './dto/updatePassword';
 import mongoose from 'mongoose';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -109,7 +110,7 @@ export class UsersController {
   @Post('consultation_values')
   async syncConsultationValues(
     @GetUser() user: JWTUserInterface,
-    @Body() body: { value: string },
+    @Body() body: ConsultationValuesDto,
   ) {
     const data = await this.usersService.syncConsultationValues(
       user.id,
